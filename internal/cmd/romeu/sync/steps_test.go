@@ -171,7 +171,7 @@ func TestRunStepsReleasesTheLockAndTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer again.Close()
+	t.Cleanup(func() { _ = again.Close() })
 	lk2, err := again.Lock()
 	if err != nil {
 		t.Fatalf("the lock is still held after runSteps: %v", err)
