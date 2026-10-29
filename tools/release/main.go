@@ -5,10 +5,17 @@
 // bootstrap):
 //
 //	go run ./tools/release build --version v1.0.0 --dry-run [--out dir]
+//	go run ./tools/release build --host --out path
 //
-// It runs from the root of the repository. Without --dry-run the build
-// asks the latest scheduled fuzz.yml run first, through the GitHub API,
-// with GH_TOKEN and GITHUB_REPOSITORY (owner/name) in its environment;
+// --host is the host-native build: one romeu for the platform it runs
+// on, embedding the julieta linux binary of the same GOARCH, written to
+// path, which must not exist (build.Host). It takes no other flag,
+// writes no archive and reads no network; the e2e of a command that
+// needs julieta builds its romeu with it (10 10.2, the e2e row).
+//
+// It runs from the root of the repository. Without --dry-run or --host
+// the build asks the latest scheduled fuzz.yml run first, through the
+// GitHub API, with GH_TOKEN and GITHUB_REPOSITORY (owner/name) in its environment;
 // --dry-run reads no network and makes no such check. The API is https
 // and api.github.com unless --api-host names another host:port. The tree
 // must be clean; a dry run builds a dirty one only with --allow-dirty and
@@ -18,8 +25,9 @@
 // is written in one rename; it defaults to a new temporary directory. The commands are in
 // tools/release/internal/build, whose doc comment says what the build
 // does; this package parses the command line and calls it, under
-// procgroup.Main. The exit status is 0 when the archives are written, 1
-// when the build refuses or fails, and 2 for a wrong command line.
+// procgroup.Main. The exit status is 0 when the archives, or the host
+// build's binary, are written, 1 when the build refuses or fails, and 2
+// for a wrong command line.
 package main
 
 import (
@@ -28,13 +36,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/release/internal/build"
 )
 
 const (
-	exitOK    = 0 // the archives are written
+	exitOK    = 0 // the archives, or the host binary, are written
 	exitError = 1 // the build refuses or fails
 	exitUsage = 2 // the command line is wrong
 )
@@ -50,7 +59,8 @@ func start(args []string, stdout, stderr io.Writer) int {
 	})
 }
 
-const usage = "usage:\n  go run ./tools/release build --version <v> [--dry-run [--allow-dirty]] [--out <dir>] [--api-host <host>]\n"
+const usage = "usage:\n  go run ./tools/release build --version <v> [--dry-run [--allow-dirty]] [--out <dir>] [--api-host <host>]\n" +
+	"  go run ./tools/release build --host --out <path>\n"
 
 // run parses args and calls the command they name.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -65,7 +75,17 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	out := fs.String("out", "", "where the archives go; absent or empty")
 	dirty := fs.Bool("allow-dirty", false, "a dry run may build a tree with changes")
 	apiHost := fs.String("api-host", "", "the one API host:port to use besides api.github.com")
-	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 || *version == "" {
+	host := fs.Bool("host", false, "build one romeu for this platform, embedding julieta, to --out")
+	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
+		say(stderr, "release build: unknown flag or argument\n%s", usage)
+		return exitUsage
+	}
+	if *host {
+		if *out == "" || otherThan(fs, "host", "out") {
+			say(stderr, "release build: --host needs --out and takes no other flag\n%s", usage)
+			return exitUsage
+		}
+	} else if *version == "" {
 		say(stderr, "release build: --version is required and takes no argument but its flags\n%s", usage)
 		return exitUsage
 	}
@@ -78,6 +98,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		say(stderr, "release build: no go command: %v\n", err)
 		return exitError
+	}
+	if *host {
+		return runHost(ctx, build.HostOptions{Root: root, Out: *out, GoBin: goBin}, stdout, stderr)
 	}
 	opts := build.Options{Root: root, Version: *version, Out: *out, DryRun: *dry, AllowDirty: *dirty, GoBin: goBin}
 	if !*dry {
@@ -100,6 +123,26 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	say(stdout, "%s\n", res.Checksums)
 	notes(stdout, res)
+	return exitOK
+}
+
+// otherThan reports whether fs set a flag not named in names.
+func otherThan(fs *flag.FlagSet, names ...string) bool {
+	other := false
+	fs.Visit(func(f *flag.Flag) { other = other || !slices.Contains(names, f.Name) })
+	return other
+}
+
+// runHost runs the host build and names the binary on stdout.
+func runHost(ctx context.Context, o build.HostOptions, stdout, stderr io.Writer) int {
+	if err := build.Host(ctx, o); err != nil {
+		// After a signal procgroup.Main says the run was interrupted.
+		if ctx.Err() == nil {
+			say(stderr, "release build: %v\n", err)
+		}
+		return exitError
+	}
+	say(stdout, "%s\n", o.Out)
 	return exitOK
 }
 
