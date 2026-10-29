@@ -15,6 +15,8 @@ owns:
   - internal/cmd/julieta/memory/add*.go
   - internal/cmd/julieta/setup/migrate*.go
   - internal/manifest/**
+  - internal/cmd/romeu/sync/step4_tree.go
+  - internal/cmd/romeu/sync/step5_memory.go
   - e2e/julieta_stamp_test.go
 needs:
   - T035
@@ -108,6 +110,10 @@ already waits on T043.
 - Operator: approves the `contracts` surface if a new error id is
   needed for the manifest without `sharedMemory`; otherwise no.
 - Acceptance:
+  - `romeu sync` step 4 creates `memory/_shared/stamps/` beside
+    `entries/`, and step 5 warns when `stamps/` is over its cap: T043
+    makes `_shared/` with `entries/` only, since memstore's allowlist
+    has no `stamps/` before this task (decided on 2026-10-29).
   - A manifest without `sharedMemory`: `add --shared` and `add --tag
     handoff` exit 2 naming the member; with it, `add --shared --tag
     project` writes under `_shared/entries/` and `list` shows `shared`

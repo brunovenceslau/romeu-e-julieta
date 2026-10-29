@@ -8,6 +8,7 @@ owns:
   - internal/hostpaths/**
   - internal/cmd/romeu/init/**
   - internal/cmd/romeu/approve/**
+  - internal/cmd/romeu/sync/step1_lock.go
   - docs/spec/02-layouts.md
 needs:
   - T041
@@ -15,6 +16,7 @@ needs:
 after:
   - T164
   - T165
+  - T043
 ask_first:
   - contracts
 sitting: none
@@ -23,7 +25,9 @@ sitting: none
 # T169 - A shared place for the host paths: the settings path and the root check
 
 Goal: one place for the host paths and the root check, used by `init`,
-`approve` and `doctor`, in place of the copies each command grows.
+`approve`, `sync` and `doctor`, in place of the copies each command
+grows. `sync` step 1 (T043) holds a copy of `approve`'s `loadSettings`,
+which this task moves too (decided on 2026-10-29).
 Decided on 2026-10-23, scope this repository; no existing task covers
 it.
 
