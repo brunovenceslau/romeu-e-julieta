@@ -28,7 +28,7 @@ type step struct {
 // Step 9 (live changes) stays dark until T047.
 var steps = []step{
 	{n: 1, name: "lock, settings and gate 1", do: lockAndCheck},
-	{n: 2, name: "fetch the config repo", do: notBuilt},
+	{n: 2, name: "fetch the config repo", do: fetchConfig},
 	{n: 3, name: "read and validate the specs", do: notBuilt},
 	{n: 4, name: "create the tree and fetch the repos", do: notBuilt},
 	{n: 5, name: "check the memory dirs", do: notBuilt},

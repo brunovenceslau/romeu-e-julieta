@@ -7,6 +7,7 @@ package sync
 
 import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
@@ -27,6 +28,13 @@ type run struct {
 	// which every git and sbx call runs with.
 	settings spec.HostSettings
 	home     string
+
+	// Step 2: the hardened git of the host settings, the path of the
+	// config repo's clone, and the spec commit, a full object id the
+	// fetched config ref reaches.
+	git         *gitsafe.Runner
+	configClone string
+	specCommit  string
 }
 
 // newRun returns the run of one command line.
