@@ -3,7 +3,7 @@ id: T177
 title: "julieta setup moves no branch"
 milestone: M2
 module: julieta-core
-fate: new
+fate: merged
 owns:
   - internal/cmd/julieta/setup/repos.go
   - internal/cmd/julieta/setup/state.go
@@ -25,8 +25,11 @@ owns:
 needs:
   - T051
 after: []
-ask_first: []
+ask_first:
+  - formats
 sitting: none
+merged: 2026-10-29
+pr: 313
 ---
 
 # T177 - julieta setup moves no branch

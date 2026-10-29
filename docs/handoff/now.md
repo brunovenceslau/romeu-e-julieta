@@ -2,18 +2,18 @@
 
 ## Where we stopped
 
-T038 is merged (#301), and so are T171, T173 and T166. Since the
-re-plan of 2026-10-28, T177 and T178 come before T172 and T174, which
-wait on T039. T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
+T177 is merged (#313): setup moves no branch, and julieta-setup/v1
+carries `branchState` (REQ-1310). T178 comes before T172 and T174,
+which wait on T039. T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. Setup: T177 in review, then T178; since #309 the plan check
-   compares two owns globs. Issue #303 (setup reports an unusable sandbox as
-   RJ-348 internal; a Finder `.DS_Store` in the memory dir) is open.
+1. T178; open: #303 (setup's RJ-348 on a `.DS_Store`), #311 (tools/ci
+   reads nested worktrees), #310 (schema enum, description and check;
+   each schema change takes a `formats` approval line).
 2. Memory: T039, then T043 and T167, then T174 and T175, then T172,
    then T176 and T179; T039 is the critical path's head.
 3. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
@@ -55,8 +55,8 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## In flight
 
-- `feat/t177-setup-moves-no-branch` (T177); older branches as they
-  were.
+- `feat/ask-first-formats` (the formats surface); older branches as
+  they were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
