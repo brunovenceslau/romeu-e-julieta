@@ -11,55 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/catalog"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/egress"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
-
-// fullRun returns a run with one target and every field of the contract
-// in run.go set, each to its zero value: the shape a step's test starts
-// from before it fills what the earlier steps would have.
-func fullRun() *run {
-	t := &target{
-		spec:          spec.Project{},
-		envDir:        "",
-		cloneDirs:     map[string]string{},
-		memoryDirs:    map[string]string{},
-		egressRefs:    map[string]string{},
-		egressCommits: map[string]string{},
-		record:        nil,
-		candidate:     nil,
-		rendered:      render.Rendered{},
-		egress:        egress.Result{},
-		side:          gate.Side{},
-		renderRec:     render.Record{},
-		drifted:       nil,
-		outcome:       "",
-	}
-	return &run{
-		env:           &cli.Env{},
-		flags:         flags{from: "origin"},
-		settings:      spec.HostSettings{},
-		home:          "",
-		store:         nil,
-		lock:          nil,
-		bin:           render.Bin{},
-		catalog:       catalog.Catalog{},
-		catalogDigest: canon.Sum[canon.CatalogKind]{},
-		git:           nil,
-		configDir:     "",
-		specRef:       "",
-		specCommit:    "",
-		specs:         nil,
-		targets:       []*target{t},
-		warnings:      nil,
-	}
-}
 
 func TestStepsAreTheTenOf0442InOrder(t *testing.T) {
 	if len(steps) != 10 {
@@ -81,7 +35,7 @@ func TestRunStepsStopsAtTheFirstError(t *testing.T) {
 		return step{n, "step", func(context.Context, *run) error { ran = append(ran, n); return err }}
 	}
 	boom := errors.New("boom")
-	r := fullRun()
+	r := newRun(&cli.Env{}, flags{})
 	err := runSteps(context.Background(), r, []step{mark(1, nil), mark(2, boom), mark(3, nil)})
 	if !errors.Is(err, boom) || !strings.Contains(err.Error(), "step 2") {
 		t.Fatalf("got %v, want boom wrapped with step 2", err)
@@ -118,11 +72,11 @@ func TestCheckRulesRunsInNameOrder(t *testing.T) {
 	rules = nil
 	var order []string
 	add := func(name string) {
-		register(rule{name, func(context.Context, *run, *target) error { order = append(order, name); return nil }})
+		register(rule{name, func(context.Context, *run) error { order = append(order, name); return nil }})
 	}
 	add("b")
 	add("a")
-	if err := checkRules(context.Background(), nil, nil); err != nil {
+	if err := checkRules(context.Background(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(order, ",") != "a,b" {
@@ -134,7 +88,7 @@ func TestRegisterPanics(t *testing.T) {
 	saved := rules
 	t.Cleanup(func() { rules = saved })
 	rules = nil
-	ok := rule{"x", func(context.Context, *run, *target) error { return nil }}
+	ok := rule{"x", func(context.Context, *run) error { return nil }}
 	register(ok)
 	for _, ru := range []rule{ok, {"", ok.check}, {"y", nil}} {
 		func() {
@@ -158,7 +112,7 @@ func TestRunStepsReleasesTheLockAndTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := fullRun()
+	r := newRun(&cli.Env{}, flags{})
 	r.store, r.lock = st, lk
 	boom := errors.New("boom")
 	if err := runSteps(context.Background(), r, []step{{n: 1, name: "step", do: func(context.Context, *run) error { return boom }}}); !errors.Is(err, boom) {
@@ -177,15 +131,6 @@ func TestRunStepsReleasesTheLockAndTheStore(t *testing.T) {
 		t.Fatalf("the lock is still held after runSteps: %v", err)
 	}
 	lk2.Unlock()
-}
-
-func TestWarnKeepsTheOrder(t *testing.T) {
-	r := fullRun()
-	r.warn("a", "first")
-	r.warn("b", "second")
-	if len(r.warnings) != 2 || r.warnings[0] != (warning{"a", "first"}) || r.warnings[1] != (warning{"b", "second"}) {
-		t.Errorf("got %v, want a then b", r.warnings)
-	}
 }
 
 func TestUsageNamesTheRuleAndExitsTwo(t *testing.T) {
@@ -219,5 +164,12 @@ func TestFromDefaultsToOrigin(t *testing.T) {
 	f := definition.New(&cli.Env{}).Flags().Lookup("from")
 	if f == nil || f.DefValue != "origin" {
 		t.Fatalf("--from defaults to %v, want origin", f)
+	}
+}
+
+func TestAStepNotBuiltStopsTheRun(t *testing.T) {
+	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), steps)
+	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 1") {
+		t.Fatalf("got %v, want step 1 not built", err)
 	}
 }

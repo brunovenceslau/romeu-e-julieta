@@ -27,20 +27,25 @@ type step struct {
 // docs/plan.md): a task that adds a step edits this slice by one line.
 // Step 9 (live changes) stays dark until T047.
 var steps = []step{
-	{n: 1, name: "lock, settings and gate 1", do: lockAndCheck},
-	{n: 2, name: "fetch the config repo", do: fetchConfig},
-	{n: 3, name: "read and validate the specs", do: readSpecs},
-	{n: 4, name: "create the tree and fetch the repos", do: makeTree},
-	{n: 5, name: "check the memory dirs", do: checkMemory},
-	{n: 6, name: "read descriptors and render the candidate", do: renderCandidate},
-	{n: 7, name: "check the live files for drift", do: checkDrift},
-	{n: 8, name: "gate 2 and promote", do: gateAndPromote},
+	{n: 1, name: "lock, settings and gate 1", do: notBuilt},
+	{n: 2, name: "fetch the config repo", do: notBuilt},
+	{n: 3, name: "read and validate the specs", do: notBuilt},
+	{n: 4, name: "create the tree and fetch the repos", do: notBuilt},
+	{n: 5, name: "check the memory dirs", do: notBuilt},
+	{n: 6, name: "read descriptors and render the candidate", do: notBuilt},
+	{n: 7, name: "check the live files for drift", do: notBuilt},
+	{n: 8, name: "gate 2 and promote", do: notBuilt},
 	{n: 9, name: "apply live changes", do: skipLive},
-	{n: 10, name: "report orphans and the julieta pin", do: report},
+	{n: 10, name: "report orphans and the julieta pin", do: notBuilt},
 }
 
 // errNotBuilt is what a step returns until its slice of T043 lands.
 var errNotBuilt = errors.New("not built yet")
+
+// notBuilt is each step whose slice of T043 has not landed: the slice
+// replaces it, in its line of steps, with the step's function in a file
+// of its own.
+func notBuilt(context.Context, *run) error { return errNotBuilt }
 
 // runSteps runs each step in order and stops at the first error, which
 // it returns as is when it is an error of the table (cli.Error) and

@@ -12,17 +12,15 @@ import (
 	"strings"
 )
 
-// rule is a render-time rule: a check of one target, which step 6 runs
-// on every target before it renders, in the order of the rules' names.
+// rule is a render-time rule: a check step 6 runs before it renders, in the order of the rules' names.
 // An error it returns stops the command (rule 14 of docs/plan.md: an
 // unordered set, one rule per file, each joined by a package-level
 // var _ = register(rule{...})).
 type rule struct {
 	// name is the rule's slug, unique in the registry.
 	name string
-	// check returns why t breaks the rule, or nil. A rule that only
-	// warns records the warning with r.warn and returns nil.
-	check func(ctx context.Context, r *run, t *target) error
+	// check returns why the run breaks the rule, or nil.
+	check func(ctx context.Context, r *run) error
 }
 
 // rules is the registry register fills during initialization; nothing
@@ -43,14 +41,14 @@ func register(ru rule) rule {
 	return ru
 }
 
-// checkRules runs every registered rule on t, in the order of the
+// checkRules runs every registered rule, in the order of the
 // rules' names, and returns the first error.
-func checkRules(ctx context.Context, r *run, t *target) error {
+func checkRules(ctx context.Context, r *run) error {
 	sorted := slices.SortedFunc(slices.Values(rules), func(a, b rule) int {
 		return strings.Compare(a.name, b.name)
 	})
 	for _, ru := range sorted {
-		if err := ru.check(ctx, r, t); err != nil {
+		if err := ru.check(ctx, r); err != nil {
 			return err
 		}
 	}
