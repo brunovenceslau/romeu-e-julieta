@@ -578,14 +578,15 @@ func TestSyncRefusesOverTheCaps(t *testing.T) {
 // memory dir cannot be opened for a reason other than being no
 // directory: the files it holds stay on the remote.
 func TestSyncFailsOnAnUnreadableDir(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root opens a directory of mode 000")
-	}
 	r := newRemote(t)
 	p := newProject(t, r.url)
 	_, err := memgit.Sync(t.Context(), runner(t), p)
 	require.NoError(t, err)
 	before := r.main(t)
+	require.NotEmpty(t, before)
+	if os.Geteuid() == 0 {
+		return // root opens a directory of mode 000
+	}
 	api := filepath.Join(p.EnvDir, "memory", "api")
 	require.NoError(t, os.Chmod(api, 0))
 	t.Cleanup(func() { _ = os.Chmod(api, 0o700) })
