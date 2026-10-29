@@ -269,7 +269,7 @@ Three consequences of the grammar:
   `actions/attest-build-provenance`.
 
 `REQ-0815` The `pr` step runs in its own job, the pr job of the grammar, from the
-default branch's code, on the file that `GITHUB_EVENT_PATH` names; `tools/ci
+base branch's code, on the file that `GITHUB_EVENT_PATH` names; `tools/ci
 all` does not run it. A local run
 is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
 `gh api`, for example), or, before the pull request exists,

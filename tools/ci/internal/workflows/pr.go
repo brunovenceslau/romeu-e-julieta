@@ -201,10 +201,10 @@ func (c *grammar) prCheckout(step *yaml.Node) {
 	with := field(step, "with")
 	for _, key := range []string{"ref", "repository"} {
 		if v := field(with, key); v != nil {
-			c.add(v, "the pr job checks out the default branch's commit, github.sha, so its checkout names no "+key+", never pull_request.base.sha or the head (the pr job row)")
+			c.add(v, "the pr job checks out the base branch's commit, github.sha, so its checkout names no "+key+", never pull_request.base.sha or the head (the pr job row)")
 		}
 	}
 	if v := field(with, prDepth); v == nil || v.Kind != yaml.ScalarNode || v.Tag != "!!int" || v.Value != prDepthNone {
-		c.add(step, "the checkout of the pr job sets "+prDepth+": "+prDepthNone+", the whole history of the default branch (the pr job row)")
+		c.add(step, "the checkout of the pr job sets "+prDepth+": "+prDepthNone+", the whole history of the base branch (the pr job row)")
 	}
 }

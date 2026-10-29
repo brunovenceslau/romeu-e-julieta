@@ -251,8 +251,8 @@ var runGit = func(ctx context.Context, r git.Repo, args []string) ([]byte, error
 }
 
 // fetchRemote is the remote the pr job fetches a missing head from: the
-// one actions/checkout names, the repository of the default branch,
-// which serves the head of a pull request from a fork too.
+// one actions/checkout names, this repository (the base branch's), which
+// serves the head of a pull request from a fork too.
 const fetchRemote = "origin"
 
 // noCredentials are the settings the fetch of the head runs with, so it

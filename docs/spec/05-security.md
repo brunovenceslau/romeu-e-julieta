@@ -415,7 +415,13 @@ workflow defined in the pull request's base branch, a branch of this
 repository that the pull request does not change (the default branch
 for most, the branch below for one in a stack; decided on 2026-10-09,
 the base in place of the default branch on 2026-10-29), builds that
-branch's commit, and reads the head only as data. So a
+branch's commit, and reads the head only as data. For a pull request
+into a stack branch, that code and the lists it reads are the branch's,
+which may hold the unmerged changes of the pull request below, so its
+`pr` result is advisory for the surfaces the lower pull request changes;
+the `pr` run of a pull request whose base is `main`, the bottom of a
+stack or one retargeted to `main`, is the gate, and a retargeted pull
+request is merged after that run (12 12.4). So a
 change to a workflow file does not change the job that judges it; the
 job's shape (its event, its checkout and the git flags it reads the head
 with) is in

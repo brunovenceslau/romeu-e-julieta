@@ -576,12 +576,22 @@ no grant covers a change to the code that judges a pull request; a test
 of the approval package lists those packages and holds it (05 5.3).
 `approvalLine` is in the approval package of `tools/ci`; a pull request
 that moves it updates the glob and this page with it.
-The check that the base is the default branch (12.9) stays, but it is
-not what makes the code trusted. So a run
-judges a pull request with the current `main`, and a pull request opened
-before a fix to `pr` is judged by the fixed `pr` on its next run, which
-a new event starts: a push to the head, an `edited` event from a change
-to the title or body, or a close and reopen. `REQ-1151` A re-run of an old run
+The rule that the base is the default branch (12.9) is a review rule,
+not what makes the code trusted. So a run judges a pull request with the
+current code of its base: `main` for most, and for a pull request into a
+stack branch that branch's code and lists (`.github/ask-first.yaml`,
+`docs/grants.yaml`, the denylist), which may hold the unmerged changes
+of the pull request below, so that `pr` result is advisory for the
+surfaces the lower pull request changes, and the `pr` run of a pull
+request whose base is `main` (the bottom of a stack, or one retargeted
+to `main` when the one below merges) is the gate; a retargeted pull
+request is merged after the run its retarget starts, never on the green
+of the run against the old base, and a base force-pushed between the
+event and the run leaves `base.sha` out of the clone, so `pr` exits 2
+and the next event judges again (decided on 2026-10-29). A pull request
+opened before a fix to `pr` is judged by the fixed `pr` on its next run,
+which a new event starts: a push to the head, an `edited` event from a
+change to the title, the body or the base, or a close and reopen. `REQ-1151` A re-run of an old run
 keeps the `GITHUB_SHA` of the original event, so it judges with the old
 code
 ([re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),

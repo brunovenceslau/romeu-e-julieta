@@ -3,7 +3,7 @@
 
 // Command pr is the step of the pr job (12 12.4, REQ-1150): it judges
 // the pull request of the event payload file it is given, the one
-// GITHUB_EVENT_PATH names, from the default branch's checkout it runs in.
+// GITHUB_EVENT_PATH names, from the base branch's checkout it runs in.
 //
 //	go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"
 //

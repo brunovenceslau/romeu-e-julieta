@@ -100,6 +100,7 @@ func TestWorkflowsPRRefused(t *testing.T) {
 		{"a second event", "on:\n  pull_request_target:\n", "on:\n  push:\n  pull_request_target:\n", "runs on pull_request_target alone"},
 		{"another event alone", "  pull_request_target:\n", "  pull_request:\n", "runs on pull_request_target alone"},
 		{"another filter", "    types: [opened, synchronize, reopened, edited]\n", "    paths: [docs/**]\n    types: [opened, synchronize, reopened, edited]\n", "the filter paths"},
+		{"a paths-ignore filter", "    types: [opened, synchronize, reopened, edited]\n", "    paths-ignore: [docs/**]\n    types: [opened, synchronize, reopened, edited]\n", "the filter paths-ignore"},
 		{"a checkout of part of the history", "          fetch-depth: 0\n", "          fetch-depth: 1\n", "fetch-depth: 0"},
 		{"a checkout of the default depth", "          fetch-depth: 0\n", "", "fetch-depth: 0"},
 		{"a second job", "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci static\n", "holds one job"},
