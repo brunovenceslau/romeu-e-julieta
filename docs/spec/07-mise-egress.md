@@ -158,25 +158,28 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
    refuses a host that is no egress domain, naming the kit
    (REQ-0069). `REQ-1315` Only the hosts of the runtime phase enter the
    derivation, for every descriptor step 6 reads (the workload's and
-   each kit's); the hosts of the install phase stay apart, since the
-   rules of this derivation last the life of the sandbox and an install
-   host in them would stay open to the agent: `github.com`, which the
-   `julieta` kit needs at install alone (REQ-0592), takes gists,
-   issues and pushes. A host the kit needs at runtime too is declared
-   in the runtime phase. The install hosts still go through
-   `egress.Split` and are shown in gate 2 with the capability set
-   (REQ-0569). Measured at sitting M0 (sbx v0.48.0): the install
-   steps run inside the sandbox, once at create and before the agent,
-   and the proxy refuses an undeclared host there. Not measured yet:
-   that sbx reads the install phase of `network-policy@1`, that it
-   allows a host of that phase during the install, and that it closes
-   it before the agent starts. The first real `sbx` build of the
-   `julieta` or `os-base` kit measures these three, and the facts of
-   M0 again, on the sbx it runs (the host ran v0.50.1 on 2026-10-29,
-   after M0); until then this rule is provisional, and if the install
-   cannot reach its hosts, or a host still answers at runtime, this
-   rule and the kits are revisited (decided on 2026-10-29, scope this
-   repository).
+   each kit's); the hosts of the install phase stay apart. sbx opens
+   them for the install alone: the install steps run inside the
+   sandbox, once at create and before the agent, and the agent's
+   requests to an install host are refused. A host the kit needs at
+   runtime too is declared in the runtime phase. The install hosts
+   still go through `egress.Split` and are shown in gate 2 with the
+   capability set (REQ-0569). sbx applies the runtime hosts of the
+   descriptors itself, with their ports, as a rule of the sandbox that
+   no `sbx policy` call made or can edit, so gate 2, which approves
+   the capability set, is what lets one in; the derivation keeps them
+   for the gate's upload flag (step 7), the digest (step 8) and the
+   applied set the manifest lists, and romeu does not apply a domain
+   that only a descriptor declared (REQ-1316).
+   Measured on 2026-10-29 with sbx v0.50.1 (a probe kit with
+   `example.com:443` in its install phase and `example.org:443` in its
+   runtime phase): during the install both answered and an undeclared
+   host was refused; at runtime the install host and the undeclared
+   host were refused, and the runtime host answered through the rule
+   `kit:<sandbox>` that sbx provisioned (`editable: false`). Sitting
+   M0 (sbx v0.48.0) measured the same refusal at install. Reopened by
+   an sbx version whose recording shows another behaviour (decided on
+   2026-10-29, scope this repository).
 7. Move every domain with `upload: true`, or without a `domains` entry,
    to `gated`.
 8. `REQ-0633` `effectiveDigest` = `canon.Digest(canon.Egress, sorted union)`; recorded
@@ -204,7 +207,11 @@ would mean running mise on the host.
 approved `gated`; removal via `sbx policy rm network --sandbox <name>
 --resource <domain>` for domains romeu applied earlier and that left the set;
 verification with `sbx policy check network --sandbox <name> <domain>`
-(exact argv from the block A recordings).
+(exact argv from the block A recordings). `REQ-1316` The domains that
+only the descriptors declared (step 6) are not applied, removed or
+checked by romeu: sbx applies them from the descriptor, and a rule
+romeu added for one would widen it, since a rule with no port opens
+every port of the domain (measured on 2026-10-29, sbx v0.50.1).
 `REQ-0635` Applied on create (before `julieta setup`), on every `run` (re-applies
 after an `sbx reset`), and on `sync` for a running sandbox. `REQ-0636` The
 manifest carries the applied set
