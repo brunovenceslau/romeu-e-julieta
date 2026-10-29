@@ -103,12 +103,13 @@ func usage(cmd *cobra.Command, message string) error {
 // system's message in the details (REQ-1280).
 func unwritable(err error) error {
 	return SettingsUnwritable.New("init cannot make or write the host settings",
-		cli.Detail{Key: "error", Value: termsafe.Escape(err.Error())})
+		cli.Detail{Key: "error", Value: err.Error()})
 }
 
 // refuse is a precondition init stops at, named by the slug of the rule
 // it breaks, with exit 2 (REQ-1258: a rule with no row of 04 4.4 has no
-// id of its own).
+// id of its own): config-ref-not-default, config-no-default-branch and
+// clone-exists. A rule with a row raises the row.
 func refuse(cmd *cobra.Command, slug, message string) error {
 	return usage(cmd, slug+": "+message)
 }
@@ -134,7 +135,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	if err != nil {
 		return err
 	}
-	if err := absent(cmd, settings); err != nil {
+	if err := absent(settings); err != nil {
 		return err
 	}
 
@@ -178,11 +179,11 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 	defer lk.Unlock()
-	if err := absent(cmd, settings); err != nil { // another init may have won
+	if err := absent(settings); err != nil { // another init may have won
 		return err
 	}
 
-	rt, envDir, made, err := openTree(cmd, h.Root, h.Config.Project+"-env")
+	rt, envDir, made, err := openTree(h.Root, h.Config.Project+"-env")
 	if err != nil {
 		return err
 	}
@@ -194,7 +195,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	if err != nil {
 		return err
 	}
-	pending, err := prepareSettings(cmd, settings)
+	pending, err := prepareSettings(settings)
 	if err != nil {
 		return err
 	}
@@ -207,7 +208,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		made.undo(rt, filepath.Base(envDir), h.Root)
 		return err
 	}
-	if err := commitSettings(cmd, pending, settings, data); err != nil {
+	if err := commitSettings(pending, settings, data); err != nil {
 		// dest is this run's clone: absent proved <envDir>/<dir> did not
 		// exist, so nothing of the operator's goes with it.
 		err = errors.Join(err, os.RemoveAll(dest))
@@ -222,7 +223,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 // temporary file the settings are written to, mode 0600. A directory or
 // a file init cannot make is settings-unwritable: a precondition (RJ-354,
 // exit 2) and not an internal error.
-func prepareSettings(cmd *cobra.Command, settings string) (*renameio.PendingFile, error) {
+func prepareSettings(settings string) (*renameio.PendingFile, error) {
 	if err := os.MkdirAll(filepath.Dir(settings), dirMode); err != nil {
 		return nil, unwritable(err)
 	}
@@ -237,7 +238,7 @@ func prepareSettings(cmd *cobra.Command, settings string) (*renameio.PendingFile
 // place, which fails if a file appeared there meanwhile (settings-exist),
 // where a rename would silently replace it. The temporary file is
 // removed by the caller's Cleanup.
-func commitSettings(cmd *cobra.Command, pf *renameio.PendingFile, settings string, data []byte) error {
+func commitSettings(pf *renameio.PendingFile, settings string, data []byte) error {
 	if _, err := pf.Write(data); err != nil {
 		return unwritable(err)
 	}
@@ -254,7 +255,7 @@ func commitSettings(cmd *cobra.Command, pf *renameio.PendingFile, settings strin
 }
 
 // absent refuses settings that exist: init never overwrites them.
-func absent(cmd *cobra.Command, settings string) error {
+func absent(settings string) error {
 	_, err := os.Lstat(settings)
 	switch {
 	case err == nil:
@@ -396,7 +397,7 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // between is caught. A directory init made is 0700; one that was there
 // is chmod'ed through the handle only when the checks passed, and never
 // followed out of the root.
-func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made, error) {
+func openTree(root, envName string) (*os.Root, string, made, error) {
 	var m made
 	// The levels above the root are made as they are needed and stay;
 	// the root's last element is this run's when its Mkdir succeeds.
@@ -542,7 +543,7 @@ func cloneError(cmd *cobra.Command, err error, configURL string, remote bool) er
 	case errors.Is(err, gitsafe.ErrRemoteContent) || (remote && refused) || (!remote && exited):
 		return ConfigCloneFailed.New("git could not clone the config repo",
 			cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
-			cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
+			cli.Detail{Key: "git", Value: err.Error()})
 	case refused:
 		return usage(cmd, termsafe.Escape(err.Error()))
 	}
