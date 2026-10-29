@@ -122,3 +122,10 @@
 {"want":"I25","argv":["secret","set","github","--sandbox","shop","--refresh","1h"],"note":"--command is the fourth word, though --sandbox is the second"}
 {"want":"I25","argv":["secret","set","github","--command","/bin/x","--sandbox","shop"],"note":"driven flags swapped"}
 {"want":"I25","argv":["secret","set","github","--refresh","1h","--sandbox","shop","--command","/bin/x"],"note":"--refresh in an earlier slot"}
+{"want":"ok","argv":["secret","ls"],"note":"the listing of secrets, no flag"}
+{"want":"shape","argv":["secret","ls","-t","x"],"note":"a flag secret ls does not have"}
+{"want":"shape","argv":["secret","ls","--token=x"],"note":"a value as a flag"}
+{"want":"shape","argv":["secret","ls","github"],"note":"a word after secret ls"}
+{"want":"shape","argv":["secret","ls","--","x"],"note":"a double dash"}
+{"want":"I4","argv":["secret","ls","-y"],"note":""}
+{"want":"I4","argv":["-y","secret","ls"],"note":""}

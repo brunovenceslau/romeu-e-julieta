@@ -37,6 +37,12 @@ const maxListing = 1 << 20
 // kind ("rule" or "default"), effect ("allow" or "deny") and resource
 // (the pattern of a rule, empty for a default); other members are
 // skipped.
+//
+// The argv of the secret listing (sbxdrv.SecretList), secretHeader and
+// the values of scopeOf are the assumed parts: at O3 (T168) probe A9
+// records them on a host, and they are pinned here and in secret_ls.go.
+// Until then an output of another shape is upstream-shape (RJ-310), so a
+// wrong guess fails closed and never reads as an empty list.
 const secretHeader = "SCOPE SERVICE SECRET"
 
 // scopeOf reads a scope: "sandbox:<name>" with one name is a per-sandbox
