@@ -38,14 +38,19 @@ that links `sync` into the binary (`import_sync.go`) uses both.
 3. A remote branch named `HEAD` would map to the same ref as the
    remote's HEAD: the fetch refuses it. `Fetch` refuses a call whose
    pattern refspec writes into `refs/romeu/origin/<dir>/` unless the
-   same call carries `HEAD:refs/romeu/origin/<dir>/HEAD`, so git's own
-   check refuses the collision (decided on 2026-10-29, scope this
-   repository: the floor is in gitsafe, not in each caller). `sync`
-   steps 2 and 4 (T043) pass both refspecs.
-   Deferred: on a case-insensitive file system a branch named `head`
-   lands in the same loose ref file, and git's check compares names
-   case-sensitively. Reopened by the first macOS run of the `sync`
-   e2e (T043) or T170, whichever comes first.
+   same call carries `HEAD:refs/romeu/origin/<dir>/HEAD`, and a call
+   with that HEAD refspec gets negative refspecs from gitsafe for each
+   name git would read `HEAD` as (`refs/heads/HEAD`, `refs/tags/HEAD`
+   and the rest of its lookup), so a branch or tag named `HEAD` never
+   lands in `<dir>/HEAD`, and an origin with no HEAD (unborn, or a
+   symref to a missing branch) makes the fetch fail (decided on
+   2026-10-29, scope this repository: the floor is in gitsafe, not in
+   each caller). `sync` steps 2 and 4 (T043) pass both refspecs.
+   Deferred: on a case-insensitive file system a pattern can write a
+   case variant of `HEAD` (`head`, or `hEAD` through `h*`) into the
+   same loose ref file, and git compares names case-sensitively.
+   Reopened by the first macOS run of the `sync` e2e (T043) or T170,
+   whichever comes first.
 
 - Implements: REQ-0492 (05 5.2), REQ-0336 (04 4.2), REQ-0466 (05 5.1).
 - Operator: no.
@@ -57,6 +62,8 @@ that links `sync` into the binary (`import_sync.go`) uses both.
     refuses a name outside the namespace, as it does for `refs/heads/`.
   - A `Fetch` with a pattern into `refs/romeu/origin/<dir>/` and no
     HEAD refspec for that dir is refused before git runs; with both, a
-    remote branch named `HEAD` makes the fetch fail and writes nothing.
+    remote branch or tag named `HEAD` never lands in `<dir>/HEAD`, and
+    an origin whose HEAD is unborn makes the fetch fail and writes
+    nothing, on real git.
   - The table tests of `internal/gitsafe` cover both, on real git.
 - Verify: `go test ./internal/gitsafe/ -run 'Refspec|ListRefs' -v`.
