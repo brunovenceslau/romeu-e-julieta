@@ -11,8 +11,47 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/egress"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
+
+// fullRun returns a run with one target and every field of the contract
+// in run.go set, each to its zero value: the shape a step's test starts
+// from before it fills what the earlier steps would have.
+func fullRun() *run {
+	t := &target{
+		spec:          spec.Project{},
+		envDir:        "",
+		egressCommits: map[string]string{},
+		record:        nil,
+		candidate:     nil,
+		rendered:      render.Rendered{},
+		egress:        egress.Result{},
+		set:           gate.Set{},
+		widening:      canon.Sum[canon.WideningKind]{},
+		renderRec:     render.Record{},
+		drifted:       nil,
+		promoted:      false,
+	}
+	return &run{
+		env:        &cli.Env{},
+		flags:      flags{from: "origin"},
+		settings:   spec.HostSettings{},
+		home:       "",
+		store:      (*state.Store)(nil),
+		lock:       nil,
+		git:        nil,
+		configDir:  "",
+		specCommit: "",
+		specs:      nil,
+		targets:    []*target{t},
+	}
+}
 
 func TestStepsAreTheTenOf0442InOrder(t *testing.T) {
 	if len(steps) != 10 {
@@ -34,7 +73,7 @@ func TestRunStepsStopsAtTheFirstErrorAndReleases(t *testing.T) {
 		return step{n, "step", func(context.Context, *run) error { ran = append(ran, n); return err }}
 	}
 	boom := errors.New("boom")
-	r := newRun(&cli.Env{}, flags{})
+	r := fullRun()
 	err := runSteps(context.Background(), r, []step{mark(1, nil), mark(2, boom), mark(3, nil)})
 	if !errors.Is(err, boom) || !strings.Contains(err.Error(), "step 2") {
 		t.Fatalf("got %v, want boom wrapped with step 2", err)
@@ -49,8 +88,8 @@ func TestRunStepsReturnsAnErrorOfTheTableAsIs(t *testing.T) {
 	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), []step{
 		{1, "step", func(context.Context, *run) error { return want }},
 	})
-	if err != want {
-		t.Fatalf("got %v, want the table error itself", err)
+	if !errors.Is(err, want) || err.Error() != want.Error() {
+		t.Fatalf("got %v, want the table error itself, unwrapped", err)
 	}
 }
 
