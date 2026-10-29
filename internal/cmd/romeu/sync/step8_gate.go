@@ -65,7 +65,9 @@ var errApprovalRequired = errors.New("gate 2 needs a terminal to approve a chang
 // the project record is written through Store.UpdateProject: the
 // approval, when this run gave one, and lastRunAt. The approval is
 // written once the promotion commit is done, so a command killed
-// before it asks again on the next sync (REQ-0082).
+// before it asks again on the next sync (REQ-0082). A live file that
+// --overwrite-drift let through (step 7) is reported, once its project
+// is promoted, as replaced, its edit lost.
 //
 // On an error each candidate not yet promoted or declined is declined,
 // so a command that returns leaves no candidate dir; an approved one
@@ -175,8 +177,18 @@ func promote(r *run, p spec.Project, env string, c *candidate, a *state.Approval
 	}); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(r.env.Stdout, "promoted  %s\n", termsafe.Escape(p.Name))
-	return err
+	if _, err := fmt.Fprintf(r.env.Stdout, "promoted  %s\n", termsafe.Escape(p.Name)); err != nil {
+		return err
+	}
+	for _, e := range r.overwritten {
+		if e.project != p.Name {
+			continue
+		}
+		if _, err := fmt.Fprintf(r.env.Stderr, "replaced the edited %s of %s; its edit is lost\n", termsafe.Escape(e.path), termsafe.Escape(p.Name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // diff returns the gate 2 diff of the candidate c, whose env dir is env,

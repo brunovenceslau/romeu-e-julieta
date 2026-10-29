@@ -83,6 +83,7 @@ func gateRun(t *testing.T) *gateFixture {
 func (f *gateFixture) rerender(t *testing.T) {
 	t.Helper()
 	f.again()
+	f.r.overwritten = nil
 	require.NoError(t, renderCandidates(t.Context(), f.r))
 }
 
