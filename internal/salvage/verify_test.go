@@ -56,7 +56,7 @@ func (s sandbox) verifyConfig(t *testing.T, clone string) salvage.VerifyConfig {
 	return salvage.VerifyConfig{
 		Git: hostRunner(t), Name: project, Generation: salvageGen, SalvageID: salvageID,
 		Repos:    []salvage.VerifyRepo{{Dir: "api", Memory: s.memory, Clone: clone}},
-		CapBytes: 1 << 20, Work: t.TempDir(),
+		CapBytes: 1 << 20, Work: workDir(t),
 	}
 }
 
@@ -129,10 +129,13 @@ func TestVerify(t *testing.T) {
 
 	t.Run("a second import", func(t *testing.T) {
 		// The refs are create-only (I6): the same salvage imported again
-		// fails on the first ref, and moves none.
-		_, err := salvage.Verify(t.Context(), s.verifyConfig(t, clone))
+		// fails on the first ref, creates none and moves none.
+		before := git(t, clone, "for-each-ref")
+		again, err := salvage.Verify(t.Context(), s.verifyConfig(t, clone))
 		require.Error(t, err)
-		assert.Equal(t, s.head, git(t, clone, "rev-parse", prefix+"api/heads/main"))
+		assert.Equal(t, before, git(t, clone, "for-each-ref"))
+		require.Len(t, again.Repos, 1)
+		assert.Empty(t, again.Repos[0].Imported, "what Verify did is returned with the error")
 	})
 
 	t.Run("a forged complete", func(t *testing.T) {
@@ -171,17 +174,21 @@ func TestVerifyRepoMissing(t *testing.T) {
 	}{
 		{"no salvage dir", func(*testing.T, string) {}},
 		{"no manifest", func(t *testing.T, memory string) {
+			t.Helper()
 			require.NoError(t, os.MkdirAll(filepath.Join(memory, "salvage", salvageGen, salvageID), 0o700))
 		}},
 		{"a manifest that does not decode", func(t *testing.T, memory string) {
+			t.Helper()
 			put(t, memory, "salvage/"+salvageGen+"/"+salvageID+"/manifest.json", `{"schema":"salvage/v1"}`)
 		}},
 		{"another repo", func(t *testing.T, memory string) {
+			t.Helper()
 			m := validManifest()
 			m.Repo, m.Bundles, m.Files, m.Refs = "api", nil, nil, nil
 			put(t, memory, "salvage/"+salvageGen+"/"+salvageID+"/manifest.json", string(encode(t, m)))
 		}},
 		{"another generation", func(t *testing.T, memory string) {
+			t.Helper()
 			m := validManifest()
 			m.Repo, m.Generation, m.Bundles, m.Files, m.Refs = "web", "01j9zc2q8x7w4t6y3r5e1v9k0q", nil, nil, nil
 			put(t, memory, "salvage/"+salvageGen+"/"+salvageID+"/manifest.json", string(encode(t, m)))
@@ -233,18 +240,23 @@ func TestVerifyHostilePaths(t *testing.T) {
 		{"absolute", nil, "/etc/passwd"},
 		{"a dot-dot element", nil, "../repo.bundle"},
 		{"a link inside the salvage dir", func(t *testing.T, dir string) {
+			t.Helper()
 			require.NoError(t, os.Symlink(".", filepath.Join(dir, "in")))
 		}, "in/repo.bundle"},
 		{"a link outside the salvage dir", func(t *testing.T, dir string) {
+			t.Helper()
 			require.NoError(t, os.Symlink(outside, filepath.Join(dir, "out")))
 		}, "out/repo.bundle"},
 		{"a link in place of the file", func(t *testing.T, dir string) {
+			t.Helper()
 			require.NoError(t, os.Symlink("repo.bundle", filepath.Join(dir, "alias.bundle")))
 		}, "alias.bundle"},
 		{"a FIFO", func(t *testing.T, dir string) {
+			t.Helper()
 			require.NoError(t, syscall.Mkfifo(filepath.Join(dir, "fifo.bundle"), 0o600))
 		}, "fifo.bundle"},
 		{"a directory", func(t *testing.T, dir string) {
+			t.Helper()
 			require.NoError(t, os.Mkdir(filepath.Join(dir, "d.bundle"), 0o700))
 		}, "d.bundle"},
 	}
@@ -296,7 +308,7 @@ func TestVerifyOverCap(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"over-cap ignored.tar.gz"}, items(v), "the bundle fits, the archive does not")
 	assert.NotEmpty(t, v.Repos[0].Imported)
-	assert.False(t, v.SecretBearing)
+	assert.True(t, v.SecretBearing, "the archive is stored whether or not it is verified")
 
 	c = s.verifyConfig(t, repo(t))
 	c.CapBytes = m.Bundles[0].Size - 1
@@ -305,6 +317,55 @@ func TestVerifyOverCap(t *testing.T) {
 	assert.Equal(t, []string{"over-cap repo.bundle"}, items(v), "the archive fits what the bundle left")
 	assert.Empty(t, v.Repos[0].Imported)
 	assert.Equal(t, []string{salvage.ReasonOverCap}, salvage.Reasons(v.Skipped))
+
+	t.Run("the bundles of every repo first", func(t *testing.T) {
+		// The archive of the first repo would take the room of the second
+		// repo's bundle; the bundles are read first, so the archive is
+		// the one over the cap.
+		w := newSandbox(t)
+		wm := filepath.Join(t.TempDir(), "web")
+		require.NoError(t, os.Mkdir(wm, 0o700))
+		salvaged(t, sandbox{repo: w.repo, memory: wm, home: w.home, head: w.head}, func(c *salvage.Config) { c.Repos[0].Dir = "web" })
+		webBundle := readManifest(t, filepath.Join(wm, "salvage", salvageGen, salvageID)).Bundles[0].Size
+		c := s.verifyConfig(t, repo(t))
+		c.Repos = append(c.Repos, salvage.VerifyRepo{Dir: "web", Memory: wm, Clone: repo(t)})
+		c.CapBytes = m.Bundles[0].Size + webBundle
+		v, err := salvage.Verify(t.Context(), c)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"over-cap ignored.tar.gz"}, items(v))
+		require.Len(t, v.Repos, 2)
+		assert.NotEmpty(t, v.Repos[1].Imported)
+	})
+}
+
+// TestVerifyManifestRefs makes payload-mismatch a ref of the manifest
+// that no bundle holds, and a ref it names twice.
+func TestVerifyManifestRefs(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*salvage.Manifest)
+		want []string
+	}{
+		{"a ref of a repository no bundle holds", func(m *salvage.Manifest) {
+			m.Refs = append(m.Refs, salvage.Ref{Nested: "worktree-0/gone", Ref: "refs/heads/main", SHA: m.Refs[0].SHA})
+		}, []string{"payload-mismatch refs/heads/main"}},
+		{"a ref named twice", func(m *salvage.Manifest) {
+			m.Refs = append(m.Refs, m.Refs[0])
+		}, []string{"payload-mismatch refs/heads/main"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newSandbox(t)
+			clone := salvaged(t, s, nil)
+			editManifest(t, s.dir(), func(m *salvage.Manifest) {
+				require.Equal(t, "refs/heads/main", m.Refs[0].Ref)
+				tt.edit(m)
+			})
+			v, err := salvage.Verify(t.Context(), s.verifyConfig(t, clone))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, items(v))
+		})
+	}
 }
 
 // TestVerifyPayloadMismatch makes payload-mismatch a payload whose size
@@ -318,6 +379,7 @@ func TestVerifyPayloadMismatch(t *testing.T) {
 		bundle bool
 	}{
 		{"a changed archive", func(t *testing.T, dir string) {
+			t.Helper()
 			f := filepath.Join(dir, salvage.IgnoredFile)
 			data, err := os.ReadFile(f)
 			require.NoError(t, err)
@@ -325,21 +387,26 @@ func TestVerifyPayloadMismatch(t *testing.T) {
 			require.NoError(t, os.WriteFile(f, data, 0o600))
 		}, "ignored.tar.gz", false},
 		{"an absent archive", func(t *testing.T, dir string) {
+			t.Helper()
 			require.NoError(t, os.Remove(filepath.Join(dir, salvage.IgnoredFile)))
 		}, "ignored.tar.gz", false},
 		{"a longer bundle", func(t *testing.T, dir string) {
+			t.Helper()
 			f, err := os.OpenFile(filepath.Join(dir, "repo.bundle"), os.O_WRONLY|os.O_APPEND, 0)
 			require.NoError(t, err)
 			_, err = f.WriteString("x")
 			require.NoError(t, errors.Join(err, f.Close()))
 		}, "repo.bundle", true},
 		{"another size in the manifest", func(t *testing.T, dir string) {
+			t.Helper()
 			editManifest(t, dir, func(m *salvage.Manifest) { m.Bundles[0].Size-- })
 		}, "repo.bundle", true},
 		{"a bundle ref the manifest does not name", func(t *testing.T, dir string) {
+			t.Helper()
 			editManifest(t, dir, func(m *salvage.Manifest) { m.Refs = m.Refs[1:] })
 		}, "repo.bundle", true},
 		{"a bundle ref at another object", func(t *testing.T, dir string) {
+			t.Helper()
 			editManifest(t, dir, func(m *salvage.Manifest) { m.Refs[0].SHA = strings.Repeat("d", 40) })
 		}, "repo.bundle", true},
 	}
@@ -372,6 +439,16 @@ func TestVerifyRefuses(t *testing.T) {
 		{"a project name with a slash", func(c *salvage.VerifyConfig) { c.Name = "a/b" }},
 		{"a repo dir git refuses in a ref", func(c *salvage.VerifyConfig) { c.Repos[0].Dir = "x.lock" }},
 		{"an empty repo dir", func(c *salvage.VerifyConfig) { c.Repos[0].Dir = "" }},
+		{"no work dir", func(c *salvage.VerifyConfig) { c.Work = "" }},
+		{"a relative work dir", func(c *salvage.VerifyConfig) { c.Work = "work" }},
+		{"a work dir others can open", func(c *salvage.VerifyConfig) {
+			c.Work = t.TempDir()
+			require.NoError(t, os.Chmod(c.Work, 0o755))
+		}},
+		{"a work dir that is a link", func(c *salvage.VerifyConfig) {
+			c.Work = filepath.Join(t.TempDir(), "link")
+			require.NoError(t, os.Symlink(workDir(t), c.Work))
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -381,4 +458,12 @@ func TestVerifyRefuses(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+// workDir returns a new work dir of the host half, 0700.
+func workDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.Chmod(dir, 0o700))
+	return dir
 }

@@ -11,11 +11,13 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // importBundle runs step 2 of the host half (REQ-0715) for the bundle b
@@ -27,23 +29,30 @@ import (
 //     ref of an earlier generation is not taken for this one's (I17);
 //  2. b is copied out of the salvage dir through the root into the
 //     work dir, its size and sha256 checked on the way (payload-mismatch);
-//  3. git bundle verify reads the copy; when it fails and the repo has
-//     an origin, origin's branches are fetched into
-//     refs/romeu/origin/<dir>/ and the copy is verified again;
-//  4. git bundle unbundle writes its objects, and the heads it carries
-//     must be the refs m names in b, name for name and object for
-//     object (payload-mismatch);
-//  5. git fsck --strict runs on each head's object, since
+//  3. a quarantine repository is made in the work dir, which borrows the
+//     clone's objects and lends it none (quarantine);
+//  4. git bundle verify reads the copy there; when it fails and the
+//     repo has an origin, origin's branches are fetched into
+//     refs/romeu/origin/<dir>/ of the clone, once per repo, and the
+//     copy is verified again;
+//  5. git bundle unbundle writes its objects into the quarantine, and
+//     the heads it carries must pass step 1 and be the refs m names in
+//     b, name for name and object for object (payload-mismatch);
+//  6. git fsck --strict runs there on each head's object, since
 //     transfer.fsckObjects does not cover an unbundle (05 5.1);
-//  6. each head becomes a create-only ref (CreateRef, I6) below
-//     HostRefPrefix: <dir>/<ref without refs/> for the repo's bundle,
+//  7. only then are the objects unbundled into the clone, and each head
+//     becomes a create-only ref (CreateRef, I6) below HostRefPrefix:
+//     <dir>/<ref without refs/> for the repo's bundle,
 //     <dir>/nested-<k>/<ref without refs/> for a nested one's.
 //
-// A failure of steps 1, 3 or 5 is the item fsck-failed, and nothing of
-// the bundle is imported. The copy stays in the work dir, which the
-// caller removes. An error is a payload path refused (salvage-path), a
-// read or a git call that failed for another reason, or a ref that
-// already exists.
+// A failure of steps 1, 4, 5 (but a refs mismatch) or 6 is the item
+// fsck-failed, and nothing of the bundle reaches the clone: a malformed
+// object stays in the quarantine, where it cannot fail every later fsck
+// of the clone. The copy and the quarantine stay in the work dir, which
+// the caller removes. An error is a payload path refused
+// (salvage-path), a read or a git call that failed for another reason,
+// or a ref that already exists; the refs created before it are
+// returned with it.
 func (v *verifier) importBundle(ctx context.Context, root *os.Root, r VerifyRepo, m Manifest, b Bundle, k int) ([]gitsafe.Head, error) {
 	want := map[string]string{}
 	for _, ref := range m.Refs {
@@ -52,10 +61,6 @@ func (v *verifier) importBundle(ctx context.Context, root *os.Root, r VerifyRepo
 		}
 		if err := v.checkBundleRef(ref.Ref); err != nil {
 			v.skip(r.Dir, b.File, ReasonFsckFailed, err)
-			return nil, nil
-		}
-		if _, dup := want[ref.Ref]; dup {
-			v.skip(r.Dir, b.File, ReasonPayloadMismatch, fmt.Errorf("the manifest names the ref %q twice", clip(ref.Ref)))
 			return nil, nil
 		}
 		want[ref.Ref] = ref.SHA
@@ -68,56 +73,66 @@ func (v *verifier) importBundle(ctx context.Context, root *os.Root, r VerifyRepo
 	if err != nil {
 		return nil, err
 	}
-	if err := v.verifyBundle(ctx, r, b, copied); err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
-		}
-		v.skip(r.Dir, b.File, ReasonFsckFailed, err)
-		return nil, nil
+	got, ok, err := v.quarantined(ctx, r, b, copied, want)
+	if err != nil || !ok {
+		return nil, err
 	}
-	heads, err := v.c.Git.Unbundle(ctx, r.Clone, copied)
-	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
-		}
-		v.skip(r.Dir, b.File, ReasonFsckFailed, err)
-		return nil, nil
-	}
-	got := map[string]string{}
-	for _, h := range heads {
-		if err := v.checkBundleRef(h.Ref); err != nil {
-			v.skip(r.Dir, b.File, ReasonFsckFailed, err)
-			return nil, nil
-		}
-		got[h.Ref] = h.OID
-	}
-	if !maps.Equal(got, want) {
-		v.skip(r.Dir, b.File, ReasonPayloadMismatch, errors.New("the bundle's refs are not the refs the manifest names"))
-		return nil, nil
-	}
-	oids := slices.Compact(slices.Sorted(maps.Values(got)))
-	for _, oid := range oids {
-		if err := v.c.Git.Fsck(ctx, r.Clone, oid); err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return nil, ctxErr
-			}
-			v.skip(r.Dir, b.File, ReasonFsckFailed, err)
-			return nil, nil
-		}
+	if _, err := v.c.Git.Unbundle(ctx, r.Clone, copied); err != nil {
+		return nil, err
 	}
 	base := v.prefix + r.Dir + "/"
 	if b.Nested != "" {
 		base += "nested-" + strconv.Itoa(k) + "/"
 	}
-	imported := make([]gitsafe.Head, 0, len(heads))
+	imported := make([]gitsafe.Head, 0, len(got))
 	for _, name := range slices.Sorted(maps.Keys(got)) {
 		ref := base + strings.TrimPrefix(name, "refs/")
 		if err := v.c.Git.CreateRef(ctx, r.Clone, ref, got[name]); err != nil {
-			return nil, fmt.Errorf("the ref %s: %w", ref, err)
+			return imported, fmt.Errorf("the ref %s: %w", termsafe.Escape(ref), err)
 		}
 		imported = append(imported, gitsafe.Head{Ref: ref, OID: got[name]})
 	}
 	return imported, nil
+}
+
+// quarantined runs steps 3 to 6 of importBundle for the copy of b, and
+// returns the bundle's heads, ref to object, and true when they passed;
+// false when the bundle is a skipped item, which it records.
+func (v *verifier) quarantined(ctx context.Context, r VerifyRepo, b Bundle, copied string, want map[string]string) (map[string]string, bool, error) {
+	fail := func(reason string, err error) (map[string]string, bool, error) {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, false, ctxErr
+		}
+		v.skip(r.Dir, b.File, reason, err)
+		return nil, false, nil
+	}
+	q, err := v.quarantine(ctx, r.Clone)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := v.verifyBundle(ctx, r, b, q, copied); err != nil {
+		return fail(ReasonFsckFailed, err)
+	}
+	heads, err := v.c.Git.Unbundle(ctx, q, copied)
+	if err != nil {
+		return fail(ReasonFsckFailed, err)
+	}
+	got := map[string]string{}
+	for _, h := range heads {
+		if err := v.checkBundleRef(h.Ref); err != nil {
+			return fail(ReasonFsckFailed, err)
+		}
+		got[h.Ref] = h.OID
+	}
+	if !maps.Equal(got, want) {
+		return fail(ReasonPayloadMismatch, errors.New("the bundle's refs are not the refs the manifest names"))
+	}
+	for _, oid := range slices.Compact(slices.Sorted(maps.Values(got))) {
+		if err := v.c.Git.Fsck(ctx, q, oid); err != nil {
+			return fail(ReasonFsckFailed, err)
+		}
+	}
+	return got, true, nil
 }
 
 // checkBundleRef returns an error for a ref name a salvage bundle may
@@ -148,19 +163,58 @@ func (v *verifier) copyOut(root *os.Root, b Bundle) (string, error) {
 	return f.Name(), errors.Join(err, f.Close())
 }
 
-// verifyBundle runs git bundle verify on the copy of b; when it fails
-// and b is the repo's own bundle of a repo with an origin, it fetches
-// origin's branches into refs/romeu/origin/<dir>/, where a missing
-// prerequisite would be, and verifies again (REQ-0715). A nested
-// repository's bundle has no prerequisite, so it has no fetch.
-func (v *verifier) verifyBundle(ctx context.Context, r VerifyRepo, b Bundle, copied string) error {
-	err := v.c.Git.BundleVerify(ctx, r.Clone, copied)
-	if err == nil || b.Nested != "" || r.Origin == "" {
+// verifyBundle runs git bundle verify on the copy of b in the
+// quarantine q; when it fails and b is the repo's own bundle of a repo
+// with an origin, it fetches origin's branches into the clone's
+// refs/romeu/origin/<dir>/, where a missing prerequisite would be, once
+// per repo, and verifies again (REQ-0715). A nested repository's bundle
+// has no prerequisite, so it has no fetch.
+func (v *verifier) verifyBundle(ctx context.Context, r VerifyRepo, b Bundle, q, copied string) error {
+	err := v.c.Git.BundleVerify(ctx, q, copied)
+	if err == nil || b.Nested != "" || r.Origin == "" || v.fetched[r.Dir] {
 		return err
 	}
+	if v.fetched == nil {
+		v.fetched = map[string]bool{}
+	}
+	v.fetched[r.Dir] = true
 	spec := "+refs/heads/*:refs/romeu/origin/" + r.Dir + "/*"
 	if ferr := v.c.Git.Fetch(ctx, r.Clone, r.Origin, []string{spec}); ferr != nil {
 		return errors.Join(err, fmt.Errorf("the fetch of origin: %w", ferr))
 	}
-	return v.c.Git.BundleVerify(ctx, r.Clone, copied)
+	return v.c.Git.BundleVerify(ctx, q, copied)
+}
+
+// quarantine makes a new repository in the work dir whose objects/info/
+// alternates names the object dir of the clone: git reads the clone's
+// objects there, so a bundle's prerequisites resolve and fsck follows
+// its history into them, while what an unbundle writes stays in the
+// quarantine. It is a bare repository of the three entries git needs,
+// HEAD, objects and refs, with no config, so no setting of the clone
+// applies; a SHA-1 one, the format of every origin of v1 (GitHub serves
+// no SHA-256 repository), so a SHA-256 bundle fails its verify there.
+func (v *verifier) quarantine(ctx context.Context, clone string) (string, error) {
+	common, err := v.c.Git.CommonDir(ctx, clone)
+	if err != nil {
+		return "", err
+	}
+	q, err := os.MkdirTemp(v.c.Work, "quarantine-")
+	if err != nil {
+		return "", err
+	}
+	for _, d := range []string{"objects", "objects/info", "refs"} {
+		if err := os.Mkdir(filepath.Join(q, d), 0o700); err != nil {
+			return "", err
+		}
+	}
+	files := map[string]string{
+		"HEAD":                    "ref: refs/heads/main\n",
+		"objects/info/alternates": filepath.Join(common, "objects") + "\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(q, name), []byte(content), 0o600); err != nil {
+			return "", err
+		}
+	}
+	return q, nil
 }

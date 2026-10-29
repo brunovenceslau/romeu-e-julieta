@@ -149,47 +149,57 @@ func HostRefPrefix(name, generation, salvageID string) string {
 }
 
 // Verify runs steps 1 and 2 of the host half of 08 8.5 (REQ-0714,
-// REQ-0715) over the generation's recorded repo set: for each repo it
-// reads the manifest of memory/<dir>/salvage/<generation>/<salvage-id>/
-// through an os.Root (I24); a repo with none, or with one this build
-// does not decode or that names another generation or repo, is the
-// item repo-missing. A salvageId other than the one passed is
-// salvage-id-mismatch (RJ-339), and a path that breaks the rule of
+// REQ-0715) over the generation's recorded repo set. First, for each
+// repo, it reads the manifest of memory/<dir>/salvage/<generation>/
+// <salvage-id>/ through an os.Root (I24); a repo with none, or with one
+// this build does not decode or that names another generation or
+// repo, is the item repo-missing. A salvageId other than the one passed
+// is salvage-id-mismatch (RJ-339), and a path that breaks the rule of
 // REQ-0252 is salvage-path (RJ-307): both are errors, not items. Then,
-// bundles first and within salvage.capBytes, each bundle is verified
-// and imported (importBundle) and each file's size and sha256 checked;
-// a payload beyond the cap is not read and is over-cap (REQ-0253). The
-// manifests' items are kept and their complete is not read (REQ-0717).
-// Any other error is a verification romeu could not run.
+// within salvage.capBytes, the bundles of every repo are verified and
+// imported (importBundle), and only after them the files of every repo
+// are checked, size and sha256, so an archive of ignored files never
+// takes the room of committed work; a payload beyond what is left of
+// the cap is not read and is over-cap (REQ-0253). The manifests' items
+// are kept and their complete is not read (REQ-0717).
+//
+// Any other error is a verification romeu could not run. Verify then
+// returns, with the error, what it did: the refs it created stay, since
+// they are create-only (I6), and the caller reports them.
 func Verify(ctx context.Context, c VerifyConfig) (Verification, error) {
-	if c.Git == nil {
-		return Verification{}, errors.New("salvage: a verification needs a runner")
-	}
-	if _, err := canon.ParseULID(c.Generation); err != nil {
-		return Verification{}, fmt.Errorf("the generation: %w", err)
-	}
-	if _, err := canon.ParseULID(c.SalvageID); err != nil {
-		return Verification{}, fmt.Errorf("the salvage id: %w", err)
-	}
-	if err := checkComponent("the project name", c.Name); err != nil {
+	if err := c.check(); err != nil {
 		return Verification{}, err
 	}
 	v := &verifier{c: c, budget: max(c.CapBytes, 0), prefix: HostRefPrefix(c.Name, c.Generation, c.SalvageID)}
 	out := Verification{RefsPrefix: v.prefix}
+	err := v.run(ctx, &out)
+	out.Skipped, out.SecretBearing = v.items, v.secret
+	return out, err
+}
+
+// check returns an error for a config Verify cannot run with: no
+// runner, an id that is no ULID, a name or a repo dir that cannot be a
+// component of a ref name, or a work dir that is not an absolute path
+// to a directory of this user's that only it can open (REQ-0710).
+func (c VerifyConfig) check() error {
+	if c.Git == nil {
+		return errors.New("salvage: a verification needs a runner")
+	}
+	if _, err := canon.ParseULID(c.Generation); err != nil {
+		return fmt.Errorf("the generation: %w", err)
+	}
+	if _, err := canon.ParseULID(c.SalvageID); err != nil {
+		return fmt.Errorf("the salvage id: %w", err)
+	}
+	if err := checkComponent("the project name", c.Name); err != nil {
+		return err
+	}
 	for _, r := range c.Repos {
 		if err := checkComponent("the repo dir", r.Dir); err != nil {
-			return Verification{}, err
+			return err
 		}
 	}
-	for _, r := range c.Repos {
-		res, err := v.repo(ctx, r)
-		if err != nil {
-			return Verification{}, fmt.Errorf("the salvage of the repo %s: %w", r.Dir, err)
-		}
-		out.Repos = append(out.Repos, res)
-	}
-	out.Skipped, out.SecretBearing = v.items, v.secret
-	return out, nil
+	return checkWork(c.Work)
 }
 
 // checkComponent returns an error for a name that cannot be one
@@ -203,103 +213,171 @@ func checkComponent(what, name string) error {
 
 // verifier is one run of Verify.
 type verifier struct {
-	c      VerifyConfig
-	budget int64
-	prefix string
-	items  []Item
-	secret bool
+	c       VerifyConfig
+	budget  int64
+	prefix  string
+	items   []Item
+	secret  bool
+	fetched map[string]bool // the repos whose origin was fetched
 }
 
-// skip records an item of the repo dir.
+// opened is the salvage dir of one repo whose manifest passed step 1.
+type opened struct {
+	repo VerifyRepo
+	root *os.Root
+	m    Manifest
+	res  int // its index in Verification.Repos
+}
+
+// run fills out: the manifests, then the bundles, then the files.
+func (v *verifier) run(ctx context.Context, out *Verification) (err error) {
+	var dirs []opened
+	defer func() {
+		for _, d := range dirs {
+			err = errors.Join(err, d.root.Close())
+		}
+	}()
+	for _, r := range v.c.Repos {
+		res, d, err := v.open(r)
+		out.Repos = append(out.Repos, res)
+		if err != nil {
+			return fmt.Errorf("the salvage of the repo %s: %w", r.Dir, err)
+		}
+		if d != nil {
+			d.res = len(out.Repos) - 1
+			dirs = append(dirs, *d)
+		}
+	}
+	for _, d := range dirs {
+		nested := 0
+		for _, b := range d.m.Bundles {
+			if b.Nested != "" {
+				nested++
+			}
+			if !v.take(d.repo.Dir, b.File, b.Size) {
+				continue
+			}
+			imported, err := v.importBundle(ctx, d.root, d.repo, d.m, b, nested)
+			out.Repos[d.res].Imported = append(out.Repos[d.res].Imported, imported...)
+			if err != nil {
+				return fmt.Errorf("the salvage of the repo %s: %w", d.repo.Dir, err)
+			}
+		}
+	}
+	for _, d := range dirs {
+		if err := v.files(d); err != nil {
+			return fmt.Errorf("the salvage of the repo %s: %w", d.repo.Dir, err)
+		}
+	}
+	return nil
+}
+
+// skip records an item of the repo dir, its item and detail cut and
+// escaped.
 func (v *verifier) skip(dir, item, reason string, err error) {
-	i := Item{Repo: dir, Item: termsafe.Escape(item), Reason: reason}
+	i := Item{Repo: dir, Item: termsafe.Escape(clip(item)), Reason: reason}
 	if err != nil {
-		i.Detail = termsafe.Escape(err.Error())
+		i.Detail = termsafe.Escape(clipDetail(err.Error()))
 	}
 	v.items = append(v.items, i)
 }
 
-// repo verifies and imports the salvage of the repo r.
-func (v *verifier) repo(ctx context.Context, r VerifyRepo) (RepoResult, error) {
+// open runs step 1 for the repo r: it reads, decodes and checks its
+// manifest, and returns the salvage dir to read, or nil when the repo
+// is repo-missing.
+func (v *verifier) open(r VerifyRepo) (RepoResult, *opened, error) {
 	res := RepoResult{Dir: r.Dir}
 	root, err := openSalvageDir(r.Memory, v.c.Generation, v.c.SalvageID)
 	if errors.Is(err, fs.ErrNotExist) {
 		v.skip(r.Dir, "the salvage dir", ReasonRepoMissing, errors.New("absent"))
-		return res, nil
+		return res, nil, nil
 	}
 	if err != nil {
-		return res, err
+		return res, nil, err
 	}
-	defer func() { _ = root.Close() }()
+	m, sum, err := v.manifest(root, r)
+	if err != nil || sum == "" {
+		return res, nil, errors.Join(err, root.Close())
+	}
+	res.Manifest, res.ManifestSHA256 = m, sum
+	for _, s := range m.Skipped {
+		v.items = append(v.items, Item{Repo: r.Dir, Item: termsafe.Escape(clip(s.Item)), Reason: s.Reason, Detail: termsafe.Escape(clipDetail(s.Detail))})
+	}
+	held := map[string]bool{}
+	for _, b := range m.Bundles {
+		held[b.Nested] = true
+	}
+	seen := map[Ref]bool{}
+	for _, ref := range m.Refs {
+		key := Ref{Nested: ref.Nested, Ref: ref.Ref}
+		switch {
+		case !held[ref.Nested]:
+			v.skip(r.Dir, ref.Ref, ReasonPayloadMismatch, fmt.Errorf("no bundle holds the nested repository %q", clip(ref.Nested)))
+		case seen[key]:
+			v.skip(r.Dir, ref.Ref, ReasonPayloadMismatch, errors.New("the manifest names the ref twice"))
+		}
+		seen[key] = true
+	}
+	// The files stay in the memory dir whether or not they verify
+	// (REQ-0710, REQ-0711).
+	v.secret = v.secret || len(m.Files) > 0
+	return res, &opened{repo: r, root: root, m: m}, nil
+}
+
+// manifest reads, decodes and checks the manifest of the salvage dir
+// root of the repo r, and returns it with the sha256 of its bytes; an
+// empty sha256 and no error mean the repo is repo-missing.
+func (v *verifier) manifest(root *os.Root, r VerifyRepo) (Manifest, string, error) {
 	data, err := readManifest(root)
 	if errors.Is(err, fs.ErrNotExist) {
 		// A salvage dir without its manifest, which an interrupted
 		// salvage leaves, is ignored and kept (REQ-0708).
 		v.skip(r.Dir, ManifestFile, ReasonRepoMissing, errors.New("absent"))
-		return res, nil
+		return Manifest{}, "", nil
 	}
 	if err != nil {
-		return res, err
+		return Manifest{}, "", err
 	}
 	m, err := DecodeManifest(data)
 	if errors.Is(err, ErrManifest) {
 		v.skip(r.Dir, ManifestFile, ReasonRepoMissing, err)
-		return res, nil
+		return Manifest{}, "", nil
 	}
 	if err != nil {
-		return res, err
+		return Manifest{}, "", err
 	}
 	if m.SalvageID != v.c.SalvageID {
-		return res, SalvageIDMismatch.New(fmt.Sprintf("the manifest of the repo %s names the salvage %q, not %s, the id romeu passed",
+		return Manifest{}, "", SalvageIDMismatch.New(fmt.Sprintf("the manifest of the repo %s names the salvage %q, not %s, the id romeu passed",
 			r.Dir, termsafe.Escape(clip(m.SalvageID)), v.c.SalvageID))
 	}
 	if m.Generation != v.c.Generation || m.Repo != r.Dir {
-		v.skip(r.Dir, ManifestFile, ReasonRepoMissing, fmt.Errorf("it names the generation %q and the repo %q",
-			clip(m.Generation), clip(m.Repo)))
-		return res, nil
+		v.skip(r.Dir, ManifestFile, ReasonRepoMissing, fmt.Errorf("it names the generation %q and the repo %q", clip(m.Generation), clip(m.Repo)))
+		return Manifest{}, "", nil
 	}
 	if err := CheckPaths(m); err != nil {
-		return res, err
+		return Manifest{}, "", err
 	}
 	sum := sha256.Sum256(data)
-	res.Manifest, res.ManifestSHA256 = m, hex.EncodeToString(sum[:])
-	for _, s := range m.Skipped {
-		v.items = append(v.items, Item{Repo: r.Dir, Item: termsafe.Escape(s.Item), Reason: s.Reason, Detail: termsafe.Escape(s.Detail)})
-	}
-	for _, ref := range m.Refs {
-		if !slices.ContainsFunc(m.Bundles, func(b Bundle) bool { return b.Nested == ref.Nested }) {
-			v.skip(r.Dir, ref.Ref, ReasonPayloadMismatch, fmt.Errorf("no bundle holds the nested repository %q", clip(ref.Nested)))
-		}
-	}
-	nested := 0
-	for _, b := range m.Bundles {
-		if b.Nested != "" {
-			nested++
-		}
-		if !v.take(r.Dir, b.File, b.Size) {
+	return m, hex.EncodeToString(sum[:]), nil
+}
+
+// files checks the size and sha256 of each file of the salvage dir d
+// that fits in what is left of the cap (REQ-0714, REQ-0253).
+func (v *verifier) files(d opened) error {
+	for _, f := range d.m.Files {
+		if !v.take(d.repo.Dir, f.Path, f.Size) {
 			continue
 		}
-		imported, err := v.importBundle(ctx, root, r, m, b, nested)
-		if err != nil {
-			return res, err
-		}
-		res.Imported = append(res.Imported, imported...)
-	}
-	for _, f := range m.Files {
-		if !v.take(r.Dir, f.Path, f.Size) {
-			continue
-		}
-		err := readPayload(root, f.Path, f.Size, f.SHA256, nil)
+		err := readPayload(d.root, f.Path, f.Size, f.SHA256, nil)
 		if errors.Is(err, errMismatch) {
-			v.skip(r.Dir, f.Path, ReasonPayloadMismatch, err)
+			v.skip(d.repo.Dir, f.Path, ReasonPayloadMismatch, err)
 			continue
 		}
 		if err != nil {
-			return res, err
+			return err
 		}
-		v.secret = true
 	}
-	return res, nil
+	return nil
 }
 
 // take reports whether the payload p of size bytes fits in what is left

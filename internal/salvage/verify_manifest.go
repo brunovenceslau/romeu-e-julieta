@@ -42,7 +42,8 @@ var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // every member but agentStop must be present and not null. A member
 // this build does not know is skipped, as a newer julieta of the same
 // version may add one (REQ-0163). The schema is read first, so a newer
-// version is format-newer (RJ-311). Then each size is not negative,
+// version is format-newer (RJ-311). Then it lists at most maxPayloads
+// bundles and as many files, each size is from 0 to maxPayloadSize,
 // each sha256 and object id has its form, each skipped reason is one of
 // the sandbox half, and agentStop, when present, counts no more killed
 // than matched: present with zero matched is a --stop-agents that
@@ -107,6 +108,9 @@ func DecodeManifest(data []byte) (Manifest, error) {
 // checkManifest returns ErrManifest for a value of m that is not of its
 // form.
 func checkManifest(m Manifest) error {
+	if len(m.Bundles) > maxPayloads || len(m.Files) > maxPayloads {
+		return fmt.Errorf("%w: %d bundles and %d files pass the cap of %d each", ErrManifest, len(m.Bundles), len(m.Files), maxPayloads)
+	}
 	if s := m.AgentStop; s != nil && (s.Matched < 0 || s.Killed < 0 || s.Killed > s.Matched) {
 		return fmt.Errorf("%w: agentStop matched %d, killed %d", ErrManifest, s.Matched, s.Killed)
 	}
@@ -146,10 +150,18 @@ var sandboxReasons = []string{
 	ReasonWorktreeChanging, ReasonInProgressOperation, ReasonAgentNotMatched, ReasonAgentPathMissing,
 }
 
+// maxPayloadSize is the largest size a payload may declare, 2^53 bytes,
+// the largest integer every JSON reader keeps exact.
+const maxPayloadSize = 1 << 53
+
+// maxPayloads is the most bundles, and the most files, one manifest
+// lists: each bundle costs git processes on the host.
+const maxPayloads = 4096
+
 // checkPayload returns ErrManifest for a payload whose size is negative
-// or whose sha256 is not lowercase hex.
+// or past maxPayloadSize, or whose sha256 is not lowercase hex.
 func checkPayload(p string, size int64, sum string) error {
-	if size < 0 || !sha256Hex.MatchString(sum) {
+	if size < 0 || size > maxPayloadSize || !sha256Hex.MatchString(sum) {
 		return fmt.Errorf("%w: the payload %q has the size %d and the sha256 %q", ErrManifest, clip(p), size, clip(sum))
 	}
 	return nil
@@ -159,7 +171,9 @@ func checkPayload(p string, size int64, sum string) error {
 // (REQ-0252) to every path of m: bundles[].file, files[].path,
 // worktrees[].path and each embedded-repo path (bundles[].nested,
 // refs[].nested, worktrees[].nested) is relative, clean, has no ".."
-// element and no control character, and no payload is named twice. The
+// element and no control character, is at most maxPathLen bytes of at
+// most maxPathDepth elements, no payload is named twice, and no two
+// bundles hold one repository (the same bundles[].nested). The
 // filesystem half, no symbolic link and below the salvage dir, is the
 // read's (openPayload). A refusal is the error salvage-path (RJ-307).
 func CheckPaths(m Manifest) error {
@@ -174,6 +188,7 @@ func CheckPaths(m Manifest) error {
 		seen[p] = true
 		return nil
 	}
+	held := map[string]bool{}
 	for _, b := range m.Bundles {
 		if err := payload("bundles[].file", b.File); err != nil {
 			return err
@@ -181,6 +196,10 @@ func CheckPaths(m Manifest) error {
 		if err := checkLabel("bundles[].nested", b.Nested); err != nil {
 			return err
 		}
+		if held[b.Nested] {
+			return SalvagePath.New(fmt.Sprintf("two bundles hold the repository %q", clip(b.Nested)))
+		}
+		held[b.Nested] = true
 	}
 	for _, f := range m.Files {
 		if err := payload("files[].path", f.Path); err != nil {
@@ -212,11 +231,22 @@ func checkLabel(what, p string) error {
 	return checkRel(what, p)
 }
 
+// The bounds of a path of a manifest: the read of a payload judges each
+// element with Lstat (checkComponents), so a deep path a sandbox made
+// costs no more than these.
+const (
+	maxPathLen   = 4096
+	maxPathDepth = 64
+)
+
 // checkRel returns salvage-path (RJ-307) for a path p of the manifest
-// member what that is not relative and clean, or that holds a ".."
-// element, an empty or "." one, or a control or format character.
+// member what that is not relative and clean, that holds a ".."
+// element, an empty or "." one, or a control or format character, or
+// that passes maxPathLen or maxPathDepth.
 func checkRel(what, p string) error {
 	switch {
+	case len(p) > maxPathLen || strings.Count(p, "/") >= maxPathDepth:
+		return SalvagePath.New(fmt.Sprintf("%s %q is longer or deeper than %d bytes and %d elements", what, clip(p), maxPathLen, maxPathDepth))
 	case p == "" || p == ".":
 		return SalvagePath.New(fmt.Sprintf("%s %q is empty", what, clip(p)))
 	case strings.HasPrefix(p, "/"):

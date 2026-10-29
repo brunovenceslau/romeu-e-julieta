@@ -102,6 +102,12 @@ func TestDecodeManifestRefuses(t *testing.T) {
 		{"a worktree HEAD of another form", edit(func(m *salvage.Manifest) { m.Worktrees[0].Head = "HEAD" })},
 		{"a host reason", edit(func(m *salvage.Manifest) { m.Skipped[0].Reason = salvage.ReasonPayloadMismatch })},
 		{"an unknown reason", edit(func(m *salvage.Manifest) { m.Skipped[0].Reason = "fine" })},
+		{"a size past 2^53", edit(func(m *salvage.Manifest) { m.Files[0].Size = 1<<53 + 1 })},
+		{"too many bundles", edit(func(m *salvage.Manifest) {
+			for range 4096 {
+				m.Bundles = append(m.Bundles, m.Bundles[0])
+			}
+		})},
 		{"more killed than matched", edit(func(m *salvage.Manifest) { m.AgentStop = &salvage.AgentStop{Matched: 1, Killed: 2} })},
 		{"over the cap", valid[:len(valid)-2] + `,"pad":"` + strings.Repeat("x", salvage.MaxManifestSize) + `"}`},
 	}
@@ -135,7 +141,7 @@ func TestCheckPaths(t *testing.T) {
 		{"a trailing slash", "agent/"},
 		{"a dot element", "./x"},
 		{"a control character", "a\x1b[2Jb"},
-		{"a format character", "a‮b"},
+		{"a format character", "a\u202eb"},
 	}
 	members := []struct {
 		name string
@@ -160,6 +166,21 @@ func TestCheckPaths(t *testing.T) {
 			})
 		}
 	}
+	t.Run("a path too deep", func(t *testing.T) {
+		m := validManifest()
+		m.Files[0].Path = strings.Repeat("a/", 64) + "f"
+		assertRow(t, salvage.SalvagePath, salvage.CheckPaths(m))
+	})
+	t.Run("a path too long", func(t *testing.T) {
+		m := validManifest()
+		m.Files[0].Path = strings.Repeat("a", 4097)
+		assertRow(t, salvage.SalvagePath, salvage.CheckPaths(m))
+	})
+	t.Run("two bundles of one repository", func(t *testing.T) {
+		m := validManifest()
+		m.Bundles[1].Nested = ""
+		assertRow(t, salvage.SalvagePath, salvage.CheckPaths(m))
+	})
 	t.Run("a payload named twice", func(t *testing.T) {
 		m := validManifest()
 		m.Files[0].Path = m.Bundles[0].File

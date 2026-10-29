@@ -77,16 +77,20 @@ func TestImportRefNames(t *testing.T) {
 		setup func(t *testing.T, s sandbox)
 	}{
 		{"a name with .. in the manifest", func(t *testing.T, s sandbox) {
+			t.Helper()
 			editManifest(t, s.dir(), func(m *salvage.Manifest) { m.Refs[0].Ref = "refs/heads/a..b" })
 		}},
 		{"a name with a control character in the manifest", func(t *testing.T, s sandbox) {
+			t.Helper()
 			editManifest(t, s.dir(), func(m *salvage.Manifest) { m.Refs[0].Ref = "refs/heads/a\x1bb" })
 		}},
 		{"a ref outside the bundle namespaces", func(t *testing.T, s sandbox) {
+			t.Helper()
 			git(t, s.repo, "update-ref", "refs/remotes/origin/main", s.head)
 			replaceBundle(t, s, "refs/heads/main", "refs/remotes/origin/main")
 		}},
 		{"a salvage ref of another generation", func(t *testing.T, s sandbox) {
+			t.Helper()
 			git(t, s.repo, "update-ref", otherGen, s.head)
 			replaceBundle(t, s, "refs/heads/main", otherGen)
 		}},
@@ -129,6 +133,23 @@ func TestImportFsckFailed(t *testing.T) {
 	assert.Contains(t, v.Skipped[0].Detail, "missingEmail", "git fsck --strict found it")
 	assert.Empty(t, git(t, clone, "for-each-ref"))
 	assert.False(t, salvage.Complete(v.Skipped))
+
+	t.Run("the rerun into the same clone", func(t *testing.T) {
+		// The malformed object stayed in the quarantine, so once the
+		// sandbox drops it, the next salvage imports into the same clone
+		// (the recovery of fsck-failed, 08 8.5).
+		git(t, s.repo, "branch", "-D", "bad")
+		const next = "01jb000000000000000000000b"
+		salvaged(t, s, func(c *salvage.Config) { c.SalvageID = next })
+		c := s.verifyConfig(t, clone)
+		c.SalvageID = next
+		v, err := salvage.Verify(t.Context(), c)
+		require.NoError(t, err)
+		assert.Empty(t, v.Skipped)
+		assert.NotEmpty(t, v.Repos[0].Imported)
+		_, err = os.Stat(filepath.Join(clone, ".git", "objects", bad[:2], bad[2:]))
+		assert.ErrorIs(t, err, os.ErrNotExist, "the malformed object never reached the clone")
+	})
 }
 
 // serveHTTPS serves the files below base over HTTPS on 127.0.0.1, which

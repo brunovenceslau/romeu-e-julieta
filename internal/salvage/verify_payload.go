@@ -14,8 +14,10 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 )
@@ -139,4 +141,40 @@ func openRegular(root *os.Root, p string) (*os.File, error) {
 		return nil, errors.Join(err, f.Close())
 	}
 	return f, nil
+}
+
+// checkWork returns an error for a work dir that is not an absolute,
+// clean path to a directory, no symbolic link, owned by this user, that
+// its group and others cannot open: the copies of the bundles are as
+// secret-bearing as the bundles (REQ-0710), and git reads them after
+// their sha256 is checked, so no one else may change them.
+func checkWork(dir string) error {
+	if !filepath.IsAbs(dir) || filepath.Clean(dir) != dir {
+		return fmt.Errorf("the work dir %q is not an absolute, clean path", clip(dir))
+	}
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return fmt.Errorf("the work dir: %w", err)
+	}
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 || !ok || int(st.Uid) != os.Getuid() {
+		return fmt.Errorf("the work dir %s is not a directory of this user's that only it can open", dir)
+	}
+	return nil
+}
+
+// detailLen is the most bytes of an error's text a skipped item keeps:
+// git's stderr can be long.
+const detailLen = 1024
+
+// clipDetail returns s cut to detailLen bytes, at a rune boundary.
+func clipDetail(s string) string {
+	if len(s) <= detailLen {
+		return s
+	}
+	cut := detailLen
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "..."
 }
