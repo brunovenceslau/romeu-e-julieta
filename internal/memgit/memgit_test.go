@@ -389,3 +389,75 @@ func TestSyncRefusesAForeignTree(t *testing.T) {
 	assert.Contains(t, w[0].Message, "api/salvage/x")
 	assert.NoFileExists(t, filepath.Join(env, "memory", "api", "salvage", "x"))
 }
+
+// TestSyncFailsOnTheMachine returns an error, and no warning, when the
+// machine's own repository cannot be made or written: a tree whose
+// parent is missing, a git dir that is a file, and excludes that are a
+// directory.
+func TestSyncFailsOnTheMachine(t *testing.T) {
+	g := runner(t)
+	_, err := memgit.Sync(t.Context(), g, memgit.Project{Name: "shop", EnvDir: filepath.Join(t.TempDir(), "absent", "shop-env"), Remote: "git://127.0.0.1:1/m"})
+	require.Error(t, err, "no parent for the memory dir")
+
+	p := newProject(t, "git://127.0.0.1:1/m")
+	require.NoError(t, os.WriteFile(filepath.Join(p.EnvDir, "memory.git"), nil, 0o600))
+	_, err = memgit.Sync(t.Context(), g, p)
+	require.Error(t, err, "a git dir that is a file")
+
+	p = newProject(t, "git://127.0.0.1:1/m")
+	_, err = memgit.Sync(t.Context(), g, p) // makes the git dir; the fetch fails
+	require.NoError(t, err)
+	exclude := filepath.Join(p.EnvDir, "memory.git", "info", "exclude")
+	require.NoError(t, os.Remove(exclude))
+	require.NoError(t, os.Mkdir(exclude, 0o700))
+	_, err = memgit.Sync(t.Context(), g, p)
+	require.Error(t, err, "excludes that are a directory")
+}
+
+// TestSyncFetchFails warns memory-push-failed for a remote that does
+// not answer, and commits nothing, since 08 8.1 fetches before the
+// commit.
+func TestSyncFetchFails(t *testing.T) {
+	p := newProject(t, "git://127.0.0.1:1/m")
+	w, err := memgit.Sync(t.Context(), runner(t), p)
+	require.NoError(t, err)
+	require.Len(t, w, 1)
+	assert.Equal(t, memgit.SlugPushFailed, w[0].Slug)
+	assert.Contains(t, w[0].Message, "the fetch of")
+	assert.Empty(t, git(t, filepath.Join(p.EnvDir, "memory.git"), "for-each-ref", "refs/heads/"))
+}
+
+// TestSyncCannotFastForward warns memory-diverged when an untracked
+// file of the memory dir stands where the remote's history writes one,
+// and when the remote's tree holds a symbolic link, and changes no file
+// of the memory dir.
+func TestSyncCannotFastForward(t *testing.T) {
+	r := newRemote(t)
+	pushFrom(t, r, "_shared/entries/01handoff.md")
+	p := newProject(t, r.url) // its own 01handoff.md, uncommitted
+	w, err := memgit.Sync(t.Context(), runner(t), p)
+	require.NoError(t, err)
+	require.Len(t, w, 1)
+	assert.Equal(t, memgit.SlugDiverged, w[0].Slug)
+	assert.Contains(t, w[0].Message, "cannot be fast-forwarded")
+	data, err := os.ReadFile(filepath.Join(p.EnvDir, "memory", "_shared", "entries", "01handoff.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "handoff\n", string(data))
+
+	link := newRemote(t)
+	work := filepath.Join(t.TempDir(), "w")
+	git(t, filepath.Dir(work), "clone", "-q", link.dir, work)
+	require.NoError(t, os.MkdirAll(filepath.Join(work, "api", "entries"), 0o700))
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(work, "api", "entries", "x.md")))
+	git(t, work, "add", "-A")
+	git(t, work, "commit", "-q", "-m", "link")
+	git(t, work, "push", "-q", "origin", "HEAD:refs/heads/main")
+	env := filepath.Join(t.TempDir(), "shop-env")
+	require.NoError(t, os.MkdirAll(filepath.Join(env, "memory"), 0o700))
+	w, err = memgit.Sync(t.Context(), runner(t), memgit.Project{Name: "shop", EnvDir: env, Remote: link.url})
+	require.NoError(t, err)
+	require.Len(t, w, 1)
+	assert.Equal(t, memgit.SlugDiverged, w[0].Slug)
+	assert.Contains(t, w[0].Message, "tree walk")
+	assert.NoFileExists(t, filepath.Join(env, "memory", "api", "entries", "x.md"))
+}
