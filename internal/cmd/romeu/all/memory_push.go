@@ -94,11 +94,20 @@ func memoryStep(role memoryRole) cli.Around {
 // An error of one project does not stop the others; the first error
 // of the table among them is returned.
 func afterWork(ctx context.Context, env *cli.Env, role memoryRole, cmd *cobra.Command, args []string) error {
+	// A role that only warns (doctor) leaves what it cannot read to the
+	// command's own checks, and fails nothing.
+	quiet := !role.push && !role.refuse
 	h, err := loadMemoryHost(env)
 	if err != nil {
+		if quiet {
+			return nil
+		}
 		return err
 	}
 	targets, err := role.targets(h, cmd, args)
+	if quiet && err != nil {
+		return nil
+	}
 	if err != nil || len(targets) == 0 {
 		return err
 	}
@@ -113,7 +122,9 @@ func afterWork(ctx context.Context, env *cli.Env, role memoryRole, cmd *cobra.Co
 	for _, t := range targets {
 		p, sp, err := h.project(ctx, t)
 		if err != nil {
-			errs = append(errs, err)
+			if !quiet {
+				errs = append(errs, err)
+			}
 			continue
 		}
 		if role.refuse {
@@ -319,6 +330,10 @@ func pullTargets(h *memoryHost, cmd *cobra.Command, _ []string) ([]memoryTarget,
 		if dir, err = os.Getwd(); err != nil {
 			return nil, err
 		}
+	}
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
 	}
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {

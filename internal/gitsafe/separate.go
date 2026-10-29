@@ -6,13 +6,16 @@
 package gitsafe
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -120,14 +123,132 @@ func (r *Runner) InitSeparate(ctx context.Context, s Separate) error {
 		"init", "-q", "--bare", "--template=", "--initial-branch=main", "--", s.GitDir)
 }
 
-// AddAll stages every change of the work tree of s, additions and
-// deletions, that the excludes of the git dir (info/exclude) leave in:
-// git add -A. The caller writes the excludes first.
-func (r *Runner) AddAll(ctx context.Context, s Separate) error {
+// StagedFile is one file StageExactly stages: its slash path from the
+// root of the work tree, its size, and the function that opens it. The
+// caller opens it so that no link is followed (O_NOFOLLOW at each
+// level), and the reader yields exactly Size bytes.
+type StagedFile struct {
+	Path string
+	Size int64
+	Open func() (io.ReadCloser, error)
+}
+
+// maxStaged bounds the files of one StageExactly, above the caps of 08
+// 8.6 for every memory dir of a project.
+const maxStaged = 200_000
+
+// StageExactly makes the index of s hold files and nothing else, each
+// a regular file of mode 100644. git reads no path of the work tree:
+// the blobs are written from the readers the caller opened, with one
+// git fast-import, which writes no object the repository already
+// holds, and the index is then rebuilt with git read-tree --empty and
+// git update-index --index-info. So no .gitignore, symbolic link or
+// nested repository of the work tree, which the sandbox writes, can
+// change what is staged (08 8.1, REQ-1304).
+func (r *Runner) StageExactly(ctx context.Context, s Separate, files []StagedFile) error {
 	if err := r.separate(s); err != nil {
 		return err
 	}
-	return r.runSeparate(ctx, s, nil, nil, "add", "-A", "--", ".")
+	if len(files) > maxStaged {
+		return fmt.Errorf("%w: %d files to stage, over %d", ErrRefused, len(files), maxStaged)
+	}
+	seen := map[string]bool{}
+	for _, f := range files {
+		if err := checkLiteralPath(f.Path); err != nil {
+			return err
+		}
+		if _, err := checkTreePath(f.Path); err != nil {
+			return err
+		}
+		if f.Size < 0 || f.Open == nil || seen[f.Path] {
+			return fmt.Errorf("%w: the staged file %q", ErrRefused, f.Path)
+		}
+		seen[f.Path] = true
+	}
+	oids, err := r.writeBlobs(ctx, s, files)
+	if err != nil {
+		return err
+	}
+	if err := r.runSeparate(ctx, s, nil, nil, "read-tree", "--empty"); err != nil {
+		return err
+	}
+	var info bytes.Buffer
+	for i, f := range files {
+		fmt.Fprintf(&info, "%s %s\t%s\n", modeFile, oids[i], f.Path)
+	}
+	noFilters, err := r.filterOverrides(ctx, s.GitDir)
+	if err != nil {
+		return err
+	}
+	return r.exec(ctx, s.WorkTree, s.global(), separateSettings, noFilters, &info, nil, "update-index", "--index-info")
+}
+
+// writeBlobs writes the blob of each file with git fast-import, which
+// reads them from its standard input and answers each get-mark with the
+// blob's id, and returns the ids in the order of files.
+func (r *Runner) writeBlobs(ctx context.Context, s Separate, files []StagedFile) ([]string, error) {
+	if len(files) == 0 {
+		return nil, nil
+	}
+	pr, pw := io.Pipe()
+	streamed := make(chan error, 1)
+	go func() {
+		err := streamBlobs(pw, files)
+		_ = pw.CloseWithError(err)
+		streamed <- err
+	}()
+	out := limitedBuffer{limit: len(files) * (maxOIDLine + 1)}
+	err := r.exec(ctx, s.WorkTree, s.global(), separateSettings, nil, pr, &out, "fast-import", "--quiet", "--done")
+	_ = pr.Close() // a git that stopped reading ends the stream
+	if serr := <-streamed; serr != nil && (err == nil || !errors.Is(serr, io.ErrClosedPipe)) {
+		return nil, serr // the cause: git's error follows from it
+	}
+	if err != nil {
+		return nil, err
+	}
+	oids := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	if out.truncated || len(oids) != len(files) {
+		return nil, fmt.Errorf("%w: git fast-import answered %d ids for %d files", ErrRefused, len(oids), len(files))
+	}
+	for _, oid := range oids {
+		if err := checkObjectID(oid); err != nil {
+			return nil, err
+		}
+	}
+	return oids, nil
+}
+
+// maxOIDLine is the longest object id, SHA-256's.
+const maxOIDLine = 64
+
+// streamBlobs writes the fast-import stream of files to w: per file a
+// blob with a mark and its exact bytes, then a get-mark, and done.
+func streamBlobs(w io.Writer, files []StagedFile) error {
+	for i, f := range files {
+		mark := strconv.Itoa(i + 1)
+		if _, err := fmt.Fprintf(w, "blob\nmark :%s\ndata %d\n", mark, f.Size); err != nil {
+			return err
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("gitsafe: %s: %w", f.Path, err)
+		}
+		_, err = io.CopyN(w, rc, f.Size)
+		var extra [1]byte
+		more, _ := io.ReadFull(rc, extra[:])
+		_ = rc.Close()
+		switch {
+		case errors.Is(err, io.EOF), more > 0:
+			return fmt.Errorf("%w: %s changed size while it was staged", ErrRefused, f.Path)
+		case err != nil:
+			return fmt.Errorf("gitsafe: %s: %w", f.Path, err)
+		}
+		if _, err := fmt.Fprintf(w, "\nget-mark :%s\n", mark); err != nil {
+			return err
+		}
+	}
+	_, err := io.WriteString(w, "done\n")
+	return err
 }
 
 // StagedChanges reports whether the index of s differs from HEAD, or

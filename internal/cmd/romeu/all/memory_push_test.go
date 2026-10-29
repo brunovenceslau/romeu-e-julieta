@@ -384,6 +384,12 @@ func TestStepTargets(t *testing.T) {
 	code, _, stderr = h.step(t, "pull", nil, "-C", filepath.Join(h.envDir, "memory", "shop-api"))
 	assert.Equal(t, 0, code, stderr)
 	assert.Contains(t, git(t, h.remoteDir, "ls-tree", "-r", "--name-only", "main"), "shop-api/entries/03pull.md")
+	t.Chdir(h.envDir)
+	require.NoError(t, os.WriteFile(filepath.Join(h.envDir, "memory", "shop-api", "entries", "03rel.md"), []byte("r\n"), 0o600))
+	code, _, stderr = h.step(t, "pull", nil, "-C", "memory")
+	assert.Equal(t, 0, code, stderr)
+	assert.Contains(t, git(t, h.remoteDir, "ls-tree", "-r", "--name-only", "main"), "shop-api/entries/03rel.md", "a relative -C")
+	t.Chdir(h.root)
 	code, _, _ = h.step(t, "pull", nil, "-C", t.TempDir())
 	assert.Equal(t, 1, code, "a directory outside the root")
 
@@ -495,4 +501,17 @@ func TestStepTargetsOfTheWorkingDirectory(t *testing.T) {
 	t.Chdir(h.root)
 	code, _, _ = h.step(t, "pull", nil)
 	assert.Equal(t, 1, code, "the root is in no project's tree")
+}
+
+// TestStepDoctorFailsNothing leaves to doctor's own checks host settings
+// it cannot read and a live render it cannot read: the step only warns.
+func TestStepDoctorFailsNothing(t *testing.T) {
+	h := newHost(t, "url", false)
+	require.NoError(t, os.Remove(filepath.Join(h.envDir, filepath.FromSlash(render.LiveRecord))))
+	require.NoError(t, os.WriteFile(filepath.Join(h.envDir, filepath.FromSlash(render.LiveRecord)), []byte("{}"), 0o600))
+	code, _, stderr := h.step(t, "doctor", nil)
+	assert.Equal(t, 0, code, stderr)
+	var stdout, errOut bytes.Buffer
+	code = RunMemoryStep(t.Context(), filepath.Join(t.TempDir(), "none.yaml"), &stdout, &errOut, "doctor", nil, func() error { return nil })
+	assert.Equal(t, 0, code, errOut.String())
 }

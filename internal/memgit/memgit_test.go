@@ -25,6 +25,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memgit"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
@@ -460,4 +461,83 @@ func TestSyncCannotFastForward(t *testing.T) {
 	assert.Equal(t, memgit.SlugDiverged, w[0].Slug)
 	assert.Contains(t, w[0].Message, "tree walk")
 	assert.NoFileExists(t, filepath.Join(env, "memory", "api", "entries", "x.md"))
+}
+
+// TestSyncClonedTreePassesTheAllowlist holds what a clone into place and
+// a fast-forward write to the layout allowlist of 08 8.1, which sync and
+// julieta memory check apply (REQ-0645): git writes the files with the
+// process's umask, not julieta's modes, and memstore.Check admits them.
+func TestSyncClonedTreePassesTheAllowlist(t *testing.T) {
+	r := newRemote(t)
+	env := filepath.Join(t.TempDir(), "shop-env")
+	first := memgit.Project{Name: "shop", EnvDir: env, Remote: r.url}
+	write(t, filepath.Join(env, "memory"), "_shared/entries/01j9z3k8m6t2q4w5e7r9y1v3k5.md", "a\n")
+	write(t, filepath.Join(env, "memory"), "api/entries/01j9z3k8m6t2q4w5e7r9y1v3k6.md", "b\n")
+	_, err := memgit.Sync(t.Context(), runner(t), first)
+	require.NoError(t, err)
+
+	second := filepath.Join(t.TempDir(), "shop-env")
+	require.NoError(t, os.MkdirAll(filepath.Join(second, "memory"), 0o700))
+	w, err := memgit.Sync(t.Context(), runner(t), memgit.Project{Name: "shop", EnvDir: second, Remote: r.url})
+	require.NoError(t, err)
+	require.Empty(t, w)
+	for _, dir := range []string{"_shared", "api"} {
+		rep, err := memstore.CheckDir(filepath.Join(second, "memory", dir))
+		require.NoError(t, err, dir)
+		assert.Empty(t, rep.Findings, dir)
+	}
+}
+
+// TestSyncStagesWhatCommittedAdmits stages entries/ and stamps/ files
+// alone, whatever the sandbox writes: a .gitignore that re-includes
+// salvage/ and snapshot/, a dotfile under entries/; and commits nothing
+// when entries/ holds a nested directory or a symbolic link, which the
+// layout allowlist refuses, so another machine never refuses the tree.
+func TestSyncStagesWhatCommittedAdmits(t *testing.T) {
+	r := newRemote(t)
+	p := newProject(t, r.url)
+	mem := filepath.Join(p.EnvDir, "memory")
+	write(t, mem, ".gitignore", "!*\n")
+	write(t, mem, "api/.gitignore", "!snapshot/\n!salvage/\n")
+	write(t, mem, "top.txt", "top\n")
+	write(t, mem, "api/entries/.hidden", "h\n")
+	write(t, mem, "_shared/stamps/.x", "x\n")
+	_, err := memgit.Sync(t.Context(), runner(t), p)
+	require.NoError(t, err)
+	assert.Equal(t, "_shared/entries/01handoff.md\n_shared/stamps/01stamp.json\napi/entries/02entry.md",
+		git(t, r.dir, "ls-tree", "-r", "--name-only", "main"))
+
+	before := r.main(t)
+	gitDir := filepath.Join(p.EnvDir, "memory.git")
+	write(t, mem, "api/entries/04new.md", "new\n")
+	write(t, mem, "api/entries/sub/nested.md", "n\n")
+	_, err = memgit.Sync(t.Context(), runner(t), p)
+	require.ErrorContains(t, err, "api/entries/sub")
+	require.NoError(t, os.RemoveAll(filepath.Join(mem, "api", "entries", "sub")))
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(mem, "api", "entries", "03link.md")))
+	_, err = memgit.Sync(t.Context(), runner(t), p)
+	require.ErrorContains(t, err, "api/entries/03link.md")
+	require.NoError(t, os.Remove(filepath.Join(mem, "api", "entries", "03link.md")))
+	require.NoError(t, os.Symlink(filepath.Join(mem, "api", "salvage"), filepath.Join(mem, "_shared", "stamps2")))
+	require.NoError(t, os.Rename(filepath.Join(mem, "_shared", "stamps"), filepath.Join(mem, "_shared", "stamps.old")))
+	require.NoError(t, os.Rename(filepath.Join(mem, "_shared", "stamps2"), filepath.Join(mem, "_shared", "stamps")))
+	_, err = memgit.Sync(t.Context(), runner(t), p)
+	require.ErrorContains(t, err, "_shared/stamps is not a directory")
+	assert.Equal(t, before, r.main(t), "nothing pushed")
+	assert.Equal(t, before, git(t, gitDir, "rev-parse", "refs/heads/main"), "nothing committed")
+}
+
+// TestSyncPushesAgain pushes, on the next run, what a refused push left
+// on the local main: the next command pushes again (REQ-1304).
+func TestSyncPushesAgain(t *testing.T) {
+	r := newRemote(t)
+	p := newProject(t, r.readOnly)
+	w, err := memgit.Sync(t.Context(), runner(t), p)
+	require.NoError(t, err)
+	require.Len(t, w, 1)
+	p.Remote = r.url
+	w, err = memgit.Sync(t.Context(), runner(t), p)
+	require.NoError(t, err)
+	assert.Empty(t, w)
+	assert.Equal(t, git(t, filepath.Join(p.EnvDir, "memory.git"), "rev-parse", "refs/heads/main"), r.main(t))
 }

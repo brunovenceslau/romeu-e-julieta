@@ -21,10 +21,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 )
@@ -75,9 +79,10 @@ const (
 	workTreeName = "memory"
 )
 
-// remoteRef is where the fetch writes the remote's branches: a host
+// remoteRefs is where the fetch writes the remote's branches: a host
 // fetch destination of gitsafe (05 5.1, I5), under the reserved dir
-// name memory, which no repo dir can take (REQ-0176).
+// name memory, which no repo dir can take (REQ-0176); remoteMain is the
+// remote's main there, and localMain the memory repository's own.
 const (
 	remoteRefs = "refs/romeu/origin/memory/"
 	remoteMain = remoteRefs + "main"
@@ -86,16 +91,24 @@ const (
 
 // exclude is the ignore rule Sync writes into the git dir's
 // info/exclude, never into the memory dir: every path of the work tree
-// but entries/ and stamps/ of each memory dir is left out, and so are
-// julieta's temporary files (08 8.1, REQ-0654). snapshot/ and salvage/
-// are secret-bearing (08 8.5) and never leave the machine this way.
+// but the files of entries/ and stamps/ of each memory dir is left out,
+// dotfiles and directories below them too, julieta's temporary files
+// among the dotfiles (08 8.1, REQ-0654). snapshot/ and salvage/ are
+// secret-bearing (08 8.5) and never leave the machine. Staging does not
+// rest on it, since a .gitignore the sandbox writes overrides it:
+// collect names the files, and gitsafe.StageExactly stages those alone.
+// It keeps what git reads of the work tree, the fast-forward's check of
+// untracked files among it, to the same set.
 const exclude = `# Written by romeu (08 8.1): only entries/ and stamps/ of each memory dir.
 /*
 !/*/
 /*/*
 !/*/entries/
 !/*/stamps/
-.tmp-*
+/*/entries/*/
+/*/stamps/*/
+/*/entries/.*
+/*/stamps/.*
 `
 
 // Notices returns the warnings sync, run and doctor print every time
@@ -128,11 +141,13 @@ func (p Project) Separate() gitsafe.Separate {
 // Fsck and WalkTree and holds nothing but entries/ and stamps/ files,
 // and an empty memory dir takes the remote's history so (the clone into
 // place of REQ-1305); a history that cannot fast-forward is
-// memory-diverged and stops Sync; entries/ and stamps/ are staged and,
-// when the index changed, committed; main is pushed when it is not the
+// memory-diverged and stops Sync; the files of entries/ and stamps/
+// are collected without following a link and staged exactly (a link or
+// a directory there is an error) and, when the index changed,
+// committed; main is pushed when it is not the
 // remote's.
 func Sync(ctx context.Context, g *gitsafe.Runner, p Project) ([]Warning, error) {
-	if p.Remote == none {
+	if p.Remote == none || p.Remote == "" {
 		return nil, nil
 	}
 	s := p.Separate()
@@ -150,7 +165,7 @@ func Sync(ctx context.Context, g *gitsafe.Runner, p Project) ([]Warning, error) 
 	if err := writeExclude(s.GitDir); err != nil {
 		return nil, err
 	}
-	if err := g.Fetch(ctx, s.GitDir, p.Remote, []string{"+refs/heads/*:" + remoteRefs + "*"}); err != nil {
+	if err := g.Fetch(ctx, s.GitDir, p.Remote, []string{"+refs/heads/main*:" + remoteRefs + "main*"}); err != nil {
 		return []Warning{{SlugPushFailed, "the fetch of " + p.Remote + " failed, so nothing was committed or pushed: " + err.Error()}}, nil
 	}
 	remote, hasRemote, err := g.RefOID(ctx, s.GitDir, remoteMain)
@@ -167,7 +182,13 @@ func Sync(ctx context.Context, g *gitsafe.Runner, p Project) ([]Warning, error) 
 			return w, err
 		}
 	}
-	if err := g.AddAll(ctx, s); err != nil {
+	files, closeDirs, err := collect(s.WorkTree)
+	if err != nil {
+		return nil, err
+	}
+	err = g.StageExactly(ctx, s, files)
+	closeDirs()
+	if err != nil {
 		return nil, fmt.Errorf("memgit: %w", err)
 	}
 	changed, err := g.StagedChanges(ctx, s)
@@ -246,7 +267,7 @@ func diverged(p Project, why string) []Warning {
 // no dotfile.
 func committed(path string) bool {
 	parts := strings.Split(path, "/")
-	return len(parts) == 3 && (parts[1] == "entries" || parts[1] == "stamps") && !strings.HasPrefix(parts[2], ".")
+	return len(parts) == 3 && !strings.HasPrefix(parts[0], ".") && (parts[1] == "entries" || parts[1] == "stamps") && !strings.HasPrefix(parts[2], ".")
 }
 
 // writeExclude writes the excludes into gitDir/info/exclude when the
@@ -265,4 +286,128 @@ func writeExclude(gitDir string) error {
 		return fmt.Errorf("memgit: the excludes: %w", err)
 	}
 	return nil
+}
+
+// collect returns the files Sync stages: each regular file, not a
+// dotfile, directly in entries/ or stamps/ of a memory dir, a directory
+// of the work tree whose name is not a dotfile. Each level is opened
+// with O_NOFOLLOW relative to the one above (openat), so no symbolic
+// link the sandbox plants, before or during the walk, leads the read
+// outside the memory dir (08 8.1, REQ-1304). A symbolic link, a
+// directory or another node where an entry or a stamp belongs is the
+// layout allowlist's refusal (REQ-0645), and an error: nothing is
+// staged. The returned function closes the directories the files are
+// opened from, once they are staged.
+func collect(workTree string) ([]gitsafe.StagedFile, func(), error) {
+	var open []int
+	closeAll := func() {
+		for _, fd := range open {
+			_ = unix.Close(fd)
+		}
+	}
+	fail := func(err error) ([]gitsafe.StagedFile, func(), error) {
+		closeAll()
+		return nil, func() {}, err
+	}
+	rootFD, err := openDir(unix.AT_FDCWD, workTree)
+	if err != nil {
+		return fail(fmt.Errorf("memgit: the memory dir: %w", err))
+	}
+	open = append(open, rootFD)
+	dirs, err := readNames(rootFD)
+	if err != nil {
+		return fail(err)
+	}
+	var files []gitsafe.StagedFile
+	for _, dir := range dirs {
+		dirFD, err := openDir(rootFD, dir)
+		if err != nil {
+			continue // a file or a link at the top: the excludes leave it out, and so does this
+		}
+		open = append(open, dirFD)
+		for _, sub := range []string{"entries", "stamps"} {
+			subFD, err := openDir(dirFD, sub)
+			switch {
+			case errors.Is(err, unix.ENOENT):
+				continue
+			case err != nil:
+				return fail(fmt.Errorf("memgit: %s/%s is not a directory, which the layout allowlist of 08 8.1 refuses; nothing was committed or pushed", dir, sub))
+			}
+			open = append(open, subFD)
+			names, err := readNames(subFD)
+			if err != nil {
+				return fail(err)
+			}
+			for _, name := range names {
+				p := dir + "/" + sub + "/" + name
+				size, err := regularSize(subFD, name)
+				if err != nil {
+					return fail(fmt.Errorf("memgit: %s %w, which the layout allowlist of 08 8.1 refuses; nothing was committed or pushed", p, err))
+				}
+				fd := subFD
+				files = append(files, gitsafe.StagedFile{Path: p, Size: size, Open: func() (io.ReadCloser, error) {
+					return openRegular(fd, name)
+				}})
+			}
+		}
+	}
+	return files, closeAll, nil
+}
+
+// openDir opens the directory name below the directory dirFD, following
+// no link.
+func openDir(dirFD int, name string) (int, error) {
+	return unix.Openat(dirFD, name, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+}
+
+// readNames returns the names in the directory fd that are not
+// dotfiles, sorted, leaving fd open.
+func readNames(fd int) ([]string, error) {
+	dup, err := unix.Dup(fd)
+	if err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	f := os.NewFile(uintptr(dup), "dir")
+	defer func() { _ = f.Close() }()
+	all, err := f.Readdirnames(-1)
+	if err != nil {
+		return nil, fmt.Errorf("memgit: %w", err)
+	}
+	var names []string
+	for _, n := range all {
+		if !strings.HasPrefix(n, ".") {
+			names = append(names, n)
+		}
+	}
+	slices.Sort(names)
+	return names, nil
+}
+
+// regularSize returns the size of the regular file name below dirFD, or
+// why it is none.
+func regularSize(dirFD int, name string) (int64, error) {
+	var st unix.Stat_t
+	if err := unix.Fstatat(dirFD, name, &st, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+		return 0, err
+	}
+	if st.Mode&unix.S_IFMT != unix.S_IFREG {
+		return 0, errors.New("is not a regular file")
+	}
+	return st.Size, nil
+}
+
+// openRegular opens the regular file name below dirFD, following no
+// link and blocking on no FIFO, and refuses anything else.
+func openRegular(dirFD int, name string) (io.ReadCloser, error) {
+	fd, err := unix.Openat(dirFD, name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), name)
+	fi, err := f.Stat()
+	if err != nil || !fi.Mode().IsRegular() {
+		_ = f.Close()
+		return nil, fmt.Errorf("%s is not a regular file", name)
+	}
+	return f, nil
 }

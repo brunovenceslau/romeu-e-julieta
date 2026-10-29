@@ -6,8 +6,10 @@
 package gitsafe
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -20,6 +22,13 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
+
+// stagedOf returns a StagedFile of path that reads data.
+func stagedOf(path, data string) StagedFile {
+	return StagedFile{Path: path, Size: int64(len(data)), Open: func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader([]byte(data))), nil
+	}}
+}
 
 // newSeparate returns a Separate in a new directory: a work tree that
 // exists and a git dir that does not.
@@ -73,32 +82,50 @@ func TestInitSeparate(t *testing.T) {
 	require.ErrorIs(t, r.InitSeparate(t.Context(), relative), ErrRefused)
 }
 
-// TestCommitSeparate stages what the excludes leave in, commits it as
-// the project's name with no email, unsigned, and reports no staged
-// change once it is committed.
+// TestCommitSeparate stages exactly the files given, whatever the work
+// tree holds (a .gitignore that re-includes a secret, a file the files
+// do not name), commits them as the project's name with no email,
+// unsigned, and reports no staged change once they are committed.
 func TestCommitSeparate(t *testing.T) {
 	r := newRunner(t, Host)
 	s := newSeparate(t)
 	require.NoError(t, r.InitSeparate(t.Context(), s))
-	writeSep(t, s.GitDir, "info/exclude", "/*/salvage/\n")
-	writeSep(t, s.WorkTree, "api/entries/e.md", "e\n")
+	writeSep(t, s.WorkTree, ".gitignore", "!*\n")
 	writeSep(t, s.WorkTree, "api/salvage/x", "x\n")
+	writeSep(t, s.WorkTree, "api/entries/e.md", "on disk\n")
 
 	changed, err := r.StagedChanges(t.Context(), s)
 	require.NoError(t, err)
 	assert.False(t, changed, "nothing staged on an unborn branch")
-	require.NoError(t, r.AddAll(t.Context(), s))
+	files := []StagedFile{stagedOf("api/entries/e.md", "e\n"), stagedOf("_shared/stamps/s", "")}
+	require.NoError(t, r.StageExactly(t.Context(), s, files))
 	changed, err = r.StagedChanges(t.Context(), s)
 	require.NoError(t, err)
 	assert.True(t, changed)
 	require.NoError(t, r.Commit(t.Context(), s, Identity{Name: "shop"}, "memory of shop"))
 	assert.Equal(t, "shop <>|shop <>|N", sepGit(t, s, "log", "-1", "--format=%an <%ae>|%cn <%ce>|%G?"))
-	assert.Equal(t, "api/entries/e.md", sepGit(t, s, "ls-files"))
+	assert.Equal(t, "_shared/stamps/s\napi/entries/e.md", sepGit(t, s, "ls-tree", "-r", "--name-only", "HEAD"))
+	assert.Equal(t, "e", sepGit(t, s, "cat-file", "blob", "HEAD:api/entries/e.md"), "the bytes of the reader, not of the path")
 
-	require.NoError(t, r.AddAll(t.Context(), s))
+	require.NoError(t, r.StageExactly(t.Context(), s, files))
 	changed, err = r.StagedChanges(t.Context(), s)
 	require.NoError(t, err)
 	assert.False(t, changed)
+	require.NoError(t, r.StageExactly(t.Context(), s, files[:1]))
+	changed, err = r.StagedChanges(t.Context(), s)
+	require.NoError(t, err)
+	assert.True(t, changed, "a file left out is a deletion")
+
+	short := stagedOf("api/entries/e.md", "e\n")
+	short.Size = 5
+	require.ErrorIs(t, r.StageExactly(t.Context(), s, []StagedFile{short}), ErrRefused, "a reader shorter than its size")
+	long := stagedOf("api/entries/e.md", "e\n")
+	long.Size = 1
+	require.ErrorIs(t, r.StageExactly(t.Context(), s, []StagedFile{long}), ErrRefused, "a reader longer than its size")
+	for _, bad := range []string{"", "/abs", "../x", "a/../b", "a\tb", "a\nb", ".git/config", "a/*"} {
+		require.ErrorIs(t, r.StageExactly(t.Context(), s, []StagedFile{stagedOf(bad, "")}), ErrRefused, "%q", bad)
+	}
+	require.ErrorIs(t, r.StageExactly(t.Context(), s, []StagedFile{stagedOf("a", ""), stagedOf("a", "")}), ErrRefused, "twice")
 
 	for _, id := range []Identity{{}, {Name: "a<b>"}, {Name: "shop", SigningKey: "ssh-ed25519 AAAA"}, {Name: "shop", AgentSocket: "/s"}} {
 		require.ErrorIs(t, r.Commit(t.Context(), s, id, "m"), ErrRefused, "%+v", id)
@@ -146,8 +173,7 @@ func TestCommitSeparateSigned(t *testing.T) {
 	r := newRunner(t, Host)
 	s := newSeparate(t)
 	require.NoError(t, r.InitSeparate(t.Context(), s))
-	writeSep(t, s.WorkTree, "_shared/stamps/s", "s\n")
-	require.NoError(t, r.AddAll(t.Context(), s))
+	require.NoError(t, r.StageExactly(t.Context(), s, []StagedFile{stagedOf("_shared/stamps/s", "s\n")}))
 	socket, public := sshAgent(t)
 	require.NoError(t, r.Commit(t.Context(), s, Identity{Name: "shop", SigningKey: public, AgentSocket: socket}, "memory of shop"))
 	assert.Contains(t, sepGit(t, s, "cat-file", "commit", "HEAD"), "gpgsig -----BEGIN SSH SIGNATURE-----")
@@ -218,7 +244,7 @@ func TestSeparateArgv(t *testing.T) {
 	writeSep(t, s.GitDir, "HEAD", "ref: refs/heads/main\n")
 	require.NoError(t, os.Mkdir(filepath.Join(s.GitDir, "objects"), 0o700))
 
-	require.NoError(t, r.AddAll(t.Context(), s))
+	require.NoError(t, r.StageExactly(t.Context(), s, nil))
 	require.NoError(t, r.Commit(t.Context(), s, Identity{Name: "shop", SigningKey: "ssh-ed25519 AAAA k", AgentSocket: "/tmp/s"}, "m"))
 	var verbs [][]string
 	for _, c := range rec.commands {
@@ -233,11 +259,12 @@ func TestSeparateArgv(t *testing.T) {
 			}
 		}
 	}
-	require.Len(t, verbs, 2)
+	require.Len(t, verbs, 3)
 	head := slices.Concat([]string{"/usr/bin/git"}, hostFlags, []string{"-c", "core.bare=false"})
-	assert.Equal(t, slices.Concat(head, []string{"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "add", "-A", "--", "."}), verbs[0])
+	assert.Equal(t, slices.Concat(head, []string{"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "read-tree", "--empty"}), verbs[0])
+	assert.Equal(t, slices.Concat(head, []string{"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "update-index", "--index-info"}), verbs[1])
 	assert.Equal(t, slices.Concat(head, []string{
 		"-c", "commit.gpgSign=true", "-c", "gpg.format=ssh", "-c", "gpg.ssh.program=ssh-keygen", "-c", "user.signingKey=key::ssh-ed25519 AAAA k",
 		"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "commit", "-q", "--no-verify", "--cleanup=verbatim", "-m", "m",
-	}), verbs[1])
+	}), verbs[2])
 }
