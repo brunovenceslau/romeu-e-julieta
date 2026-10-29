@@ -6,7 +6,6 @@
 package salvage
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -52,9 +51,10 @@ func stopAgents(names []string, wait time.Duration) (salvage.AgentStop, error) {
 	for _, pid := range left {
 		signal(pid, syscall.SIGKILL)
 	}
-	if len(waitGone(left, names, killWait)) > 0 {
-		return salvage.AgentStop{}, errors.New("a process of the agent outlived SIGKILL")
-	}
+	// A process SIGKILL has not ended yet, one stuck in the kernel, is
+	// counted as killed and does not stop the salvage, which is when its
+	// work most needs keeping.
+	waitGone(left, names, killWait)
 	return salvage.AgentStop{Matched: len(pids), Killed: len(left)}, nil
 }
 

@@ -134,10 +134,12 @@ func (s *salvager) archiveIgnored(ctx context.Context, run *repoRun) (bool, erro
 				}
 				root, err := os.OpenRoot(p.root)
 				if err != nil {
-					return err
+					// The worktree went away since step 2 read it.
+					run.skip(p.label+" ignored files", ReasonUnreadable, err)
+					continue
 				}
 				for _, file := range p.files {
-					if err := addFile(tw, root, file.path, p.label+"/"+file.path, run); err != nil {
+					if err := addFile(tw, root, file, p.label+"/"+file.path, run); err != nil {
 						return errors.Join(err, root.Close())
 					}
 				}
@@ -239,7 +241,7 @@ func (s *salvager) archiveAgent(ctx context.Context, run *repoRun) (bool, error)
 				if err := ctx.Err(); err != nil {
 					return err
 				}
-				if err := addFile(tw, home, file.path, file.path, run); err != nil {
+				if err := addFile(tw, home, file, file.path, run); err != nil {
 					return err
 				}
 			}
@@ -269,12 +271,15 @@ func writeTarGz(w io.Writer, add func(*tar.Writer) error) error {
 // owner's alone.
 const archiveMode = 0o600
 
-// addFile adds the file p of root to tw as name: a symbolic link as a
-// link, not followed; a regular file with the size it has when opened,
-// opened without following a link. A file that is gone or no longer
-// regular is unreadable, and one that shrank while it was read is
-// padded with zeros and unreadable, so the archive stays whole.
-func addFile(tw *tar.Writer, root *os.Root, p, name string, run *repoRun) error {
+// addFile adds the file f of root to tw as name: a symbolic link as a
+// link, not followed; a regular file opened without following a link,
+// with at most the size the cap counted when it was listed, so a file
+// that grew since cannot pass the cap. A file that is gone or no longer
+// regular is unreadable; one that grew is cut to that size, and one
+// that shrank while it was read is padded with zeros, each unreadable,
+// so the archive stays whole.
+func addFile(tw *tar.Writer, root *os.Root, f ignoredFile, name string, run *repoRun) error {
+	p := f.path
 	info, err := root.Lstat(p)
 	if err != nil {
 		run.skip(name, ReasonUnreadable, err)
@@ -288,29 +293,36 @@ func addFile(tw *tar.Writer, root *os.Root, p, name string, run *repoRun) error 
 		}
 		return tw.WriteHeader(&tar.Header{Typeflag: tar.TypeSymlink, Name: name, Linkname: target, Mode: archiveMode, ModTime: info.ModTime()})
 	}
-	f, err := root.OpenFile(p, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	in, err := root.OpenFile(p, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if err != nil {
 		run.skip(name, ReasonUnreadable, err)
 		return nil
 	}
-	defer func() { _ = f.Close() }()
-	info, err = f.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		run.skip(name, ReasonUnreadable, fmt.Errorf("not a regular file when opened: %w", err))
+	defer func() { _ = in.Close() }()
+	info, err = in.Stat()
+	switch {
+	case err != nil:
+		run.skip(name, ReasonUnreadable, err)
+		return nil
+	case !info.Mode().IsRegular():
+		run.skip(name, ReasonUnreadable, fmt.Errorf("not a regular file when opened, but %s", info.Mode()))
 		return nil
 	}
-	if err := tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: name, Size: info.Size(), Mode: archiveMode, ModTime: info.ModTime()}); err != nil {
+	size := min(info.Size(), f.size)
+	if err := tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: name, Size: size, Mode: archiveMode, ModTime: info.ModTime()}); err != nil {
 		return err
 	}
-	n, err := io.Copy(tw, io.LimitReader(f, info.Size()))
-	if err != nil || n < info.Size() {
-		if _, padErr := io.CopyN(tw, zeros{}, info.Size()-n); padErr != nil {
+	n, err := io.Copy(tw, io.LimitReader(in, size))
+	if err != nil || n < size {
+		if _, padErr := io.CopyN(tw, zeros{}, size-n); padErr != nil {
 			return errors.Join(err, padErr)
 		}
 		if err == nil {
 			err = errors.New("the file shrank while it was archived")
 		}
 		run.skip(name, ReasonUnreadable, err)
+	} else if info.Size() > f.size {
+		run.skip(name, ReasonUnreadable, errors.New("the file grew after the cap counted it, and was cut to that size"))
 	}
 	return nil
 }

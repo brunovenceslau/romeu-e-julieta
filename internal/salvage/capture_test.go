@@ -528,3 +528,41 @@ func TestFingerprintMoves(t *testing.T) {
 	put(t, s.repo, "a.log", "12")
 	assert.NotEqual(t, logged.Ignored, read().Ignored)
 }
+
+// TestSalvageIndexOnlyPaths: an intent-to-add file is in the capture;
+// a file added to the index and then deleted from the worktree does not
+// fail the capture of the rest; a directory whose .git is a file or a
+// link, which could name any git dir, is not a nested repository but an
+// unreadable item, since git keeps none of it; and a
+// worktree that holds only a nested repository is not dirty.
+func TestSalvageIndexOnlyPaths(t *testing.T) {
+	s := newSandbox(t)
+	put(t, s.repo, "intent", "intent\n")
+	git(t, s.repo, "add", "-N", "intent")
+	put(t, s.repo, "staged", "staged\n")
+	git(t, s.repo, "add", "staged")
+	require.NoError(t, os.Remove(filepath.Join(s.repo, "staged")))
+	put(t, s.repo, "kept", "two\n")
+	put(t, s.repo, "fake/.git", "gitdir: "+filepath.Join(s.repo, ".git")+"\n")
+	_, err := salvage.Salvage(t.Context(), s.config(t))
+	require.NoError(t, err)
+	m := readManifest(t, s.dir())
+	assert.Equal(t, []string{"unreadable worktree-0/fake"}, reasons(m))
+	require.Len(t, m.Worktrees, 1, "fake/ is no nested repository")
+	files := git(t, s.repo, "ls-tree", "-r", "--name-only", m.Worktrees[0].Capture)
+	assert.Contains(t, files, "intent")
+	assert.NotContains(t, files, "fake")
+	assert.NotContains(t, files, "staged")
+	assert.Equal(t, "two", git(t, s.repo, "show", m.Worktrees[0].Capture+":kept"))
+
+	clean := newSandbox(t)
+	nested := filepath.Join(clean.repo, "lib")
+	require.NoError(t, os.Mkdir(nested, 0o700))
+	git(t, nested, "init", "-q")
+	commit(t, nested, "nested")
+	_, err = salvage.Salvage(t.Context(), clean.config(t))
+	require.NoError(t, err)
+	m = readManifest(t, clean.dir())
+	require.Len(t, m.Worktrees, 2)
+	assert.False(t, m.Worktrees[0].Dirty, "a nested repository alone is no dirt of its holder")
+}

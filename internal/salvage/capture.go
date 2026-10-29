@@ -344,6 +344,14 @@ func (s *salvager) captureUnit(ctx context.Context, run *repoRun, u unit, depth 
 	if ok {
 		fw.Head, fw.Status = read.changes.OID, read.status
 		nested = nestedOf(u.path, read.changes)
+		// A directory git does not descend into that is no nested
+		// repository, one whose .git is a file or a link, is in no
+		// capture: say so.
+		for _, p := range read.changes.Untracked {
+			if d, isDir := strings.CutSuffix(p, "/"); isDir && !slices.Contains(nested, d) {
+				run.skip(u.label+"/"+d, ReasonUnreadable, errors.New("its .git is not a directory, so git keeps none of it"))
+			}
+		}
 	}
 	ign, err := readIgnored(ctx, s.c.Git, u.path, s.c.ExcludeIgnored)
 	if ctxErr := ctx.Err(); ctxErr != nil {
@@ -403,7 +411,7 @@ func (s *salvager) captureWorktree(ctx context.Context, run *repoRun, u unit) (w
 		last = before
 		c := before.changes
 		rec.Head, rec.Branch, rec.Detached = c.OID, c.Branch, c.Branch == ""
-		rec.Dirty = len(c.Tracked) > 0 || len(c.Untracked) > 0
+		rec.Dirty = len(c.Tracked) > 0 || slices.ContainsFunc(c.Untracked, func(p string) bool { return !strings.HasSuffix(p, "/") })
 		if c.Operation != "" {
 			run.skip(u.label, ReasonInProgressOperation, fmt.Errorf("a %s is in progress", c.Operation))
 			return last, true
@@ -447,17 +455,23 @@ func (s *salvager) captureWorktree(ctx context.Context, run *repoRun, u unit) (w
 }
 
 // untracked returns the paths a capture of c adds: the files the index
-// adds, and the untracked files in git's order while the salvage cap
-// leaves room for them (REQ-0703); the untracked files beyond it, and
-// the budget left. A nested repository is not a file of the capture.
+// adds that the worktree still holds, and the untracked files in git's
+// order while the salvage cap leaves room for them (REQ-0703); the
+// untracked files beyond it, and the budget left. A nested repository
+// is not a file of the capture, and a path gone since git listed it is
+// left to the recheck, which sees it.
 func (s *salvager) untracked(dir string, c gitsafe.Changes) (add, over []string, budget int64) {
 	budget = s.budget
-	add = slices.Clone(c.Added)
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return add, nil, budget
+		return nil, nil, budget
 	}
 	defer func() { _ = root.Close() }()
+	for _, p := range c.Added {
+		if _, err := root.Lstat(p); err == nil {
+			add = append(add, p)
+		}
+	}
 	for _, p := range c.Untracked {
 		if strings.HasSuffix(p, "/") {
 			continue

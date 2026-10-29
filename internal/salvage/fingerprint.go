@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 )
 
@@ -141,13 +143,23 @@ func fileDigest(root *os.Root, p string) (string, error) {
 	case !info.Mode().IsRegular():
 		return "other:" + info.Mode().String(), nil
 	}
-	f, err := root.Open(p)
+	// Opened without following a link and without blocking, so a path
+	// swapped for a FIFO since the Lstat cannot hang the read, and read
+	// to the size the open file has, so a file that grows cannot either.
+	f, err := root.OpenFile(p, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if err != nil {
 		return "", err
 	}
 	defer func() { _ = f.Close() }()
+	open, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !open.Mode().IsRegular() {
+		return "other:" + open.Mode().String(), nil
+	}
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	if _, err := io.Copy(h, io.LimitReader(f, open.Size())); err != nil {
 		return "", err
 	}
 	return "file:" + hex.EncodeToString(h.Sum(nil)), nil
@@ -197,6 +209,7 @@ func readIgnored(ctx context.Context, git *gitsafe.Runner, dir string, exclude [
 	}
 	defer func() { _ = root.Close() }()
 	var r ignoredRead
+	files := 0
 	h := sha256.New()
 	excludedBy := func(p string) (string, bool) {
 		for _, e := range exclude {
@@ -224,6 +237,10 @@ func readIgnored(ctx context.Context, git *gitsafe.Runner, dir string, exclude [
 		}
 		entry := ignoredEntry{path: clean}
 		visit := func(p string, info fs.FileInfo) {
+			if files == maxIgnoredFiles {
+				return
+			}
+			files++
 			f := ignoredFile{path: p, size: info.Size(), modTime: info.ModTime(), link: info.Mode()&fs.ModeSymlink != 0}
 			if !info.Mode().IsRegular() && !f.link {
 				return // a FIFO, a socket or a device holds no content to keep
@@ -270,15 +287,26 @@ func readIgnored(ctx context.Context, git *gitsafe.Runner, dir string, exclude [
 		}
 		r.entries = append(r.entries, entry)
 	}
+	if files == maxIgnoredFiles {
+		return ignoredRead{}, fmt.Errorf("more than %d ignored files", maxIgnoredFiles)
+	}
 	r.digest = hex.EncodeToString(h.Sum(nil))
 	return r, nil
 }
 
-// isRepo reports whether the directory p of root holds .git, a
-// directory or the file of a linked repository.
+// maxIgnoredFiles bounds the ignored files one worktree lists: a
+// worktree that holds more is unreadable rather than held in memory. A
+// variable, so a test can lower it.
+var maxIgnoredFiles = 1_000_000
+
+// isRepo reports whether the directory p of root holds a .git
+// directory. A .git file or link, which could name any git dir of the
+// sandbox, is not one, so a nested repository's git calls stay in its
+// own directory; a submodule, whose .git is such a file, is captured
+// by its gitlink alone (decided while building T061).
 func isRepo(root *os.Root, p string) bool {
-	_, err := root.Lstat(path.Join(p, ".git"))
-	return err == nil
+	info, err := root.Lstat(path.Join(p, ".git"))
+	return err == nil && info.IsDir()
 }
 
 // worktreeSet is a repo's worktrees in the order of their labels: the

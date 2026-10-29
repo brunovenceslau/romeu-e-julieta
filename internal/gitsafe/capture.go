@@ -65,8 +65,8 @@ type Changes struct {
 	// Tracked are the paths whose index entry or working tree file
 	// differs from HEAD, a conflict's included, in git's order.
 	Tracked []string
-	// Added are the paths among Tracked that the index adds and HEAD
-	// lacks.
+	// Added are the paths among Tracked that the index adds, or marks
+	// intent-to-add, and HEAD lacks.
 	Added []string
 	// Untracked are the files that are neither tracked nor ignored, in
 	// git's order. A path that ends with a slash is a directory git
@@ -132,7 +132,9 @@ func (r *Runner) Changes(ctx context.Context, dir string) (Changes, error) {
 			if err != nil {
 				return err
 			}
-			if rec[2] == 'A' {
+			// Added in the index (A.) or intent-to-add (.A): HEAD lacks
+			// the path, so the capture adds it by name.
+			if rec[2] == 'A' || rec[3] == 'A' {
 				if err := keep(&c.Added, path); err != nil {
 					return err
 				}
@@ -221,6 +223,7 @@ func (r *Runner) Gitlinks(ctx context.Context, dir string) ([]string, error) {
 		return nil, err
 	}
 	var paths []string
+	seen := map[string]bool{}
 	w := &records{limit: maxStatusRecord, each: func(rec string) error {
 		// "<mode> <object> <stage>\t<path>"
 		meta, path, ok := strings.Cut(rec, "\t")
@@ -228,9 +231,10 @@ func (r *Runner) Gitlinks(ctx context.Context, dir string) ([]string, error) {
 		if !ok || path == "" || len(fields) != 3 {
 			return fmt.Errorf("%w: ls-files record %q", ErrRefused, termsafe.Escape(rec))
 		}
-		if fields[0] != gitlinkMode || slices.Contains(paths, path) {
+		if fields[0] != gitlinkMode || seen[path] {
 			return nil
 		}
+		seen[path] = true
 		if len(paths) == maxCapturePaths {
 			return fmt.Errorf("%w: more than %d submodules", ErrRefused, maxCapturePaths)
 		}
@@ -338,6 +342,13 @@ func (r *Runner) CaptureCommit(ctx context.Context, dir string, c Capture) (stri
 		if _, err := git(list, "add", "--force", "--pathspec-from-file=-", "--pathspec-file-nul"); err != nil {
 			return "", err
 		}
+	}
+	// A filter driver the config gained since the listing above could
+	// have run during the adds: refuse the capture (05 5.1).
+	if again, err := r.filterOverrides(ctx, dir); err != nil {
+		return "", err
+	} else if !slices.Equal(again, noFilters) {
+		return "", fmt.Errorf("%w: the filter drivers of the config changed during the capture", ErrRefused)
 	}
 	tree, err := git("", "write-tree")
 	if err != nil {

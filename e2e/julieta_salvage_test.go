@@ -201,15 +201,15 @@ step fingerprint "$J" salvage --fingerprint
 step nothing sh -c 'ls -A /tmp/memory/api | grep -c salvage || true'
 step salvage "$J" salvage --json
 step same sh -c '[ "$(git status --porcelain=v2 --untracked-files=all; sha256sum .git/index)" = "$1" ] && echo same' sh "$before"
-step manifest cat ` + salvageDir + `/manifest.json
-step heads git bundle list-heads ` + salvageDir + `/repo.bundle
-step verify git bundle verify -q ` + salvageDir + `/repo.bundle
-step author git log -1 --format='%an %ae' ` + salvagePrefix + `worktree-0
-step unsigned sh -c 'git cat-file commit ` + salvagePrefix + `worktree-0 | grep -c gpgsig || true'
-step linked git show ` + salvagePrefix + `worktree-1:linked
-step captured git ls-tree --name-only ` + salvagePrefix + `worktree-0
-step nested git -C vendor/lib show ` + salvagePrefix + `worktree-0:dirt
-step nestedstash git -C vendor/lib rev-parse ` + salvagePrefix + `stash-0
+step manifest cat `+salvageDir+`/manifest.json
+step heads git bundle list-heads `+salvageDir+`/repo.bundle
+step verify git bundle verify -q `+salvageDir+`/repo.bundle
+step author git log -1 --format='%an %ae' `+salvagePrefix+`worktree-0
+step unsigned sh -c 'git cat-file commit `+salvagePrefix+`worktree-0 | grep -c gpgsig || true'
+step linked git show `+salvagePrefix+`worktree-1:linked
+step captured git ls-tree --name-only `+salvagePrefix+`worktree-0
+step nested git -C vendor/lib show `+salvagePrefix+`worktree-0:dirt
+step nestedstash git -C vendor/lib rev-parse `+salvagePrefix+`stash-0
 step modes find /tmp/memory/api/salvage -printf '%m %y %p\n'
 step check "$J" memory check
 `)
@@ -294,12 +294,12 @@ g commit -q -m two
 set +e
 g rebase -q r1 >/dev/null 2>&1
 set -e
-cd ` + primaryPath + `
-mkdir -p /tmp/memory/api/salvage/` + salvageGeneration + `/01jaz00000000000000000000a
+cd `+primaryPath+`
+mkdir -p /tmp/memory/api/salvage/`+salvageGeneration+`/01jaz00000000000000000000a
 step salvage "$J" salvage
-step manifest cat ` + salvageDir + `/manifest.json
-step archive tar -tzf ` + salvageDir + `/ignored.tar.gz
-step kept ls -A /tmp/memory/api/salvage/` + salvageGeneration + `
+step manifest cat `+salvageDir+`/manifest.json
+step archive tar -tzf `+salvageDir+`/ignored.tar.gz
+step kept ls -A /tmp/memory/api/salvage/`+salvageGeneration+`
 `)
 	r := step(t, steps, "salvage")
 	require.Equal(t, 0, r.code, r.stderr)
@@ -320,11 +320,12 @@ export JULIETA_MANIFEST=`+diskFullManifest(t)+`
 g clone -q /tmp/srv/api.git /dev/shm/api
 cd /dev/shm/api
 echo dirt >dirt
-dd if=/dev/zero of=/dev/shm/filler bs=64k 2>/dev/null || true
+step fill dd if=/dev/zero of=/dev/shm/filler bs=64k
 step salvage "$J" salvage
 rm -f /dev/shm/filler
 step manifest cat `+salvageDir+`/manifest.json
 `)
+	assert.Contains(t, step(t, steps, "fill").stderr, "No space left on device", "the tmpfs is full")
 	r := step(t, steps, "salvage")
 	require.Equal(t, 0, r.code, r.stderr)
 	m := salvageManifest(t, step(t, steps, "manifest"))
@@ -445,7 +446,8 @@ step manifest cat `+salvageDir+`/manifest.json
 `)
 	r := step(t, steps, "salvage")
 	require.Equal(t, 0, r.code, r.stderr)
-	assert.Equal(t, `{"path":"/tmp/home/.local/state/julieta/locks/_shared.lock","progress":"lock-wait"}`+"\n", r.stderr)
+	assert.JSONEq(t, `{"path":"`+sandboxHome+`/.local/state/julieta/locks/_shared.lock","progress":"lock-wait"}`, r.stderr)
+	assert.Equal(t, 1, strings.Count(r.stderr, "\n"), "one progress line")
 	assert.Equal(t, "stamp\n", step(t, steps, "stamp").stdout, "the stamp finished first")
 	m := salvageManifest(t, step(t, steps, "manifest"))
 	for _, f := range m.Files {

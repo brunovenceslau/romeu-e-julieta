@@ -28,12 +28,20 @@ func WaitLocks(locks []string, lock LockFunc, waiting func(path string)) error {
 	for _, p := range locks {
 		var mu sync.Mutex
 		var timer *time.Timer
+		taken := false
 		unlock, err := lock(p, func() {
 			mu.Lock()
 			defer mu.Unlock()
-			timer = time.AfterFunc(LockReport, func() { waiting(p) })
+			timer = time.AfterFunc(LockReport, func() {
+				mu.Lock()
+				defer mu.Unlock()
+				if !taken {
+					waiting(p)
+				}
+			})
 		})
 		mu.Lock()
+		taken = true
 		if timer != nil {
 			timer.Stop()
 		}
