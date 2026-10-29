@@ -62,9 +62,11 @@ func TestCheckDriftStopsAnEditedLiveFile(t *testing.T) {
 		edit func(t *testing.T, p string)
 	}{
 		{"an edited sbxenv.yaml", render.LiveEnvFile, func(t *testing.T, p string) {
+			t.Helper()
 			require.NoError(t, os.WriteFile(p, []byte("edited: true\n"), 0o600))
 		}},
 		{"a missing julieta binary", render.BinDir + "/julieta-linux-", func(t *testing.T, p string) {
+			t.Helper()
 			matches, err := filepath.Glob(p + "*")
 			require.NoError(t, err)
 			require.Len(t, matches, 1)

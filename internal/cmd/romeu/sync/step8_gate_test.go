@@ -332,16 +332,22 @@ func TestGateAndPromoteAgainChangesNothing(t *testing.T) {
 
 // TestGateAndPromoteShowsTheChangeFromTheApproval: a changed widening
 // is shown against the approved side read from the live files, so the
-// diff names the change, not the whole candidate as added.
+// diff names the change, not the whole candidate as added; N then
+// leaves the live files of the approval byte-identical (I7).
+//
+//romeu:invariant I7 test
 func TestGateAndPromoteShowsTheChangeFromTheApproval(t *testing.T) {
 	f := gateRun(t)
 	f.approve(t)
+	before := f.outsideCandidates(t)
 	f.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
 	f.rerender(t)
 
 	shown, err := f.gateOnPTY(t, "n\n")
 
 	require.NoError(t, err)
+	assert.Equal(t, before, f.outsideCandidates(t), "N leaves the promoted live files byte-identical (I7)")
+	assert.Empty(t, f.candidates(t))
 	assert.NotContains(t, f.stderr.String(), "not the approved render", "the approved side is read from the live files")
 	assert.Contains(t, shown, "product:plain")
 	assert.Contains(t, shown, "withcaps")

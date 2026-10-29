@@ -198,9 +198,10 @@ func promote(r *run, p spec.Project, env string, c *candidate, a *state.Approval
 // whole candidate as added, never less than its set holds; a line on
 // stderr says why.
 func diff(r *run, env string, c *candidate) (gate.Diff, error) {
+	full, err := gate.NewDiff(nil, c.side)
 	a := c.project.Approval
-	if a == nil {
-		return gate.NewDiff(nil, c.side)
+	if err != nil || a == nil {
+		return full, err
 	}
 	old, err := approvedSide(env, a)
 	if err == nil {
@@ -214,7 +215,7 @@ func diff(r *run, env string, c *candidate) (gate.Diff, error) {
 		termsafe.Escape(err.Error())); werr != nil {
 		return gate.Diff{}, werr
 	}
-	return gate.NewDiff(nil, c.side)
+	return full, nil
 }
 
 // approvedSide returns the approved side of the gate 2 diff of the
