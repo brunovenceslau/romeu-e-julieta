@@ -83,19 +83,44 @@ func checkRefName(name string, pattern bool) error {
 	return nil
 }
 
+// originPrefix is the namespace of the origin fetches of a host clone,
+// one directory per repo dir (02 2.3).
+const originPrefix = "refs/romeu/origin/"
+
+// remoteHEAD is the one refspec source that is not a ref name under
+// refs/: the remote's HEAD, which a host fetch takes into
+// refs/romeu/origin/<dir>/HEAD only, so a repo with no ref resolves
+// its egress from the origin (I9; decided on 2026-10-29, T183).
+const remoteHEAD = "HEAD"
+
 // checkRefspec returns ErrRefused, wrapped with the reason, for a
 // fetch refspec of the mode that is not <src>:<dst>, with an optional
 // leading +, both sides full ref names under refs/, a * on both sides
 // or on neither, and <dst> in a fetch destination of the mode (I5).
+// One source is not under refs/: on the host, HEAD, the remote's HEAD,
+// into refs/romeu/origin/<dir>/HEAD only, and no other source writes
+// that ref, so refs/romeu/origin/<dir>/HEAD is written only by a fetch
+// whose source is HEAD (decided on 2026-10-29, T183). A pattern under
+// refs/romeu/origin/ has its * as the whole last component of its
+// destination, so only a source ref whose * part is HEAD maps onto a
+// HEAD, which Fetch excludes (originNegatives).
 //
 //romeu:invariant I5 guard
 func checkRefspec(mode Mode, spec string) error {
-	src, dst, ok := strings.Cut(strings.TrimPrefix(spec, "+"), ":")
+	src, dst, ok := splitRefspec(spec)
 	if !ok {
 		return fmt.Errorf("%w: refspec %q has no destination", ErrRefused, spec)
 	}
-	if err := checkRefName(src, true); err != nil {
-		return fmt.Errorf("refspec %q: %w", spec, err)
+	intoHEAD := mode == Host && isOriginHEAD(dst)
+	switch {
+	case src == remoteHEAD && (!intoHEAD || !strings.HasSuffix(dst, "/"+remoteHEAD)):
+		return fmt.Errorf("%w: refspec %q fetches the remote's HEAD outside %s<dir>/HEAD", ErrRefused, spec, originPrefix)
+	case src != remoteHEAD && intoHEAD:
+		return fmt.Errorf("%w: refspec %q writes %s<dir>/HEAD from another source than the remote's HEAD", ErrRefused, spec, originPrefix)
+	case src != remoteHEAD:
+		if err := checkRefName(src, true); err != nil {
+			return fmt.Errorf("refspec %q: %w", spec, err)
+		}
 	}
 	if err := checkRefName(dst, true); err != nil {
 		return fmt.Errorf("refspec %q: %w", spec, err)
@@ -103,10 +128,29 @@ func checkRefspec(mode Mode, spec string) error {
 	if strings.Contains(src, "*") != strings.Contains(dst, "*") {
 		return fmt.Errorf("%w: refspec %q has a * on one side only", ErrRefused, spec)
 	}
+	if strings.HasPrefix(dst, originPrefix) && strings.Contains(dst, "*") && !strings.HasSuffix(dst, "/*") {
+		return fmt.Errorf("%w: refspec %q has a * that is not the whole last component of its destination under %s", ErrRefused, spec, originPrefix)
+	}
 	if !inNamespace(dst, fetchDestinations[mode]) {
 		return fmt.Errorf("%w: refspec %q writes outside %s", ErrRefused, spec, strings.Join(fetchDestinations[mode], ", "))
 	}
 	return nil
+}
+
+// splitRefspec returns the source and destination of a fetch refspec,
+// its leading + dropped, and false when it has no colon.
+func splitRefspec(spec string) (src, dst string, ok bool) {
+	return strings.Cut(strings.TrimPrefix(spec, "+"), ":")
+}
+
+// isOriginHEAD reports whether ref is refs/romeu/origin/<dir>/<name>,
+// <dir> one segment with no *, and <name> HEAD under case folding: on
+// a case-insensitive file system, git stores <dir>/head as the same
+// file as <dir>/HEAD.
+func isOriginHEAD(ref string) bool {
+	rest, ok := strings.CutPrefix(ref, originPrefix)
+	dir, name, cut := strings.Cut(rest, "/")
+	return ok && cut && dir != "" && !strings.Contains(dir, "*") && strings.EqualFold(name, remoteHEAD)
 }
 
 // inNamespace reports whether ref, a name checkRefName accepts, is in

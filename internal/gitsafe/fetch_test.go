@@ -6,38 +6,205 @@
 package gitsafe
 
 import (
+	"context"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
+
+// TestFetchRefusesRefspecPatternIntoOrigin: a pattern into
+// refs/romeu/origin/ whose * is not a whole last component could build
+// <dir>/HEAD from a ref not named HEAD, so it is refused before git
+// runs.
+//
+//romeu:invariant I5 test
+func TestFetchRefusesRefspecPatternIntoOrigin(t *testing.T) {
+	for _, spec := range []string{
+		"+refs/heads/*:refs/romeu/origin/x/H*",
+		"+refs/heads/*:refs/romeu/origin/x/HE*",
+		"+refs/heads/*:refs/romeu/origin/x/*D",
+		"+refs/heads/*:refs/romeu/origin/x/*/y",
+	} {
+		t.Run(spec, func(t *testing.T) {
+			r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: "/h"})
+			require.NoError(t, err)
+			var rec recorder
+			rec.install(r)
+			err = r.Fetch(t.Context(), stubRepo, "https://github.com/o/r.git", []string{spec})
+			require.ErrorIs(t, err, ErrRefused)
+			assert.Contains(t, err.Error(), spec)
+			assert.Empty(t, rec.commands, "refused before git runs")
+		})
+	}
+}
+
+// advertiseHEAD makes the recorded runner r answer ls-remote --symref
+// with the advertisement out, after the recorder records the call.
+func advertiseHEAD(r *Runner, out string) {
+	recorded := r.start
+	r.start = func(ctx context.Context, c procgroup.Command) error {
+		if err := recorded(ctx, c); err != nil {
+			return err
+		}
+		if slices.Contains(c.Argv, "--symref") && c.Stdout != nil {
+			_, err := io.WriteString(c.Stdout, out)
+			return err
+		}
+		return nil
+	}
+}
+
+// liveHEAD is the advertisement of a remote whose HEAD names a branch.
+var liveHEAD = "ref: refs/heads/main\tHEAD\n" + strings.Repeat("a", 40) + "\tHEAD\n"
 
 // TestFetchArgv: a fetch carries the four flags of 05 5.1 and an
 // explicit URL with refspecs, never a remote name, after the
-// resolution of the URL.
+// resolution of the URL; a fetch into refs/romeu/origin/ carries,
+// once, the negative refspecs of every name git reads HEAD as but HEAD
+// itself, and a fetch of the remote's HEAD first asks the remote for
+// its HEAD, with ls-remote under the same settings.
 func TestFetchArgv(t *testing.T) {
+	const url = "https://github.com/o/r.git"
+	negatives := []string{"^refs/HEAD", "^refs/tags/HEAD", "^refs/heads/HEAD", "^refs/remotes/HEAD", "^refs/remotes/HEAD/HEAD"}
+	tests := []struct {
+		name  string
+		specs []string
+		extra []string
+		head  bool // ls-remote asks for the remote's HEAD
+	}{
+		{"outside refs/romeu/origin/", []string{"+refs/heads/*:refs/sandboxes/shop/*"}, nil, false},
+		{"a pattern only", []string{"+refs/heads/*:refs/romeu/origin/r/*"}, negatives, false},
+		{"a pattern of another prefix", []string{"+refs/foo/*:refs/romeu/origin/r/*"}, append(slices.Clone(negatives), "^refs/foo/HEAD"), false},
+		{"two patterns, two prefixes", []string{"+refs/heads/*:refs/romeu/origin/r/*", "+refs/pull/*:refs/romeu/origin/r/pull/*", "+refs/notes/H*:refs/romeu/origin/s/*", "+refs/pull/*:refs/romeu/origin/s/pull/*"}, append(slices.Clone(negatives), "^refs/pull/HEAD", "^refs/notes/HHEAD"), false},
+		{"a pattern outside the namespace derives none", []string{"+refs/foo/*:refs/sandboxes/shop/*", "refs/heads/main:refs/romeu/origin/r/main"}, negatives, false},
+		{"one branch", []string{"refs/heads/main:refs/romeu/origin/r/pinned", "+refs/heads/*:refs/sandboxes/shop/*"}, negatives, false},
+		{"HEAD", []string{"+refs/heads/*:refs/romeu/origin/r/*", "+HEAD:refs/romeu/origin/r/HEAD", "refs/heads/main:refs/romeu/origin/r/pinned"}, negatives, true},
+		{"HEAD of two dirs", []string{"+HEAD:refs/romeu/origin/r/HEAD", "HEAD:refs/romeu/origin/s/HEAD"}, negatives, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: "/h", GitHosts: []GitHost{{Host: "github.com", CAFile: "/ca.pem"}}})
+			require.NoError(t, err)
+			var rec recorder
+			rec.install(r)
+			advertiseHEAD(r, liveHEAD)
+			require.NoError(t, r.Fetch(t.Context(), stubRepo, url, tt.specs))
+			require.Len(t, rec.commands, map[bool]int{false: 2, true: 3}[tt.head])
+
+			// The flags of the mode, then the caFile of the host.
+			flags := 1 + len(hostFlags) + 2
+			resolve := rec.commands[0]
+			assert.Equal(t, []string{"ls-remote", "--get-url", url}, resolve.Argv[flags:])
+			assert.Equal(t, stubRepo, resolve.Dir)
+			fetch := rec.commands[len(rec.commands)-1]
+			assert.Equal(t, "http.https://github.com/.sslCAInfo=/ca.pem", fetch.Argv[flags-1])
+			if tt.head {
+				head := rec.commands[1]
+				assert.Equal(t, []string{"ls-remote", "--symref", "--", url, "HEAD"}, head.Argv[flags:])
+				assert.Equal(t, fetch.Argv[:flags], head.Argv[:flags], "the flags of the fetch")
+				assert.Equal(t, fetch.Env, head.Env)
+				assert.Equal(t, stubRepo, head.Dir)
+			}
+
+			assert.Equal(t, stubRepo, fetch.Dir)
+			assert.Equal(t,
+				slices.Concat([]string{"fetch", "--no-tags", "--no-prune", "--no-recurse-submodules", "--no-write-fetch-head", url}, tt.specs, tt.extra),
+				fetch.Argv[flags:])
+			assert.NotContains(t, fetch.Argv, "origin")
+		})
+	}
+
+	r, err := New(Config{Mode: Sandbox, Git: "/usr/bin/git", Home: "/h"})
+	require.NoError(t, err)
+	var rec recorder
+	rec.install(r)
+	require.NoError(t, r.Fetch(t.Context(), stubRepo, url, []string{"+refs/heads/*:refs/remotes/origin/*"}))
+	require.Len(t, rec.commands, 2)
+	assert.Equal(t, "+refs/heads/*:refs/remotes/origin/*", rec.commands[1].Argv[len(rec.commands[1].Argv)-1], "a sandbox fetch carries no negative refspec")
+}
+
+// TestFetchRefspecChecksRemoteHEAD: a fetch of the remote's HEAD runs
+// only when the remote advertises exactly one HEAD that names a
+// commit; an unborn HEAD (its ref: line alone), a look-alike such as
+// refs/heads/HEAD, and an id that is not one are refused, and the
+// fetch never starts.
+//
+//romeu:invariant I5 test
+func TestFetchRefspecChecksRemoteHEAD(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	tests := []struct {
+		name   string
+		advert string
+		ok     bool
+	}{
+		{"live", liveHEAD, true},
+		{"detached", oid + "\tHEAD\n", true},
+		{"live beside a look-alike", liveHEAD + oid + "\trefs/heads/HEAD\n", true},
+		{"sha256", strings.Repeat("0a", 32) + "\tHEAD\n", true},
+		{"nothing", "", false},
+		{"unborn", "ref: refs/heads/missing\tHEAD\n", false},
+		{"a look-alike only", oid + "\trefs/heads/HEAD\n" + oid + "\trefs/tags/HEAD\n", false},
+		{"two HEAD lines", liveHEAD + strings.Repeat("b", 40) + "\tHEAD\n", false},
+		{"a short id", "abc\tHEAD\n", false},
+		{"an upper-case id", strings.Repeat("A", 40) + "\tHEAD\n", false},
+		{"no tab", oid + " HEAD\n", false},
+		{"a trailing field", oid + "\tHEAD\tx\n", false},
+		{"no newline", oid + "\tHEAD", true},
+		{"crlf", oid + "\tHEAD\r\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: "/h"})
+			require.NoError(t, err)
+			var rec recorder
+			rec.install(r)
+			advertiseHEAD(r, tt.advert)
+			err = r.Fetch(t.Context(), stubRepo, "https://github.com/o/r.git",
+				[]string{"+HEAD:refs/romeu/origin/app/HEAD", "+refs/heads/*:refs/romeu/origin/app/*"})
+			fetched := slices.ContainsFunc(rec.commands, func(c procgroup.Command) bool { return slices.Contains(c.Argv, "fetch") })
+			if tt.ok {
+				require.NoError(t, err)
+				assert.True(t, fetched)
+				return
+			}
+			require.ErrorIs(t, err, ErrRefused)
+			assert.Contains(t, err.Error(), "github.com/o/r.git")
+			assert.False(t, fetched, "no fetch ran")
+		})
+	}
+
 	r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: "/h"})
 	require.NoError(t, err)
 	var rec recorder
 	rec.install(r)
-	const url = "https://github.com/o/r.git"
-	specs := []string{"+refs/heads/*:refs/romeu/origin/r/*", "refs/heads/main:refs/romeu/origin/r/pinned"}
-	require.NoError(t, r.Fetch(t.Context(), stubRepo, url, specs))
-	require.Len(t, rec.commands, 2)
+	advertiseHEAD(r, strings.Repeat(oid+"\trefs/heads/HEAD\n", outputLimit/len(oid)))
+	err = r.Fetch(t.Context(), stubRepo, "https://github.com/o/r.git", []string{"+HEAD:refs/romeu/origin/app/HEAD"})
+	require.ErrorIs(t, err, ErrRefused, "an advertisement over the bound")
+	assert.Contains(t, err.Error(), "more than")
+	assert.Len(t, rec.commands, 2, "no fetch ran")
+}
 
-	resolve := rec.commands[0]
-	assert.Equal(t, []string{"ls-remote", "--get-url", url}, resolve.Argv[1+len(hostFlags):])
-	assert.Equal(t, stubRepo, resolve.Dir)
-
-	fetch := rec.commands[1]
-	assert.Equal(t, stubRepo, fetch.Dir)
-	assert.Equal(t,
-		append([]string{"fetch", "--no-tags", "--no-prune", "--no-recurse-submodules", "--no-write-fetch-head", url}, specs...),
-		fetch.Argv[1+len(hostFlags):])
-	assert.NotContains(t, fetch.Argv, "origin")
+// TestFetchRefspecRemoteHEADMoved: the ask for the remote's HEAD
+// follows no redirect either, and fails with ErrMoved as the fetch
+// does, before any request reaches the other host.
+func TestFetchRefspecRemoteHEADMoved(t *testing.T) {
+	url, hosts, reached := moved(t, http.StatusMovedPermanently)
+	r, err := New(Config{Mode: Host, Git: gitPath(t), Home: t.TempDir(), GitHosts: hosts})
+	require.NoError(t, err)
+	dir, _ := newRepo(t)
+	err = r.Fetch(t.Context(), dir, url, []string{"+HEAD:refs/romeu/origin/app/HEAD"})
+	assertMoved(t, err, url, http.StatusMovedPermanently)
+	assert.Contains(t, err.Error(), "git ls-remote", "the ask for HEAD failed, before the fetch")
+	assert.Zero(t, reached.Load(), "no request reaches the new host")
 }
 
 // TestFetch fetches over the loopback daemon in each mode into the
@@ -79,7 +246,7 @@ func TestFetchCAFile(t *testing.T) {
 	src, head := newRepo(t)
 	host, caFile := serveHTTPS(t, bareCopy(t, src, "repo.git"))
 	url := "https://" + host + "/repo.git"
-	specs := []string{"+refs/heads/*:refs/romeu/origin/app/*"}
+	specs := []string{"+refs/heads/*:refs/romeu/origin/app/*", "+HEAD:refs/romeu/origin/app/HEAD"}
 	tests := []struct {
 		name  string
 		hosts []GitHost

@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // fetchFlags are the flags of every fetch (05 5.1): a fetch that
@@ -19,9 +20,13 @@ var fetchFlags = []string{"--no-tags", "--no-prune", "--no-recurse-submodules", 
 // Fetch fetches the refspecs from url into the repository in dir. The
 // URL is explicit, never a remote name, and both it and what the
 // repository's config rewrites it to must pass CheckURL; each refspec
-// must write into a fetch destination of the mode (I5). A server that
-// answers with a redirect, which host mode does not follow, fails the
-// fetch with ErrMoved.
+// must write into a fetch destination of the mode (I5).
+// refs/romeu/origin/<dir>/HEAD is written only by a fetch whose source
+// is HEAD, checked by ls-remote just before (checkRemoteHEAD), and no
+// fetch into refs/romeu/origin/ mirrors a ref named HEAD
+// (originNegatives; decided on 2026-10-29, T183). A server that answers
+// with a redirect, which host mode does not follow, fails the fetch
+// with ErrMoved.
 func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) error {
 	if err := checkRepo(dir); err != nil {
 		return err
@@ -38,7 +43,13 @@ func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) 
 	if err != nil {
 		return err
 	}
+	if slices.ContainsFunc(refspecs, fetchesHEAD) {
+		if err := r.checkRemoteHEAD(ctx, dir, url, resolved); err != nil {
+			return err
+		}
+	}
 	args := slices.Concat([]string{"fetch"}, fetchFlags, []string{url}, refspecs)
+	args = append(args, originNegatives(refspecs)...)
 	return movedError(r.runWith(ctx, dir, r.hostSettings(url), nil, args...), url, resolved)
 }
 
@@ -73,4 +84,73 @@ func (r *Runner) FastForward(ctx context.Context, dir, oid string) error {
 		return err
 	}
 	return r.runInput(ctx, dir, nil, noFilters, nil, nil, "merge", "--ff-only", "--no-stat", "--no-overwrite-ignore", "--no-verify-signatures", oid)
+}
+
+// headLookalikes are the negative refspecs of every name but HEAD
+// itself that git's lookup of the source HEAD tries, in the order of
+// ref_rev_parse_rules (git refs.c), so the source HEAD reads only the
+// remote's HEAD. Negative refspecs came with git 2.29, below the
+// floor.
+var headLookalikes = []string{"^refs/HEAD", "^refs/tags/HEAD", "^refs/heads/HEAD", "^refs/remotes/HEAD", "^refs/remotes/HEAD/HEAD"}
+
+// originNegatives returns the negative refspecs of a fetch of
+// refspecs, each one checkRefspec accepts: none when no refspec writes
+// into refs/romeu/origin/; otherwise headLookalikes, then, for each
+// pattern into the namespace, its source with the * read as HEAD, the
+// one ref the pattern would map onto a ref named HEAD; each once.
+func originNegatives(refspecs []string) []string {
+	var negatives []string
+	for _, spec := range refspecs {
+		src, dst, _ := splitRefspec(spec)
+		if !strings.HasPrefix(dst, originPrefix) {
+			continue
+		}
+		if negatives == nil {
+			negatives = slices.Clone(headLookalikes)
+		}
+		if derived := "^" + strings.Replace(src, "*", remoteHEAD, 1); strings.Contains(src, "*") && !slices.Contains(negatives, derived) {
+			negatives = append(negatives, derived)
+		}
+	}
+	return negatives
+}
+
+// fetchesHEAD reports whether spec fetches the remote's HEAD.
+func fetchesHEAD(spec string) bool {
+	src, _, _ := splitRefspec(spec)
+	return src == remoteHEAD
+}
+
+// checkRemoteHEAD returns ErrRefused unless the remote at url, which
+// resolves to resolved, advertises exactly one HEAD that names a full
+// object id, read with ls-remote --symref under the settings of the
+// fetch, its output bounded by outputLimit, over which the remote is
+// refused too. An unborn HEAD, or one
+// that names a missing branch, shows only its ref: line, so the fetch
+// is refused before it runs and writes nothing; a <dir>/HEAD of an
+// earlier fetch stays as it was. The remote's HEAD can still move
+// between the two calls; the fetch then takes where it moved to.
+func (r *Runner) checkRemoteHEAD(ctx context.Context, dir, url, resolved string) error {
+	out := limitedBuffer{limit: outputLimit}
+	if err := r.runWith(ctx, dir, r.hostSettings(url), &out, "ls-remote", "--symref", "--", url, remoteHEAD); err != nil {
+		return movedError(err, url, resolved)
+	}
+	if out.truncated {
+		return fmt.Errorf("%w: %q advertises more than %d bytes for HEAD", ErrRefused, url, outputLimit)
+	}
+	heads := 0
+	for line := range strings.Lines(out.String()) {
+		oid, name, ok := strings.Cut(strings.TrimSuffix(line, "\n"), "\t")
+		if !ok || strings.HasPrefix(oid, "ref: ") || (name != remoteHEAD && !strings.HasPrefix(name, remoteHEAD+"\t")) {
+			continue
+		}
+		if name != remoteHEAD || checkObjectID(oid) != nil {
+			return fmt.Errorf("%w: %q advertises its HEAD as %q", ErrRefused, url, clipName(line))
+		}
+		heads++
+	}
+	if heads != 1 {
+		return fmt.Errorf("%w: %q advertises %d HEAD lines that name a commit, not 1; its HEAD may be unborn or name a missing branch", ErrRefused, url, heads)
+	}
+	return nil
 }

@@ -23,7 +23,8 @@ type Ref struct {
 }
 
 // listNamespaces are the namespaces ListRefs lists, besides one
-// generation of refs/salvage/ per call (salvageNamespace).
+// generation of refs/salvage/ and one repo dir of refs/romeu/origin/
+// per call (checkListNamespaces).
 var listNamespaces = []string{"refs/heads/", "refs/tags/", "refs/notes/"}
 
 // salvagePrefix is the namespace of the salvage refs of a sandbox clone
@@ -51,11 +52,12 @@ const (
 // given, sorted by name, each with the object it points at (an
 // annotated tag's own object, not its commit), under the flags of the
 // mode, with git for-each-ref. The namespaces come from a closed list:
-// refs/heads/, refs/tags/, refs/notes/, and refs/salvage/<generation>/
-// for one generation per call, each named once; git reads each as a
-// plain prefix, since none holds a pattern character. A name
-// checkDisplayRef refuses is left out of the refs and returned in
-// refused, clipped and escaped, so a caller keeps every other ref
+// refs/heads/, refs/tags/, refs/notes/, refs/salvage/<generation>/ for
+// one generation per call, and refs/romeu/origin/<dir>/ for one repo
+// dir per call (decided on 2026-10-29, T183), each named once; git
+// reads each as a plain prefix, since none holds a pattern character.
+// A name checkDisplayRef refuses is left out of the refs and returned
+// in refused, clipped and escaped, so a caller keeps every other ref
 // (decided while building T060). A name outside the namespaces asked
 // for, an id that is not a full object id and more than maxBranches
 // names, the refused ones counted, fail the whole list, and git's
@@ -195,28 +197,39 @@ func clipName(name string) string {
 
 // checkListNamespaces returns ErrRefused for a list ListRefs does not
 // take: empty, a namespace outside the closed list or named twice, or
-// more than one generation of refs/salvage/.
+// more than one generation of refs/salvage/ or repo dir of
+// refs/romeu/origin/.
 func checkListNamespaces(namespaces []string) error {
 	if len(namespaces) == 0 {
 		return fmt.Errorf("%w: a list of refs names no namespace", ErrRefused)
 	}
-	generations := 0
+	generations, dirs := 0, 0
 	for i, ns := range namespaces {
-		if slices.Contains(namespaces[:i], ns) {
+		switch {
+		case slices.Contains(namespaces[:i], ns):
 			return fmt.Errorf("%w: namespace %q named twice", ErrRefused, ns)
+		case slices.Contains(listNamespaces, ns):
+		case isSegmentNamespace(ns, salvagePrefix):
+			generations++
+		case isSegmentNamespace(ns, originPrefix):
+			dirs++
+		default:
+			return fmt.Errorf("%w: namespace %q is not one of %s, %s<generation>/ or %s<dir>/", ErrRefused, ns, strings.Join(listNamespaces, ", "), salvagePrefix, originPrefix)
 		}
-		if slices.Contains(listNamespaces, ns) {
-			continue
-		}
-		generation, ok := strings.CutPrefix(ns, salvagePrefix)
-		generation, slash := strings.CutSuffix(generation, "/")
-		if !ok || !slash || generation == "" || strings.ContainsAny(generation, "/*") || checkRefName(ns+"x", false) != nil {
-			return fmt.Errorf("%w: namespace %q is not one of %s or %s<generation>/", ErrRefused, ns, strings.Join(listNamespaces, ", "), salvagePrefix)
-		}
-		generations++
 	}
 	if generations > 1 {
 		return fmt.Errorf("%w: more than one generation of %s in one list", ErrRefused, salvagePrefix)
 	}
+	if dirs > 1 {
+		return fmt.Errorf("%w: more than one repo dir of %s in one list", ErrRefused, originPrefix)
+	}
 	return nil
+}
+
+// isSegmentNamespace reports whether ns is prefix, one segment with no
+// / or *, and a /, and a ref name may start with it.
+func isSegmentNamespace(ns, prefix string) bool {
+	segment, ok := strings.CutPrefix(ns, prefix)
+	segment, slash := strings.CutSuffix(segment, "/")
+	return ok && slash && segment != "" && !strings.ContainsAny(segment, "/*") && checkRefName(ns+"x", false) == nil
 }
