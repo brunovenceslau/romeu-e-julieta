@@ -8,7 +8,8 @@ owns:
   - internal/gitsafe/refs*.go
 needs:
   - T023
-after: []
+after:
+  - T167
 ask_first:
   - gitsafe
 sitting: none
@@ -32,9 +33,7 @@ which links `sync` into the binary, uses both.
    ref of the config repo, as REQ-0336 says, not only from the tip of
    the config ref.
 
-- Implements: REQ-0492 (05 5.2, I9) for a repo with no `ref`, and
-  REQ-0336 (04 4.2) for the reach of `--from`; T043 cites both and
-  builds the `sync` side.
+- Implements: REQ-0492 (05 5.2), REQ-0336 (04 4.2).
 - Operator: no.
 - Acceptance:
   - A fetch with the refspec `+HEAD:refs/romeu/origin/<dir>/HEAD`
