@@ -48,7 +48,9 @@ backend possible later.
 - `REQ-0660` The skill rule (`skills/julieta/SKILL.md`) tells the agent to use
   `julieta memory` for anything worth keeping, which type tag of 03 3.9
   each case takes (`user`, `feedback`, `project`, `reference`; `handoff`
-  through the `handoff` skill, 8.3), when `--shared` is right, and to
+  through the `handoff` skill, 8.3), that a session hitting friction
+  worth fixing writes a `feedback` entry so that another session can
+  triage it in parallel (03 3.9), when `--shared` is right, and to
   keep out what the code, the git history or an instruction file
   (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/`) already holds; `add`
   warns `memory-derivable` on the part of that rule a check can judge

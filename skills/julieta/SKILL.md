@@ -33,8 +33,12 @@ Every entry carries exactly one type tag, so a later session knows how
 to weigh it; `add` refuses none or two. Pick by what the note is:
 
 - `user`: the operator's role, expertise and working preferences.
-- `feedback`: a correction the operator gave, an approach the operator
-  confirmed, or what the work taught, so the mistake is not repeated.
+- `feedback`: the session's own feedback on how it is going (friction,
+  a tool that misbehaved, a gap in a check, a process that slowed the
+  work), written so that another session can triage it and implement
+  the improvement in parallel; also a correction the operator gave or
+  an approach the operator confirmed. Write one when the session hits
+  friction worth fixing.
 - `project`: ongoing work, decisions and ordering that the code and
   the git history do not hold.
 - `reference`: where to find something outside the repository.
