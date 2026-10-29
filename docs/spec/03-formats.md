@@ -33,7 +33,14 @@ and is named `<past participle>At` (`createdAt`, `updatedAt`).
 ([ADR 0041](../adr/0041-readers-of-formats-between-binaries-ignore-unknown-members.md)).
 Adding a member does not change a format's version; removing or
 renaming a member, or changing its type or meaning, is a new version,
-and the name of a removed member is never used again. A reader of a
+and the name of a removed member is never used again. `REQ-1310` A
+member that is retired, or whose meaning would change, is not changed
+within a version: it stays in the format, its writer writes it as its
+zero value from that release on, it is marked deprecated where its
+type is declared, and a new optional member carries the new meaning,
+whose absence a reader takes as unknown; the next version removes the
+old member, and its name is never used again (decided on 2026-10-28, `julieta-setup/v1`'s
+`fastForward`, `from` and `to` the first case). A reader of a
 format one binary writes and another reads (the `--json` documents of
 `julieta`, `snapshot/heads.json`, the memory entry, the handoff file and
 the manifest) skips a member it does not know, at any depth, and keeps every
@@ -663,8 +670,13 @@ Free-form markdown body.
 `REQ-0242` Tags with behaviour are a closed set, the five type tags. Four
 are the kinds of note the pinned agent's own memory records, used in
 the same cases: `user` (the operator's role, expertise and working
-preferences), `feedback` (a correction the operator gave or an approach
-the operator confirmed, and what the work taught), `project` (ongoing
+preferences), `feedback` (the session's own feedback on how the session
+itself is going: friction, a tool that misbehaved, a gap in a check, a
+process that slowed the work, written so that another session can triage
+it and implement the improvement in parallel; SessionStart lists the
+open entries of every type (08 8.1, REQ-0659), so that session sees it.
+It also holds a correction the operator gave or an approach the operator
+confirmed), `project` (ongoing
 work, decisions and ordering that the code and the git history do not
 hold) and `reference` (where to find something outside the repository).
 The fifth, `handoff`, is the narrative a session leaves for the next

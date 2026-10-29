@@ -184,6 +184,7 @@ type setupJSON struct {
 		Target  string `json:"target"`
 	} `json:"link"`
 	Repos []struct {
+		BranchState   string `json:"branchState"`
 		Cloned        bool   `json:"cloned"`
 		DefaultBranch string `json:"defaultBranch"`
 		Dir           string `json:"dir"`
@@ -217,9 +218,10 @@ func decodeStrict(t *testing.T, data string, v any) {
 // manifest of protocol N is accepted, and one of protocol 0 and one of
 // N+1 are refused with manifest-protocol (RJ-342); the accepted run
 // links $HOME/.local/bin/julieta to the binary, clones the missing
-// secondary and fast-forwards the primary's clean default branch,
-// warning default-branch-moved; a second run changes nothing; a fetch
-// that fails is the warning fetch-failed and exit 0.
+// secondary and fetches every repo, leaving the primary's clean default
+// branch at its commit, reported behind, with no warning (REQ-0399); a
+// second run changes nothing; a fetch that fails is the warning
+// fetch-failed and exit 0.
 func TestJulietaSetup(t *testing.T) {
 	const n = 1
 	steps := scenario(t, `
@@ -253,14 +255,15 @@ step fetch env JULIETA_MANIFEST=`+manifestEnv(t, n, originURL+"gone.git")+` "$J"
 	assert.Equal(t, w.Julieta, link, "the link points at the running binary")
 	assert.Empty(t, rep.Unusable)
 	require.Len(t, rep.Repos, 2)
-	assert.Equal(t, "moved", rep.Repos[0].FastForward)
-	assert.Equal(t, old, rep.Repos[0].From)
-	assert.Equal(t, tip, rep.Repos[0].To)
-	assert.Equal(t, tip, head, "the primary's main is at origin's")
+	assert.Equal(t, "behind", rep.Repos[0].BranchState)
+	for _, repo := range rep.Repos {
+		assert.Empty(t, repo.FastForward+repo.From+repo.To, "the deprecated members stay, empty (REQ-1310): %s", repo.Dir)
+	}
+	assert.Equal(t, old, head, "the primary's main stays at its commit")
 	assert.NotEqual(t, old, tip)
 	assert.True(t, rep.Repos[1].Cloned, "the missing secondary is cloned")
-	assert.Equal(t, []warningJSON{{Slug: "default-branch-moved", Message: "api " + old + ".." + tip}}, rep.Warnings)
-	assert.Equal(t, "warning default-branch-moved: api "+old+".."+tip+"\n", r.stderr)
+	assert.Empty(t, rep.Warnings)
+	assert.Empty(t, r.stderr)
 
 	r = step(t, steps, "again")
 	require.Equal(t, 0, r.code, r.stderr)
@@ -268,8 +271,10 @@ step fetch env JULIETA_MANIFEST=`+manifestEnv(t, n, originURL+"gone.git")+` "$J"
 	rep = setupJSON{}
 	decodeStrict(t, r.stdout, &rep)
 	assert.False(t, rep.Link.Changed)
+	require.Len(t, rep.Repos, 2)
+	assert.Equal(t, "behind", rep.Repos[0].BranchState)
+	assert.Equal(t, "current", rep.Repos[1].BranchState)
 	for _, repo := range rep.Repos {
-		assert.Equal(t, "current", repo.FastForward, repo.Dir)
 		assert.False(t, repo.Cloned, repo.Dir)
 	}
 

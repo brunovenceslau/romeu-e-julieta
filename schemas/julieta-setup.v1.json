@@ -33,6 +33,9 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "branchState": {
+            "type": "string"
+          },
           "cloned": {
             "type": "boolean"
           },

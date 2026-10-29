@@ -36,10 +36,11 @@ func TestStatusWithoutManifest(t *testing.T) {
 	assert.Equal(t, "RJ-342", errorID(t, stderr))
 }
 
-// TestStatusAfterSetup reports, after a setup that moved the primary's
-// default branch, the manifest's project, spec commit and egress set,
-// each repo's branch, HEAD, branch heads with ahead and behind, worktree
-// and clean state, and the warning default-branch-moved (04 4.3,
+// TestStatusAfterSetup reports, after a setup that fetched a primary
+// whose origin moved on, the manifest's project, spec commit and egress
+// set, each repo's branch, HEAD, branch heads with ahead and behind,
+// worktree and clean state, and no warning: setup moved no branch, so
+// main is still at its commit and one behind (04 4.3, REQ-0399,
 // REQ-0424; 07 7.5).
 func TestStatusAfterSetup(t *testing.T) {
 	s := newSandbox(t)
@@ -53,17 +54,18 @@ func TestStatusAfterSetup(t *testing.T) {
 	assert.Equal(t, s.m.SpecCommit, rep.SpecCommit)
 	assert.Equal(t, []string{"dl.google.com", "github.com"}, rep.Egress)
 	assert.Empty(t, rep.Errors)
-	assert.Equal(t, []setup.Warning{{Slug: setup.DefaultBranchMoved, Message: "api " + old + ".." + tip}}, rep.Warnings)
+	assert.Empty(t, rep.Warnings)
 	require.Len(t, rep.Repos, 2)
 	api := rep.Repos[0]
 	assert.Equal(t, status.Repo{
-		Dir: "api", Path: s.primary(), Branch: "main", Head: tip,
-		Branches:  []status.Branch{{Name: "main", Head: tip, Current: true, Upstream: "refs/remotes/origin/main"}},
+		Dir: "api", Path: s.primary(), Branch: "main", Head: old,
+		Branches:  []status.Branch{{Name: "main", Head: old, Behind: 1, Current: true, Upstream: "refs/remotes/origin/main"}},
 		Dirty:     []string{},
 		Errors:    []string{},
 		Stashes:   []status.Stash{},
-		Worktrees: []status.Worktree{{Path: api.Worktrees[0].Path, Head: tip, Branch: "refs/heads/main"}},
+		Worktrees: []status.Worktree{{Path: api.Worktrees[0].Path, Head: old, Branch: "refs/heads/main"}},
 	}, api)
+	assert.NotEqual(t, old, tip)
 	assert.Equal(t, "web", rep.Repos[1].Dir)
 	assert.Empty(t, rep.Repos[1].Errors)
 }
@@ -239,4 +241,22 @@ func TestDecodeIgnoresAnUnknownMember(t *testing.T) {
 	got, err := status.Decode([]byte(newer))
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
+}
+
+// TestStatusOmitsTheRetiredSlug: a setup.json written before setup
+// moved no branch may hold default-branch-moved (REQ-0399); status
+// reports its other warnings and not that one, in --json and in text.
+func TestStatusOmitsTheRetiredSlug(t *testing.T) {
+	s := newSandbox(t)
+	code, _, stderr := julieta(t.Context(), "setup")
+	require.Equal(t, 0, code, stderr)
+	path := filepath.Join(setup.StateDir(s.home), "setup.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"at":"2026-10-27T00:00:00Z","version":"v0","warnings":[`+
+		`{"message":"api a..b","slug":"default-branch-moved"},{"message":"web: offline","slug":"fetch-failed"}]}`), 0o600))
+
+	rep := statusJSON(t)
+	assert.Equal(t, []setup.Warning{{Slug: setup.FetchFailed, Message: "web: offline"}}, rep.Warnings)
+	code, _, stderr = julieta(t.Context(), "status")
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, "warning fetch-failed: web: offline\n", stderr)
 }

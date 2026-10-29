@@ -236,10 +236,11 @@ step controlplanted sh -c 'ls /tmp/pwned 2>&1 | head -1'
 }
 
 // TestJulietaInstallLockChange: a commit on the origin that changes
-// mise.lock reaches the sandbox through setup, whose install step
-// installs again, and a setup after it does not (04 4.3; the lock-change
-// commit of J8, T075): the web server sees one request for each tool
-// the origin's locks name, and none for a setup that changes nothing.
+// mise.lock reaches the checkout by a pull (setup moves no branch,
+// REQ-0399), and the next setup's install step installs again, and a
+// setup after it does not (04 4.3; the lock-change commit of J8, T075):
+// the web server sees one request for each tool the checkout's locks
+// name, and none for a setup that changes nothing.
 func TestJulietaInstallLockChange(t *testing.T) {
 	secondToml := helloToml + "\"http:hello2\" = { version = \"1.0\", url = \"http://127.0.0.1:18080/hello2-1.0.tar.gz\", checksum = \"sha256:@SUM@\" }\n"
 	secondLock := helloLock + "\n[[tools.\"http:hello2\"]]\nversion = \"1.0\"\nbackend = \"http:hello2\"\nspecifiers = [\"1.0\"]\n\n[tools.\"http:hello2\".\"platforms.linux-arm64\"]\nchecksum = \"sha256:@SUM@\"\nurl = \"http://127.0.0.1:18080/hello2-1.0.tar.gz\"\n\n[tools.\"http:hello2\".\"platforms.linux-x64\"]\nchecksum = \"sha256:@SUM@\"\nurl = \"http://127.0.0.1:18080/hello2-1.0.tar.gz\"\n"
@@ -251,6 +252,9 @@ push() {
 	g -C /tmp/seed-api add mise.toml mise.lock
 	g -C /tmp/seed-api commit -q -m "$3"
 	g -C /tmp/seed-api push -q origin main
+	# setup moves no branch (REQ-0399): the checkout takes the new locks
+	# by hand, and setup installs what they name.
+	g -C `+primaryPath+` pull -q --ff-only origin main
 }
 push '`+helloToml+`' '`+helloLock+`' first
 step setup1 "$J" setup --json

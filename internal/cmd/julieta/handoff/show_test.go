@@ -87,7 +87,7 @@ func TestShowHookPrintsInOrder(t *testing.T) {
 
 // TestShowHookPrintsSnapshotsDisabled prints the warning
 // snapshots-disabled setup recorded, as every warning of julieta state,
-// and keeps it: only default-branch-moved is cleared (REQ-0665).
+// and keeps it: a SessionStart clears no warning (REQ-0665).
 func TestShowHookPrintsSnapshotsDisabled(t *testing.T) {
 	s := newSandbox(t)
 	s.setupState(t, setup.Warning{Slug: setup.SnapshotsDisabled, Message: "snapshots disabled for api"})
@@ -97,22 +97,25 @@ func TestShowHookPrintsSnapshotsDisabled(t *testing.T) {
 	}
 }
 
-// TestShowHookClearsDefaultBranchMoved prints default-branch-moved on
-// the first SessionStart after the move and clears it; the second does
-// not print it (REQ-0399, REQ-0665).
-func TestShowHookClearsDefaultBranchMoved(t *testing.T) {
+// TestShowHookOmitsTheRetiredSlug: a setup.json written before setup
+// moved no branch may hold default-branch-moved (REQ-0399); SessionStart
+// prints its other warnings and not that one, and leaves the file as it
+// is, for the next setup to rewrite.
+func TestShowHookOmitsTheRetiredSlug(t *testing.T) {
 	s := newSandbox(t)
-	moved := setup.Warning{Slug: setup.DefaultBranchMoved, Message: "api abc..def"}
-	s.setupState(t, setup.Warning{Slug: setup.FetchFailed, Message: "web: offline"}, moved)
-	first := s.ok(t, "", "handoff", "show", "--hook")
-	assert.Contains(t, first, "warning default-branch-moved: api abc..def\n")
-	assert.Contains(t, first, "warning fetch-failed: web: offline\n")
-	second := s.ok(t, "", "handoff", "show", "--hook")
-	assert.NotContains(t, second, "default-branch-moved")
-	assert.Contains(t, second, "fetch-failed", "a fetch-failed warning holds until the next setup")
-	st, err := setup.ReadState(s.home)
+	s.setupState(t, setup.Warning{Slug: setup.FetchFailed, Message: "web: offline"},
+		setup.Warning{Slug: "default-branch-moved", Message: "api abc..def"})
+	path := filepath.Join(setup.StateDir(s.home), "setup.json")
+	before, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.Equal(t, []setup.Warning{{Slug: setup.FetchFailed, Message: "web: offline"}}, st.Warnings)
+	for range 2 {
+		out := s.ok(t, "", "handoff", "show", "--hook")
+		assert.NotContains(t, out, "default-branch-moved")
+		assert.Contains(t, out, "warning fetch-failed: web: offline\n", "a fetch-failed warning holds until the next setup")
+	}
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after))
 }
 
 // TestHooksRecordTheirRuns records the time of the last SessionStart

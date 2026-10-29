@@ -156,7 +156,7 @@ step end3 "$J" handoff write --facts
 step start4 "$J" handoff show --hook
 `)
 	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
-	assert.Contains(t, step(t, steps, "prime").stdout, "warning default-branch-moved: ", "the first SessionStart after the fast-forward of setup")
+	assert.NotContains(t, step(t, steps, "prime").stdout, "default-branch-moved", "setup moves no branch (REQ-0399)")
 	assert.Contains(t, step(t, steps, "times0").stdout, `"sessionStartAt":"20`)
 	assert.Contains(t, step(t, steps, "times0").stdout, `"sessionEndAt":"0001-01-01T00:00:00Z"`, "no SessionEnd has run")
 	require.Equal(t, 0, step(t, steps, "narrative").code, step(t, steps, "narrative").stderr)
@@ -227,21 +227,4 @@ step startok "$J" handoff show --hook
 	}
 	assert.NotContains(t, step(t, steps, "startok").stdout, "hook failure")
 	assert.Equal(t, 0, step(t, steps, "endok").code)
-}
-
-// TestJulietaHandoffDefaultBranchMoved: setup fast-forwards the
-// primary's default branch, and the first show --hook after the move
-// prints default-branch-moved and clears it; the second does not print
-// it (REQ-0399, REQ-0665).
-func TestJulietaHandoffDefaultBranchMoved(t *testing.T) {
-	steps := scenario(t, `
-export JULIETA_MANIFEST=`+manifestEnv(t, 1, originURL+"api.git")+`
-step setup "$J" setup
-cd `+primaryPath+`
-step first "$J" handoff show --hook
-step second "$J" handoff show --hook
-`)
-	require.Equal(t, 0, step(t, steps, "setup").code, step(t, steps, "setup").stderr)
-	assert.Contains(t, step(t, steps, "first").stdout, "warning default-branch-moved: ")
-	assert.NotContains(t, step(t, steps, "second").stdout, "default-branch-moved")
 }
