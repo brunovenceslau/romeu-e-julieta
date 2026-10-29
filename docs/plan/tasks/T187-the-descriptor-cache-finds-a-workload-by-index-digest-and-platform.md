@@ -12,7 +12,8 @@ owns:
 needs:
   - T033
 after: []
-ask_first: []
+ask_first:
+  - gates
 sitting: none
 ---
 
