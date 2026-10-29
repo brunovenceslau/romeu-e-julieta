@@ -21,8 +21,7 @@ owns:
   - docs/spec/08-memory-handoff-salvage.md
 needs:
   - T051
-after:
-  - T172
+after: []
 ask_first: []
 sitting: none
 ---
@@ -47,6 +46,13 @@ the code, since `TestWarningSlugs` holds the list to the code.
    they are. `internal/gitsafe` keeps its fast-forward function for its
    other callers, if any; when none is left, its removal is a gitsafe
    task (ask-first `gitsafe`), not this one.
+
+Re-plan (2026-10-28): no longer after T172. T172 waits on T174 and T175,
+and both wait on T039 through T043 and T167, while this task needs only
+T051; the file overlap (`internal/cmd/julieta/handoff/show*.go` and
+`internal/cmd/julieta/setup/*_test.go`) is now ordered the other way, T172
+after T178, so this task removes the one-time line from `handoff show`
+before T172 removes the command.
 
 - Implements: REQ-0399 (04 4.3).
 - Operator: no.

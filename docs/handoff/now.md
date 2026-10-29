@@ -2,23 +2,26 @@
 
 ## Where we stopped
 
-T038 slice 3 (personal kits, mixin only) in review. T171, T173 and
-T166 are merged; T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
+T038 is merged (#301), and so are T171, T173 and T166. The plan was
+re-ordered on 2026-10-28: T177 and T178 come before T172 and T174;
+T172 waits on T174 and T175, and through them on T039. T111 sitting
+M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## Next steps
 
-1. Memory: T174 waits on T043, T175 on T153 and T167, T172 on both;
-   T038, T039 and T043 come first, and are the critical path's head.
-2. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
+1. Setup: T177 (setup moves no branch), then T178; both need only
+   T051. Issue #303 (an unusable setup reported as RJ-348 internal; a
+   Finder `.DS_Store` in the memory dir) is open.
+2. Memory: T039, then T043 and T167, then T174 and T175, then T172,
+   then T176 and T179; T039 is the critical path's head.
+3. T111 sitting M1, after operator item 9: verona's steps 2, 6, 7 and 8;
    in both, the acceptance reads still open; then the week of daily use.
-3. T038 (issue #271, 01m5rzc40en5qkgrhsgvd9ykqt): slice 3 on
-   `feat/t038-personal-kits-slice3`, then the A11/A12 fixtures of I28.
-   T165 after T164.
-4. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
-5. The pending notes, each when its trigger fires: 01m5zg2f63219nwpzb9d52aecg,
+4. T165 (T164 is merged).
+5. Build T170; T161 once T088 is built (01m5e14094yhqhsxq2g941pwrf).
+6. The pending notes, each when its trigger fires: 01m5zg2f63219nwpzb9d52aecg,
    01m5rtp0kfzjckbdct0y77531j, 01m5rpbjkc62s2c7qecj7wf9bk, 01m5rjz3n7588xgx1xhfn56wmk,
    01m5rjz3p5x27yebkayt1hjydb, 01m5ngx0cy47r560n6hqjh4y1c, 01m5ngabwa6akgjr9eetw78kq7,
    01m5ndjpzgf0rmwkr7gc1j6wdh, 01m5n920q50b79dxxqe5ghss4r, 01m5n79kdbtk9dpq7y87sfkkaq,
@@ -53,9 +56,8 @@ issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
 
 ## In flight
 
-- `feat/t038-personal-kits-slice3` (slice 3 carried from
-  `feat/t038-personal-kits`, which stays unpushed-over); older branches
-  as they were.
+- `docs/plan-t177-before-t172` (this re-order); older branches as they
+  were.
 
 Branch and pull request state is NOT recorded here: measure it with
 ~/.sbx-kit/claude-home/bin/handoff_state.py.
