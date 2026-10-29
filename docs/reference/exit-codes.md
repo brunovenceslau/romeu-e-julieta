@@ -23,9 +23,9 @@ of [errors.md](errors.md) names its own.
 |---|---|---|
 | 0 | ok |  |
 | 1 | the operation failed | `RJ-101`, `RJ-308`, `RJ-322`, `RJ-323`, `RJ-341`, `RJ-348`, `RJ-351`, `RJ-355`, `RJ-356` |
-| 2 | usage or precondition | `RJ-203`, `RJ-310`, `RJ-311`, `RJ-314`, `RJ-325`, `RJ-326`, `RJ-327`, `RJ-329`, `RJ-330`, `RJ-331`, `RJ-332`, `RJ-333`, `RJ-334`, `RJ-336`, `RJ-337`, `RJ-340`, `RJ-342`, `RJ-343`, `RJ-345`, `RJ-346`, `RJ-349`, `RJ-350` |
+| 2 | usage or precondition | `RJ-203`, `RJ-310`, `RJ-311`, `RJ-312`, `RJ-313`, `RJ-314`, `RJ-315`, `RJ-325`, `RJ-326`, `RJ-327`, `RJ-329`, `RJ-330`, `RJ-331`, `RJ-332`, `RJ-333`, `RJ-334`, `RJ-336`, `RJ-337`, `RJ-340`, `RJ-342`, `RJ-343`, `RJ-345`, `RJ-346`, `RJ-349`, `RJ-350` |
 | 3 | approval required | `RJ-302` |
-| 4 | drift detected, or an interrupted promotion abandoned |  |
+| 4 | drift detected, or an interrupted promotion abandoned | `RJ-303` |
 | 5 | refused to protect data |  |
 | 6 | the check ran and found what it checks for | `RJ-328` |
 | 130 | ended by SIGINT |  |
