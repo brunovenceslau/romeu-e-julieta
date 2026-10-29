@@ -48,7 +48,8 @@ type Diff struct {
 	body    []string
 }
 
-// PromptLine is the question Ask writes after the diff.
+// PromptLine is the question of gate 2, which Diff.WriteTo writes after
+// the diff and Confirm asks.
 const PromptLine = "approve this widening? [y/N] "
 
 // NewDiff returns the diff from the approved side to the candidate; a

@@ -6,7 +6,10 @@ package render_test
 import (
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -107,4 +110,43 @@ func TestWorkspaceErrors(t *testing.T) {
 			require.ErrorContains(t, err, tt.want)
 		})
 	}
+}
+
+// TestWriteWorkspaces writes both workspace files into $ROMEU_ROOT,
+// mode 0600, as DevWorkspace and ReviewWorkspace give them, replacing
+// a file there whole, and leaves no temporary file behind (REQ-0048).
+func TestWriteWorkspaces(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, render.DevWorkspaceFile), []byte("edited by hand"), 0o644))
+
+	require.NoError(t, render.WriteWorkspaces(root, hostClones, reviewCheckouts))
+
+	dev, err := render.DevWorkspace(hostClones)
+	require.NoError(t, err)
+	review, err := render.ReviewWorkspace(reviewCheckouts)
+	require.NoError(t, err)
+	for name, want := range map[string][]byte{render.DevWorkspaceFile: dev, render.ReviewWorkspaceFile: review} {
+		got, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		assert.Equal(t, string(want), string(got), name)
+		info, err := os.Stat(filepath.Join(root, name))
+		require.NoError(t, err)
+		assert.Equal(t, fs.FileMode(render.FileMode), info.Mode().Perm(), name)
+	}
+	entries, err := os.ReadDir(root)
+	require.NoError(t, err)
+	assert.Len(t, entries, 2, "no temporary file is left")
+}
+
+// TestWriteWorkspacesWritesNothingOnAnError: a clone the encoder
+// refuses fails the write before either file is touched.
+func TestWriteWorkspacesWritesNothingOnAnError(t *testing.T) {
+	root := t.TempDir()
+
+	err := render.WriteWorkspaces(root, hostClones, []render.Clone{{Project: "shop", Dir: "memory"}})
+
+	require.ErrorContains(t, err, "is a name romeu reserves")
+	entries, err := os.ReadDir(root)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
 }

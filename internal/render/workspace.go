@@ -67,6 +67,29 @@ func ReviewWorkspace(checkouts []Clone) ([]byte, error) {
 	return workspace(checkouts, func(c Clone) string { return path.Join(c.Project+"-env", reviewDir, c.Dir) })
 }
 
+// WriteWorkspaces writes dev.code-workspace of the host clones clones
+// and review.code-workspace of the review checkouts checkouts into the
+// directory root, $ROMEU_ROOT, each replaced whole by the atomic write
+// rule through an os.Root on root (REQ-0048). It is the one writer of
+// the two files: a command writes them once, after the last promotion
+// of its run, from every project's record, and retire and pull write
+// them through it too. It writes nothing when either file cannot be
+// encoded.
+func WriteWorkspaces(root string, clones, checkouts []Clone) error {
+	dev, err := DevWorkspace(clones)
+	if err != nil {
+		return err
+	}
+	review, err := ReviewWorkspace(checkouts)
+	if err != nil {
+		return err
+	}
+	return Live{Root: root, Workspace: []WorkspaceFile{
+		{Name: DevWorkspaceFile, Data: dev},
+		{Name: ReviewWorkspaceFile, Data: review},
+	}}.writeWorkspace()
+}
+
 // workspace writes the workspace file of clones, each folder at the
 // path folderOf returns, through the JSON marshaller (I11), with the
 // key folders alone (I13).

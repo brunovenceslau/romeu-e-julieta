@@ -10,7 +10,7 @@
 // of its own; the render-time rules join through the registry of
 // rules.go (rule 14 of docs/plan.md).
 //
-// The command is dark until all/import_sync.go links it in (T043).
+// all/import_sync.go links the command into romeu.
 package sync
 
 import (

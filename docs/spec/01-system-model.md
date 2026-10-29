@@ -37,7 +37,7 @@ built in v1; it waits for its row in
 | Generated, in git | every file of the inventory in [12 12.3](12-engineering.md#123-generators), the `docs/reference/*` pages that replace the field and rule tables of [03](03-formats.md) once each format's generator lands among them (03, opening) | `go generate ./...` | `REQ-0046` `tools/ci generated` fails on any diff; never hand-edited |
 | Candidate (unapproved) | `<name>-env/.romeu/candidates/<candidate-id>/` (rendered files and materialized kits) | romeu `sync` | the gate; promoted only on approval (1.6) |
 | Derived, live | `<name>-env/sbxenv.yaml`, `.romeu/render.json`, `.romeu/kits/*`, `.romeu/bin/*` | romeu (promotion) | `REQ-0047` drift-checked by hash before every overwrite and before every sbx call of a **P** command (1.5) |
-| Derived from state | `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (each promotion, `retire` and `pull`) | `REQ-0048` written again whole from host state each time; no record holds their hash, so they are not drift-checked; `doctor` derives them again from host state and reports a difference, and the next promotion, `retire` or `pull` overwrites a hand edit |
+| Derived from state | `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (`sync`, once after the last promotion of a run, `retire` and `pull`) | `REQ-0048` written again whole from host state each time, by atomic rename: `sync` lists every clone of every project's record, and a `sync` that promotes nothing leaves them as they were; no record holds their hash, so they are not drift-checked; `doctor` derives them again from host state and reports a difference, and the next `sync` that promotes, `retire` or `pull` overwrites a hand edit |
 | Derived, in sandbox | secondary clones, installed tools, julieta manifest cache, herdr layout, the `julieta` link on `PATH` | julieta | `REQ-0049` disposable; recreated by `julieta setup` |
 | sbx-owned facts romeu reads | sandbox existence, state and workspace path (`sbx ls --json`); the `remote.sandbox-<name>.*` keys sbx writes into the primary host clone's `.git/config`, of which romeu reads the URL; sbx version | sbx | read only |
 | Agent output that reaches the host | memory dir files, `snapshot/heads.json` among them; git objects via fetch or bundle; julieta's `--json` stdout read over `sbx env exec` (`version`, `setup`, `status`, `salvage`) | agents / julieta | `REQ-0050` data only: validated, escaped for display, stored in romeu namespaces; never executed, never checked out outside a hardened review checkout |
@@ -268,7 +268,7 @@ shape romeu does not recognize is never read as an absent sandbox.
 | (none) | `REQ-0085` `sync` renders | rendered | candidate dir written under `.romeu/candidates/<candidate-id>/` |
 | rendered | `REQ-1207` widening digest equals the approval | promoted | promotion commit (below) |
 | rendered | `REQ-1208` digest differs, TTY, `y` (the answer `y` or `Y` followed by a newline accepts; any other line declines) | approved | approval recorded |
-| rendered | `REQ-1209` digest differs, TTY, other | declined | candidate dir deleted |
+| rendered | `REQ-1209` digest differs, TTY, other | declined | candidate dir deleted; exit 1 (`candidate-declined`) |
 | rendered | `REQ-1210` digest differs, no TTY | declined | candidate dir deleted; the widening digest printed; exit 3 |
 | approved | `REQ-1211` promotion commit completes | promoted | candidate dir deleted |
 
@@ -288,7 +288,9 @@ forward by the recovery below.
    `promoting: <candidateId>` and the previous file digests.
 2. Copy kits into content-addressed, immutable dirs
    `.romeu/kits/<id>-<digest12>/` (a dir that already exists is verified,
-   never rewritten); write `.romeu/bin/*` and the workspace files.
+   never rewritten); write `.romeu/bin/*`. The workspace files are not
+   part of the promotion: `sync` writes them once after the last
+   promotion of its run, from every project's record (REQ-0048).
 3. Rename `sbxenv.yaml` into place: **the commit point**.
 4. Rewrite `render.json` without `promoting`; delete the candidate dir
    and every kit dir no longer referenced.

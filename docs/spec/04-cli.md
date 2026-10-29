@@ -251,8 +251,12 @@ dir`, see J13).
    `.metadata_never_index` marker, [02 2.3](02-layouts.md#23-host-tree))
    and `memory/<dir>/` (create only, with the fixed subdirectories);
    hardened clone of missing repos; hardened fetch of each repo's
-   origin into `refs/romeu/origin/<dir>/*`; resolve `egressCommit` from
-   `refs/romeu/origin/<dir>/<ref>`.
+   origin into `refs/romeu/origin/<dir>/*`, and for a repo whose spec
+   names no `ref`, of the origin's `HEAD` into
+   `refs/romeu/origin/<dir>/HEAD` in the same fetch; resolve
+   `egressCommit` from `refs/romeu/origin/<dir>/<ref>`, or from
+   `refs/romeu/origin/<dir>/HEAD` for a repo with no `ref`, so no local
+   ref of the clone moves it (I9).
 5. `REQ-0340` Refuse (exit 2) if any memory dir violates the layout allowlist (I24).
 6. `REQ-0341` Read workload and kit descriptors: the cache in host state first;
    `internal/oci` by digest only on a cache miss (`registry-unreachable`
@@ -266,7 +270,15 @@ dir`, see J13).
    replaces the edited live file, and its edit is lost).
 8. `REQ-0343` Gate 2 and the candidate state machine
    ([01 1.6](01-system-model.md#candidate)); promotion commit on
-   approval or when unchanged.
+   approval or when unchanged. A target declined or refused does not
+   stop the targets after it; once every target is done, a refusal
+   without a TTY exits 3 with `project-approval-required` (`RJ-301`)
+   and an answer other than `y` on a TTY exits 1 with
+   `candidate-declined` (`RJ-358`), as gate 1's decline does
+   (REQ-1276), each naming the projects. After the last promotion of
+   the run, the workspace files are written once from every project's
+   record (01 1.2, REQ-0048); a run that promotes nothing leaves them
+   as they were.
 9. `REQ-0344` `sbx ls --json`. If the sandbox is running:
    the rest of the preflight (01 1.5), then reconcile egress live; if the `secrets`
    field is tagged `apply:"live"` (A10, Q18), `sbx secret set <svc>
@@ -574,6 +586,7 @@ its own: it is an invalid document, exit 2, named by the rule's slug
 | `RJ-355` | `toolchain-declined` | 1 | `romeu approve --toolchain` on a terminal, when the answer to gate 1 is anything but `y` ([01 1.4](01-system-model.md#gate-1-toolchain-acknowledgement-per-machine)); `toolchain.json` is unchanged, so a command chained after it does not run; hint: `romeu approve --toolchain`. `RJ-352` to `RJ-354` are kept for the rows of `romeu init` decided on 2026-10-23 |
 | `RJ-356` | `config-clone-failed` | 1 | `REQ-1286` `romeu init`, when git fails the clone of the config repo, or gitsafe refuses what the remote sent: a URL that names no repository, an access the origin refuses, or a private repository and no `--git-credential-helper`; the details hold `config.url` and git's output (4.1, Error ids, item 7): git itself prints no credential, but what a helper writes to its standard error is part of that output and is not filtered; nothing of the run is left; hint: `decide: check the URL and your access; a private config repo needs --git-credential-helper` |
 | `RJ-357` | `memory-remote-missing` | 2 | `sync`, for a project spec without `memory.remote` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store), REQ-1305); `memory: {remote: none}` opts out; hint: `decide: add memory: {remote: <url of a private repository>} to the spec, or memory: {remote: none} to keep memory on this machine only` |
+| `RJ-358` | `candidate-declined` | 1 | `sync` step 8 (4.2), on a TTY, when the answer to gate 2 is anything but `y` ([01 1.6](01-system-model.md#candidate)); the candidate dir is deleted and the live files are unchanged; the targets after it still meet gate 2, and the message names every declined project; hint: `romeu sync <name>` |
 
 ### `fingerprint-unstable` (`RJ-338`)
 

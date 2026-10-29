@@ -107,11 +107,12 @@ func (c *config) run(f flags) *run {
 
 // TestFetchConfig is step 2 of 04 4.2: the fetch of the config repo's
 // origin into refs/romeu/origin/<cfg-dir>/*, and the spec commit, the
-// head of the config ref or a --from commit that it reaches.
+// head of the config ref or a --from commit that a fetched branch of the
+// origin reaches, the config ref or another (REQ-0336).
 func TestFetchConfig(t *testing.T) {
 	type fixture struct {
-		c                      *config
-		first, head, own, tree string
+		c                               *config
+		first, head, own, tree, feature string
 	}
 	tests := []struct {
 		name string
@@ -126,6 +127,7 @@ func TestFetchConfig(t *testing.T) {
 		{name: "origin is the head of the config ref", from: func(fixture) string { return fromOrigin }, want: func(f fixture) string { return f.head }},
 		{name: "the head itself", from: func(f fixture) string { return f.head }, want: func(f fixture) string { return f.head }},
 		{name: "a commit the config ref reaches", from: func(f fixture) string { return f.first }, want: func(f fixture) string { return f.first }},
+		{name: "a commit only another branch of the origin reaches", from: func(f fixture) string { return f.feature }, want: func(f fixture) string { return f.feature }},
 		{name: "a commit of the clone the origin never had", from: func(f fixture) string { return f.own }, slug: "from-unreachable"},
 		{name: "a commit the clone does not hold", from: func(fixture) string { return strings.Repeat("1", 40) }, slug: "from-unreachable"},
 		{name: "the tree of the head", from: func(f fixture) string { return f.tree }, slug: "from-unreachable"},
@@ -156,6 +158,9 @@ func TestFetchConfig(t *testing.T) {
 			c := newConfig(t, map[string]string{"projects/cfg.yaml": "first"})
 			f := fixture{c: c, first: gitIn(t, c.origin, "rev-parse", "HEAD")}
 			f.head = commitFiles(t, c.origin, map[string]string{"projects/cfg.yaml": "second"})
+			gitIn(t, c.origin, "checkout", "-q", "-b", "feature", f.first)
+			f.feature = commitFiles(t, c.origin, map[string]string{"projects/cfg.yaml": "on a branch"})
+			gitIn(t, c.origin, "checkout", "-q", "main")
 			f.own = commitFiles(t, c.clone, map[string]string{"local": "never pushed"})
 			f.tree = gitIn(t, c.origin, "rev-parse", f.head+"^{tree}")
 			if tt.arrange != nil {

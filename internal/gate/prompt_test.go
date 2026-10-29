@@ -27,14 +27,6 @@ func closeAtEnd(t *testing.T, f *os.File) {
 	})
 }
 
-// sampleDiff is the diff of a first approval of the base inputs.
-func sampleDiff(t *testing.T) Diff {
-	t.Helper()
-	d, err := NewDiff(nil, side(t, baseInputs()))
-	require.NoError(t, err)
-	return d
-}
-
 // screen reads everything the terminal side of the pair writes, from
 // the master, so the terminal never blocks on output; it returns what
 // was read so far, with the terminal's CR LF as LF.
@@ -91,124 +83,6 @@ func within[T any](t *testing.T, done <-chan T, screen func() string) T {
 	}
 }
 
-// askOnPTY runs Ask with both stdin and stderr on the terminal of a
-// /dev/ptmx pair. It types early before Ask starts, waits for the
-// prompt, types answer, and returns Ask's result and the screen.
-func askOnPTY(t *testing.T, d Diff, early, answer string) (bool, string) {
-	t.Helper()
-	master, terminal := openPTY(t)
-	read := screen(t, master)
-	if early != "" {
-		_, err := io.WriteString(master, early)
-		require.NoError(t, err)
-		waitFor(t, read, strings.TrimSuffix(early, "\n"))
-	}
-	type result struct {
-		ok  bool
-		err error
-	}
-	done := make(chan result, 1)
-	go func() {
-		ok, err := Ask(terminal, terminal, d)
-		done <- result{ok, err}
-	}()
-	waitFor(t, read, PromptLine)
-	_, err := io.WriteString(master, answer)
-	require.NoError(t, err)
-	r := within(t, done, read)
-	require.NoError(t, r.err)
-	return r.ok, read()
-}
-
-// TestAskOnATerminal drives the answer through a /dev/ptmx pair on
-// stdin, typed once the prompt is on the screen, and reads what Ask
-// writes to stderr, the same terminal (10 10.1, REQ-0790).
-//
-//romeu:invariant I7 test
-func TestAskOnATerminal(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		typed string
-		want  bool
-	}{
-		{"y approves", "y\n", true},
-		{"Y approves", "Y\n", true},
-		{"N declines", "N\n", false},
-		{"an empty line declines", "\n", false},
-		{"yes declines", "yes\n", false},
-		{"y after a space declines", " y\n", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			d := sampleDiff(t)
-			got, shown := askOnPTY(t, d, "", tt.typed)
-			assert.Equal(t, tt.want, got)
-
-			var want strings.Builder
-			_, err := d.WriteTo(&want)
-			require.NoError(t, err)
-			assert.Contains(t, shown, want.String(), "the diff, the summary again and the prompt go to stderr")
-		})
-	}
-}
-
-// TestAskDropsWhatWasTypedBeforeThePrompt: a "y" typed, or pasted,
-// before the diff was on the screen is not an answer to it; Ask drops
-// the terminal's input queue once the diff is written.
-//
-//romeu:invariant I7 test
-func TestAskDropsWhatWasTypedBeforeThePrompt(t *testing.T) {
-	t.Parallel()
-	got, _ := askOnPTY(t, sampleDiff(t), "y\n", "n\n")
-	assert.False(t, got)
-}
-
-// TestAskWithoutATerminal: a pipe, a file or a reader that is no file
-// on stdin is no terminal, so Ask approves nothing and writes nothing.
-//
-//romeu:invariant I7 test
-func TestAskWithoutATerminal(t *testing.T) {
-	t.Parallel()
-	pipeRead, pipeWrite, err := os.Pipe()
-	require.NoError(t, err)
-	closeAtEnd(t, pipeRead)
-	closeAtEnd(t, pipeWrite)
-	_, err = io.WriteString(pipeWrite, "y\n")
-	require.NoError(t, err)
-	file, err := os.CreateTemp(t.TempDir(), "answer")
-	require.NoError(t, err)
-	closeAtEnd(t, file)
-
-	_, terminal := openPTY(t)
-	tests := []struct {
-		name   string
-		stdin  io.Reader
-		stderr io.Writer
-	}{
-		{"a pipe on stdin", pipeRead, terminal},
-		{"a file on stdin", file, terminal},
-		{"a reader that is no file on stdin", strings.NewReader("y\n"), terminal},
-		{"no reader on stdin", nil, terminal},
-		{"a writer that is no file on stderr", terminal, &strings.Builder{}},
-		{"a file on stderr", terminal, file},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := Ask(tt.stdin, tt.stderr, sampleDiff(t))
-			require.ErrorIs(t, err, ErrNoTerminal)
-			assert.False(t, got)
-			if b, ok := tt.stderr.(*strings.Builder); ok {
-				assert.Empty(t, b.String())
-			}
-		})
-	}
-	info, err := file.Stat()
-	require.NoError(t, err)
-	assert.Zero(t, info.Size(), "nothing is written without a terminal")
-}
-
 func TestReadAnswer(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -246,11 +120,12 @@ func TestReadAnswerDrainsALongLine(t *testing.T) {
 	assert.Equal(t, "next\n", string(rest))
 }
 
-// TestConfirmOnATerminal: Confirm, the prompt of gate 1, needs a
-// terminal on stdin and on the stderr the text goes to, like Ask, so the
-// operator sees the text before answering (decided on 2026-10-23); the
-// text goes through the writer over that stderr, and "y" or "Y" typed
-// once the text is shown approves.
+// TestConfirmOnATerminal: Confirm, the prompt of gates 1 and 2, needs a
+// terminal on stdin and on the stderr the text goes to, so the operator
+// sees the text before answering (decided on 2026-10-23); the text goes
+// through the writer over that stderr, driven through a /dev/ptmx pair
+// (10 10.1, REQ-0790), and "y" or "Y" typed once the text is shown
+// approves, while a y typed before it is dropped.
 //
 //romeu:invariant I7 test
 func TestConfirmOnATerminal(t *testing.T) {
@@ -263,8 +138,10 @@ func TestConfirmOnATerminal(t *testing.T) {
 	}{
 		{"y approves", "", "y\n", true},
 		{"Y approves", "", "Y\n", true},
+		{"N declines", "", "N\n", false},
 		{"an empty line declines", "", "\n", false},
 		{"yes declines", "", "yes\n", false},
+		{"y after a space declines", "", " y\n", false},
 		{"a y typed before the text is dropped", "y\n", "n\n", false},
 	}
 	for _, tt := range tests {
@@ -317,6 +194,7 @@ func TestConfirmWithoutATerminal(t *testing.T) {
 		stderrFD int
 	}{
 		{"a pipe on stdin", pipeRead, int(terminal.Fd())},
+		{"a file on stdin", file, int(terminal.Fd())},
 		{"a reader that is no file on stdin", strings.NewReader("y\n"), int(terminal.Fd())},
 		{"no reader on stdin", nil, int(terminal.Fd())},
 		{"a pipe on stderr", terminal, int(pipeWrite.Fd())},

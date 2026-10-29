@@ -190,7 +190,11 @@ func resolve(ctx context.Context, r *run, p spec.Project, t tree, cat catalog.Ca
 	if err != nil {
 		return candidate{}, err
 	}
-	in := egress.Input{Spec: p.Egress, Kit: declared(workload, kits), Catalog: cat}
+	hosts, err := declared(p.Workload, workload, kits)
+	if err != nil {
+		return candidate{}, err
+	}
+	in := egress.Input{Spec: p.Egress, Kit: hosts, Catalog: cat}
 	for _, rt := range t.repos {
 		in.Repos = append(in.Repos, egress.Repo{Dir: rt.dir, URL: repoURL(p, rt.dir), Read: egress.GitReader(r.git, rt.clone, rt.egressCommit)})
 	}
@@ -218,27 +222,26 @@ func newCandidate(env string) (*state.Candidate, error) {
 
 // workloadCapabilities returns the capability set of the descriptor of
 // the workload ref (06 6.1, REQ-0571): the entry of the descriptor
-// cache under the ref's digest when there is one for romeu's platform,
-// and otherwise the descriptor read from the registry by digest, which
-// is then cached under the digest of the manifest it was read from.
-//
-// A cache entry is keyed by that manifest's digest (03 3.8, REQ-0240),
-// which is the ref's own for a workload of one manifest; for an index,
-// the platform manifest's digest is known only once the registry has
-// been read, so the cache answers a workload of one manifest alone, and
-// an index is read from its registry at each sync until the store can
-// find an entry by the index digest and the platform.
+// cache that the ref's digest reaches for romeu's platform, and
+// otherwise the descriptor read from the registry by digest, which is
+// then cached under the digest of the manifest it was read from (03
+// 3.8, REQ-0240). The cache is looked up by the ref's digest and the
+// platform (Store.FindDescriptor), so a multi-arch workload, whose
+// entry is keyed by its platform manifest's digest, is read from the
+// cache too: a second sync with the same ref reads no registry. Only a
+// pair with no entry goes to the registry; an entry that cannot be read
+// stops the sync with its error (record-unreadable, format-newer).
 func workloadCapabilities(ctx context.Context, r *run, ref string) (oci.Capabilities, error) {
 	w, err := spec.ParseWorkload(ref)
 	if err != nil {
 		return oci.Capabilities{}, err
 	}
 	platform := oci.Platform{OS: "linux", Architecture: runtime.GOARCH}
-	d, err := r.store.GetDescriptor(w.Digest)
+	d, err := r.store.FindDescriptor(w.Digest, platform.String())
 	switch {
-	case err == nil && d.Workload == w.Digest && d.Platform == platform.String():
+	case err == nil:
 		return *d.Capabilities, nil
-	case err != nil && !errors.Is(err, fs.ErrNotExist):
+	case !errors.Is(err, fs.ErrNotExist):
 		return oci.Capabilities{}, err
 	}
 	f, err := fetchWorkload(ctx, ref, platform)
@@ -334,34 +337,46 @@ func kitFiles(rt *os.Root, name string) ([]gate.File, error) {
 	return files, err
 }
 
-// declared returns the domains the network capability of the workload
-// and of each kit allows: the kits' input of the egress derivation (07
-// 7.5, step 6), which gates each one the catalog does not allow (I10).
-// The hosts of the install phase and of the runtime phase are merged
-// into the one list egress.Input.Kit takes, so a host a kit allows at
-// install alone is allowed to the sandbox at runtime too. Whether
-// egress keeps the phases apart is open: kits/julieta/julieta.yaml
-// names the install phase so the runtime does not open github.com
-// (REQ-0592), and 07 7.5 does not say. Each host is passed as the
-// descriptor writes it; a host:port entry fails the derivation until
-// egress.Split (REQ-0069, 06 6.1) splits it.
-func declared(workload oci.Capabilities, kits []render.MaterializedKit) []string {
+// declared returns the domains of the runtime phase of the network
+// capability of the workload, whose reference is ref, and of each kit:
+// the kits' input of the egress derivation (07 7.5, step 6), which
+// gates each one the catalog does not allow (I10). Every host of both
+// phases passes through egress.Split, which strips a port and refuses a
+// host that is no egress domain (REQ-0069), as usage with the slug
+// descriptor-invalid; only the runtime phase's enter the derivation
+// (REQ-1315), since sbx opens the install hosts for the install alone,
+// and gate 2 shows them with the capability set.
+func declared(ref string, workload oci.Capabilities, kits []render.MaterializedKit) ([]string, error) {
 	var out []string
-	add := func(c oci.Capabilities) {
+	add := func(name string, c oci.Capabilities) error {
 		if c.Network == nil {
-			return
+			return nil
 		}
-		for _, rules := range []oci.Rules{c.Network.Install, c.Network.Runtime} {
-			for _, e := range rules.Allow {
-				out = append(out, e.Hosts...)
+		for _, phase := range []struct {
+			rules   oci.Rules
+			runtime bool
+		}{{c.Network.Install, false}, {c.Network.Runtime, true}} {
+			for _, e := range phase.rules.Allow {
+				doms, err := egress.Split(name, e.Hosts)
+				if err != nil {
+					return usage("descriptor-invalid", termsafe.Escape(err.Error()))
+				}
+				if phase.runtime {
+					out = append(out, doms...)
+				}
 			}
 		}
+		return nil
 	}
-	add(workload)
+	if err := add(ref, workload); err != nil {
+		return nil, err
+	}
 	for _, k := range kits {
-		add(k.Capabilities)
+		if err := add(k.ID, k.Capabilities); err != nil {
+			return nil, err
+		}
 	}
-	return out
+	return out, nil
 }
 
 // repoURL returns the URL of the repo of p whose dir is dir.

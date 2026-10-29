@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,17 +34,22 @@ var (
 	stderrFD = func() int { return syscall.Stderr }
 )
 
-// errApprovalRequired is the interim error of a sync without a terminal
-// whose widening digest differs from the approval (01 1.6, REQ-1210):
-// it exits 1, as an error of no row, until project-approval-required
-// (RJ-301, exit 3) is declared, with the slice that links sync into the
-// binary.
-var errApprovalRequired = errors.New("gate 2 needs a terminal to approve a changed widening; run romeu sync again on one")
-
 // errCandidateChanged is the refusal of a candidate dir whose files
 // are no longer those step 6 rendered, which the gate 2 diff showed: it
 // is declined, and nothing of it is promoted.
 var errCandidateChanged = errors.New("the candidate dir changed after it was rendered, so it is not the one the gate showed; it is declined")
+
+// outcome is what gate 2 did with one target's candidate.
+type outcome int
+
+const (
+	// gatePromoted: the candidate was promoted.
+	gatePromoted outcome = iota + 1
+	// gateDeclined: the operator declined it on a terminal.
+	gateDeclined
+	// gateRefused: its widening digest differs and no terminal can ask.
+	gateRefused
+)
 
 // gateAndPromote is step 8 of 04 4.2 (REQ-0343): gate 2 and the
 // candidate machine of 01 1.6, for each target in order.
@@ -56,16 +62,20 @@ var errCandidateChanged = errors.New("the candidate dir changed after it was ren
 //     other answer declines, which deletes the candidate dir and leaves
 //     the live files as they are (REQ-1209, I7).
 //   - Without a terminal the candidate is declined, its dir deleted,
-//     its widening digest printed, and the command fails once every
-//     target is done (REQ-1210), recording no approval.
+//     and its widening digest printed (REQ-1210), recording no approval.
+//
+// The targets after a declined or refused one still meet gate 2. Once
+// every target is done, a refusal without a terminal fails the command
+// with project-approval-required (RJ-301, exit 3), and a decline on a
+// terminal with candidate-declined (RJ-358, exit 1), as gate 1's
+// decline does (REQ-1276); each names the projects, and its hint is
+// their sync.
 //
 // gate.Confirm writes the diff and its prompt through the CLI writer
 // of stderr, once both stdin and the file descriptor of stderr are a
-// terminal, and asks as gate.Ask does: what was typed before the prompt
-// is dropped, and y or Y approves. gate.Ask needs the *os.File of
-// stderr, which no command holds, since all output goes through the
-// CLI writer (04 4.1, Output). The diff is escaped already, and
-// escaping it again changes nothing.
+// terminal: what was typed before the prompt is dropped, and y or Y
+// approves. The diff is escaped already, and escaping it again changes
+// nothing.
 //
 // A promotion runs the promotion commit (render.Live.Promote), then
 // the project record is written through Store.UpdateProject: the
@@ -79,25 +89,91 @@ var errCandidateChanged = errors.New("the candidate dir changed after it was ren
 // (step 7) is added to the warnings, once its project is promoted, as
 // replaced, its edit lost.
 //
+// After the last target, when this run promoted any, the workspace
+// files are written once from every project's record (writeWorkspaces);
+// a run that promotes nothing leaves them as they were. The promotion
+// commit itself is given none to write.
+//
 // On an error each candidate still rendered is declined, which deletes
-// its dir, and a refusal without a terminal of an earlier target is
-// joined to the error. An approved candidate whose promotion failed is
-// the one exception: the candidate machine has no row from approved to
-// declined, so its dir is left, and the next sync's render deletes it
-// (REQ-0082). The workspace files are not written yet: render.Live
-// takes them, and they need every clone of host state.
+// its dir, and the error stops the step and is the one returned: a
+// target declined or refused before it is reported by the line printed
+// for it alone, and the workspace files are still written when a
+// target before it was promoted. An approved candidate
+// whose promotion failed is the one exception to the decline: the
+// candidate machine has no row from approved to declined, so its dir is
+// left, and the next sync's render deletes it (REQ-0082).
 func gateAndPromote(ctx context.Context, r *run) error {
-	var refused error
+	names := map[outcome][]string{}
 	for i, p := range r.targets {
-		err := gateOne(ctx, r, p, r.trees[i].env, &r.candidates[i])
-		switch {
-		case errors.Is(err, errApprovalRequired):
-			refused = err
-		case err != nil:
-			return errors.Join(refused, err, decline(rendered(r.candidates)))
+		got, err := gateOne(ctx, r, p, r.trees[i].env, &r.candidates[i])
+		if err != nil {
+			var ws error
+			if len(names[gatePromoted]) > 0 {
+				ws = writeWorkspaces(r)
+			}
+			return errors.Join(err, decline(rendered(r.candidates)), ws)
+		}
+		names[got] = append(names[got], p.Name)
+	}
+	if len(names[gatePromoted]) > 0 {
+		if err := writeWorkspaces(r); err != nil {
+			return err
 		}
 	}
-	return refused
+	var errs []error
+	if n := names[gateRefused]; len(n) > 0 {
+		errs = append(errs, named(ProjectApprovalRequired, n, "gate 2 needs a terminal to approve the changed widening of "))
+	}
+	if n := names[gateDeclined]; len(n) > 0 {
+		errs = append(errs, named(CandidateDeclined, n, "gate 2 was declined for "))
+	}
+	return errors.Join(errs...)
+}
+
+// named returns the error of row for the projects names, its message
+// prefix followed by the names and its hint the sync of them all.
+func named(row cli.Row, names []string, prefix string) error {
+	escaped := make([]string, len(names))
+	for i, n := range names {
+		escaped[i] = termsafe.Escape(n)
+	}
+	e := row.New(prefix + strings.Join(escaped, ", "))
+	e.Fill = map[string]string{"<name>": strings.Join(escaped, " ")}
+	return e
+}
+
+// writeWorkspaces writes dev.code-workspace and review.code-workspace
+// into the root (REQ-0048) from every project's record: the repos of
+// the approved widening set of each <name>-env/ under the root whose
+// record holds an approval, as host clones. A dir whose name is no
+// project name, or has no record, is no project of host state. Host
+// state records no review checkout until romeu pull does (T069), so
+// review.code-workspace lists none.
+func writeWorkspaces(r *run) error {
+	names, err := envDirs(r.settings.Root)
+	if err != nil {
+		return fmt.Errorf("the workspace files: %w", err)
+	}
+	var clones []render.Clone
+	for _, name := range names {
+		rec, err := r.store.LoadProject(name)
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, state.ErrInvalidName) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if rec.Approval == nil {
+			continue
+		}
+		for _, repo := range rec.Approval.Set.Repos {
+			clones = append(clones, render.Clone{Project: name, Dir: repo.Dir})
+		}
+	}
+	if err := render.WriteWorkspaces(r.settings.Root, clones, nil); err != nil {
+		return fmt.Errorf("the workspace files: %w", err)
+	}
+	return nil
 }
 
 // rendered returns the candidates of cs still in the state rendered:
@@ -113,57 +189,55 @@ func rendered(cs []candidate) []candidate {
 }
 
 // gateOne is step 8 for the target p, whose env dir is env, and its
-// candidate c.
-func gateOne(ctx context.Context, r *run, p spec.Project, env string, c *candidate) error {
+// candidate c: it returns what gate 2 did with it.
+func gateOne(ctx context.Context, r *run, p spec.Project, env string, c *candidate) (outcome, error) {
 	if a := c.project.Approval; a != nil && a.WideningDigest == c.widening {
 		if err := unchanged(c); err != nil {
-			return err
+			return 0, err
 		}
-		return promote(r, p, env, c, nil)
+		return gatePromoted, promote(r, p, env, c, nil)
 	}
 	d, err := diff(r, env, c)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	var text strings.Builder
 	if _, err := d.WriteTo(&text); err != nil {
-		return err
+		return 0, err
 	}
 	ok, err := gate.Confirm(stdin(), stderrFD(), r.env.Stderr, text.String())
 	if errors.Is(err, gate.ErrNoTerminal) {
 		if _, err := c.dir.Apply(state.CandidateDeclineNoTTY, nil, state.Approval{}); err != nil {
-			return err
+			return 0, err
 		}
-		if _, err := fmt.Fprintf(r.env.Stdout, "gate 2: %s needs an approval of the widening digest %s; the candidate is deleted\n",
-			termsafe.Escape(p.Name), c.widening); err != nil {
-			return err
-		}
-		return errApprovalRequired
+		_, err := fmt.Fprintf(r.env.Stdout, "gate 2: %s needs an approval of the widening digest %s; the candidate is deleted\n",
+			termsafe.Escape(p.Name), c.widening)
+		return gateRefused, err
 	}
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return 0, err
 	}
 	if !ok {
 		if _, err := c.dir.Apply(state.CandidateDecline, nil, state.Approval{}); err != nil {
-			return err
+			return 0, err
 		}
 		_, err := fmt.Fprintf(r.env.Stdout, "gate 2: declined for %s; the candidate is deleted and the live files are unchanged\n", termsafe.Escape(p.Name))
-		return err
+		return gateDeclined, err
 	}
 	if err := unchanged(c); err != nil {
-		return err
+		return 0, err
 	}
 	a := state.Approval{
 		WideningDigest: c.widening, Set: c.set, RenderDigest: c.set.RenderDigest,
 		SpecCommit: r.specCommit, CandidateID: c.dir.ID(), ApprovedAt: seams.Now(),
 	}
 	if _, err := c.dir.Apply(state.CandidateApprove, c.project, a); err != nil {
-		return err
+		return 0, err
 	}
-	return promote(r, p, env, c, &a)
+	return gatePromoted, promote(r, p, env, c, &a)
 }
 
 // unchanged checks that the dir of the rendered candidate c holds the

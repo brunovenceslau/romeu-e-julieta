@@ -129,7 +129,7 @@ func TestOverwriteDriftKeepsTheEditOnADecline(t *testing.T) {
 
 	_, err := f.gateOnPTY(t, "n\n")
 
-	require.NoError(t, err)
+	requireDeclined(t, err, "shop")
 	assert.Equal(t, edited, f.liveEnv(t), "the edit stays")
 	assert.Empty(t, warned(f.r), "nothing is reported replaced")
 }

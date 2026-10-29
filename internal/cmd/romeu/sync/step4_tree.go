@@ -59,10 +59,11 @@ type tree struct {
 }
 
 // repoTree is one repo of a target, in the order of its spec: its dir,
-// the paths of its host clone and of its memory dir, and the egress
-// ref and the commit it points at (I9).
+// the paths of its host clone and of its memory dir, the branch it
+// follows, and the egress ref and the commit it points at (I9).
 type repoTree struct {
 	dir, clone, memory      string
+	branch                  string
 	egressRef, egressCommit string
 }
 
@@ -138,7 +139,7 @@ func makeTarget(ctx context.Context, r *run, p spec.Project) (tree, error) {
 				return tree{}, err
 			}
 		}
-		if rp.egressRef, rp.egressCommit, err = fetchRepo(ctx, r.git, repo, rp.clone); err != nil {
+		if rp.branch, rp.egressRef, rp.egressCommit, err = fetchRepo(ctx, r.git, repo, rp.clone); err != nil {
 			return tree{}, err
 		}
 		t.repos = append(t.repos, rp)
@@ -222,38 +223,43 @@ func cloneMissing(rt *os.Root, name, path string) (bool, error) {
 }
 
 // fetchRepo fetches the origin of repo into refs/romeu/origin/<dir>/*
-// of clone and returns the egress ref, refs/romeu/origin/<dir>/<ref>,
-// and its commit (I9).
+// of clone and returns the branch the repo follows, the egress ref and
+// its commit (I9).
 //
-// With no ref in the spec, <ref> is the origin's HEAD as the clone
-// records it, the local refs/remotes/origin/HEAD, since gitsafe has no
-// read of the remote's HEAD: its refspec check refuses a source outside
-// refs/, so +HEAD:refs/romeu/origin/<dir>/HEAD cannot be fetched. The
-// commit is still read from refs/romeu/origin/ alone, but a local
-// rewrite of refs/remotes/origin/HEAD changes which branch it is. So
-// I9 holds only for a repo whose spec names its ref, until gitsafe
-// reads the remote's HEAD.
-func fetchRepo(ctx context.Context, g *gitsafe.Runner, repo spec.Repo, clone string) (string, string, error) {
+// With a ref in the spec, the branch is that ref and the egress ref is
+// refs/romeu/origin/<dir>/<ref>. With none, the same fetch takes the
+// origin's HEAD into refs/romeu/origin/<dir>/HEAD (T183), which is the
+// egress ref, so the egress commit is the origin's and no local ref
+// moves it, refs/remotes/origin/HEAD among them. The name of the
+// branch, which the manifest gives julieta, is still the one the
+// clone's refs/remotes/origin/HEAD points at, since the fetch of HEAD
+// stores its commit and not the branch it names; a clone that records
+// none is ref-missing, before any fetch. A local rewrite of that ref
+// changes the name alone, never the egress (reopened when romeu run
+// writes the manifest, T046).
+func fetchRepo(ctx context.Context, g *gitsafe.Runner, repo spec.Repo, clone string) (branch, egressRef, commit string, err error) {
 	prefix := "refs/romeu/origin/" + repo.Dir + "/"
-	if err := fetch(ctx, g, clone, repo.URL, []string{"+refs/heads/*:" + prefix + "*"}); err != nil {
-		return "", "", err
-	}
-	ref := repo.Ref
-	if ref == "" {
-		var err error
-		if ref, err = g.DefaultBranch(ctx, clone); err != nil {
-			return "", "", err
+	refspecs := []string{"+refs/heads/*:" + prefix + "*"}
+	branch, egressRef = repo.Ref, prefix+repo.Ref
+	if branch == "" {
+		if branch, err = g.DefaultBranch(ctx, clone); err != nil {
+			return "", "", "", err
 		}
-		if ref == "" {
-			return "", "", usage("ref-missing", "the spec names no ref for "+termsafe.Escape(repo.URL)+", and its clone records no HEAD of the origin; name the branch in ref")
+		if branch == "" {
+			return "", "", "", usage("ref-missing", "the spec names no ref for "+termsafe.Escape(repo.URL)+", and its clone records no HEAD of the origin; name the branch in ref")
 		}
+		egressRef = prefix + "HEAD"
+		refspecs = append(refspecs, "+HEAD:"+egressRef)
 	}
-	commit, ok, err := g.RefOID(ctx, clone, prefix+ref)
+	if err := fetch(ctx, g, clone, repo.URL, refspecs); err != nil {
+		return "", "", "", err
+	}
+	commit, ok, err := g.RefOID(ctx, clone, egressRef)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if !ok {
-		return "", "", usage("ref-missing", "the origin of "+termsafe.Escape(repo.URL)+" has no branch "+termsafe.Escape(ref))
+		return "", "", "", usage("ref-missing", "the origin of "+termsafe.Escape(repo.URL)+" has no branch "+termsafe.Escape(branch))
 	}
-	return prefix + ref, commit, nil
+	return branch, egressRef, commit, nil
 }

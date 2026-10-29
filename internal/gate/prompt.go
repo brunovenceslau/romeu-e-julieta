@@ -13,62 +13,31 @@ import (
 	"golang.org/x/term"
 )
 
-// ErrNoTerminal is the error of Ask when standard input or standard
-// error is not a terminal: an approval needs both (01 1.4, REQ-0059). sync then
-// declines the candidate, prints the widening digest and exits 3 with
-// project-approval-required (01 1.6, REQ-1210).
+// ErrNoTerminal is the error of Confirm when standard input or standard
+// error is not a terminal: an approval needs both (01 1.4, REQ-0059).
+// sync then declines the candidate, prints the widening digest and exits
+// 3 with project-approval-required (01 1.6, REQ-1210).
 var ErrNoTerminal = errors.New("gate: an approval needs a terminal on standard input and standard error")
 
-// maxAnswer is the most bytes of an answer Ask reads: a longer line is
-// no "y" and declines.
+// maxAnswer is the most bytes of an answer Confirm reads: a longer line
+// is no "y" and declines.
 const maxAnswer = 4096
 
-// Ask writes the diff d, its summary repeated right above the prompt,
-// and PromptLine to stderr, so a piped stdout keeps them visible, and
-// reads one answer line from stdin (REQ-0272). Both must be a terminal,
-// so the operator reads the diff where the answer is typed. Once the
-// diff is written, and before PromptLine, Ask drops the terminal's
-// input queue (show), so a line typed or pasted before the diff was on
-// the screen is not an answer to it. It approves on "y" or "Y" followed by a newline; any other
-// line, an end of input before a newline, and a line longer than
-// maxAnswer decline (01 1.6, REQ-1208). Without a terminal it writes
-// nothing and returns ErrNoTerminal.
-//
-//romeu:invariant I7 guard
-func Ask(stdin io.Reader, stderr io.Writer, d Diff) (bool, error) {
-	in, ok := stdin.(*os.File)
-	if !ok || !term.IsTerminal(int(in.Fd())) {
-		return false, ErrNoTerminal
-	}
-	out, ok := stderr.(*os.File)
-	if !ok || !term.IsTerminal(int(out.Fd())) {
-		return false, ErrNoTerminal
-	}
-	var b strings.Builder
-	if _, err := d.WriteTo(&b); err != nil {
-		return false, fmt.Errorf("gate: write the diff: %w", err)
-	}
-	if err := show(int(in.Fd()), out, b.String()); err != nil {
-		return false, err
-	}
-	line, err := readAnswer(in)
-	if err != nil {
-		return false, fmt.Errorf("gate: read the answer: %w", err)
-	}
-	return line == "y" || line == "Y", nil
-}
-
-// Confirm is the prompt of gate 1 (01 1.4, REQ-0061): it writes text,
-// which ends with its question, to stderr and reads one answer line from
-// stdin, by the rules of Ask: once the lines above its question are
-// written, and before the question, it drops the terminal's input queue
-// (show), and "y" or "Y" followed by a newline approves while any other
-// line, or an end of input, declines. Like Ask, it needs
-// a terminal on stdin and on the process's standard error, the file
-// descriptor stderrFD, so the operator sees the text where the answer is
-// typed (decided on 2026-10-23); stderr is the command's CLI writer over
-// that standard error, which escapes what it is given. Without both
-// terminals it writes nothing and returns ErrNoTerminal.
+// Confirm is the prompt of gate 1 (01 1.4, REQ-0061) and of gate 2
+// (REQ-0272), whose text is the diff Diff.WriteTo writes: it writes
+// text, which ends with its question, to stderr, so a piped stdout
+// keeps it visible, and reads one answer line from stdin. Once the
+// lines above its question are written, and before the question, it
+// drops the terminal's input queue (show), so a line typed or pasted
+// before the text was on the screen is not an answer to it. It approves
+// on "y" or "Y" followed by a newline; any other line, an end of input
+// before a newline, and a line longer than maxAnswer decline (01 1.6,
+// REQ-1208). It needs a terminal on stdin and on the process's standard
+// error, the file descriptor stderrFD, so the operator sees the text
+// where the answer is typed (decided on 2026-10-23); stderr is the
+// command's CLI writer over that standard error, which escapes what it
+// is given. Without both terminals it writes nothing and returns
+// ErrNoTerminal.
 //
 //romeu:invariant I7 guard
 func Confirm(stdin io.Reader, stderrFD int, stderr io.Writer, text string) (bool, error) {
