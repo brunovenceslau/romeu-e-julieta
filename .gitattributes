@@ -53,6 +53,7 @@ docs/reference/romeu/completion/bash.md -text
 docs/reference/romeu/completion/fish.md -text
 docs/reference/romeu/completion/zsh.md -text
 docs/reference/romeu/init.md -text
+docs/reference/romeu/sync.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
 internal/gate/fields_gen.go -text

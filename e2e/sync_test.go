@@ -6,7 +6,10 @@
 package e2e
 
 import (
+	"encoding/json/v2"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -14,6 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/e2e/internal/romeu"
+	"github.com/brunovenceslau/romeu-e-julieta/e2e/scenarios"
+	"github.com/brunovenceslau/romeu-e-julieta/e2e/scenarios/j11"
+	"github.com/brunovenceslau/romeu-e-julieta/e2e/scenarios/j2"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
@@ -105,4 +111,252 @@ func TestSyncPassesGate1(t *testing.T) {
 	assert.Equal(t, 2, res.Code, res.Stderr)
 	assert.Contains(t, res.Stderr, "config-clone-missing")
 	assert.NoDirExists(t, e.Root, "nothing is written under the root")
+}
+
+// The project of the sync cases: foo, two repos of the origins, the
+// primary on its branch main and the other on its origin's HEAD, the
+// product kit julieta, and memory kept on the machine (08 8.1,
+// REQ-1305).
+const (
+	// syncWorkload is the workload of foo, and its digest the index
+	// digest the descriptor cache is looked up by.
+	syncWorkload = "docker.io/docker/sbx-kit-claude@sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5"
+	syncIndex    = "sha256:c0132e89a89d94ddca3984513afdb36be57bd087fcc75823a4d14064b6a39ea5"
+	// syncManifest stands for the platform manifest the index names:
+	// another digest, so a cache looked up by the index digest alone
+	// would miss it.
+	syncManifest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	fooSpec      = "schema: project/v1\nname: foo\nrepos:\n" +
+		"  - url: https://github.com/owner/foo-api\n    primary: true\n    ref: main\n" +
+		"  - url: https://github.com/owner/foo-web\n" +
+		"workload: " + syncWorkload + "\nagent: sbx-kit-claude\nkits:\n  - product: julieta\nmemory: {remote: none}\n"
+)
+
+// syncFixture is an embedded Env whose origins hold the config repo
+// owner/cfg with the spec of foo and foo's two repos, after romeu init,
+// gate 1, and the descriptor cache entry of foo's workload.
+type syncFixture struct {
+	e *romeu.Env
+	o *romeu.Origins
+}
+
+// newSyncFixture returns the fixture.
+func newSyncFixture(t *testing.T) syncFixture {
+	t.Helper()
+	o := romeu.NewOrigins(t)
+	url := o.PushConfigRepo(t, "owner", "cfg", map[string]string{"projects/foo.yaml": fooSpec})
+	o.Push(t, "owner/foo-api", "main", map[string]string{"README": "foo-api"})
+	o.Push(t, "owner/foo-web", "main", map[string]string{"README": "foo-web"})
+	e := romeu.NewEmbedded(t, o)
+	res := e.Run(t, []string{"init", "--config-url", url})
+	require.Equal(t, 0, res.Code, res.Stderr)
+	e.AppendSettings(t, "gitHosts:\n  - host: github.com\nworkloadRepositories:\n  - docker.io/docker/sbx-kit-claude\n")
+	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.49.2", "handshake.jsonl"))
+	require.NoError(t, err)
+	require.NoError(t, e.SetSbxSession(session))
+	approve(t, e)
+	e.SeedDescriptor(t, syncIndex, syncManifest)
+	return syncFixture{e: e, o: o}
+}
+
+// env returns the path p, slash-separated, below foo-env/.
+func (f syncFixture) env(p string) string {
+	return filepath.Join(f.e.Root, "foo-env", filepath.FromSlash(p))
+}
+
+// approveFoo runs romeu sync foo on a terminal answered y.
+func (f syncFixture) approveFoo(t *testing.T) romeu.Result {
+	t.Helper()
+	res := f.e.RunTerminal(t, romeu.GatePrompt, "y\n", []string{"sync", "foo"})
+	require.Equal(t, 0, res.Code, res.Stderr)
+	return res
+}
+
+// candidates returns the names under foo's candidates dir.
+func (f syncFixture) candidates(t *testing.T) []string {
+	t.Helper()
+	entries, err := os.ReadDir(f.env(".romeu/candidates"))
+	require.NoError(t, err)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// workspaceFolders returns the folders of the workspace file name.
+func (f syncFixture) workspaceFolders(t *testing.T, name string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.e.Root, name))
+	require.NoError(t, err)
+	var doc struct {
+		Folders []struct {
+			Path string `json:"path"`
+		} `json:"folders"`
+	}
+	require.NoError(t, json.Unmarshal(data, &doc))
+	out := []string{}
+	for _, d := range doc.Folders {
+		out = append(out, d.Path)
+	}
+	return out
+}
+
+// TestSyncJ2Step3 runs step 3 of J2 as the scenario function reads it
+// from commands.yaml: sync clones the repos from origins served over
+// TLS, makes foo-env/ and its memory dirs, renders and reaches gate 2,
+// which, with no terminal in the world of a scenario, ends with exit 3
+// and nothing promoted (04 4.2; 01 1.6, REQ-1210).
+func TestSyncJ2Step3(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+	tbl, err := scenarios.Load("j2")
+	require.NoError(t, err)
+
+	s := j2.J2(tbl, j2.Vars{Name: "foo", Dirs: []string{"foo-api", "foo-web"}})
+
+	require.NoError(t, s.Run(f.e.World(t)))
+	assert.Empty(t, tbl.Unread())
+	assert.Equal(t, [][]string{{"version"}, {"version"}}, f.e.SbxCalls(t), "gate 1 of approve and of sync read sbx version alone")
+}
+
+// TestSyncApprovesOnYAndPromotes: the pty case "sync approves on y and
+// promotes" (I7): on a terminal the gate 2 diff and its prompt go to
+// stderr, never stdout, and y promotes: the live sbxenv.yaml, render.json
+// and the julieta of .romeu/bin, the approval recorded, no candidate
+// dir left, and the workspace files listing foo's clones (REQ-0048).
+func TestSyncApprovesOnYAndPromotes(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+
+	res := f.approveFoo(t)
+
+	assert.Contains(t, res.Stderr, "gate 2: widening of the project foo")
+	assert.NotContains(t, res.Stdout, romeu.GatePrompt, "the prompt goes to stderr")
+	assert.Contains(t, res.Stdout, "promoted  foo")
+	for _, p := range []string{"sbxenv.yaml", ".romeu/render.json", ".romeu/bin/julieta-linux-" + runtime.GOARCH} {
+		assert.FileExists(t, f.env(p))
+	}
+	assert.Empty(t, f.candidates(t))
+	live, err := os.ReadFile(f.env("sbxenv.yaml"))
+	require.NoError(t, err)
+	assert.FileExists(t, f.env(".metadata_never_index"))
+	assert.NotContains(t, string(live), ".metadata_never_index", "the marker lies outside every mount (REQ-0138)")
+	assert.NotRegexp(t, `(?m)(workspace: \.|- \.)/?$`, string(live), "foo-env/ itself is no mount")
+	assert.FileExists(t, filepath.Join(f.e.StateDir(), "projects", "foo.json"))
+	assert.Equal(t, []string{"foo-env/foo-api", "foo-env/foo-web"}, f.workspaceFolders(t, "dev.code-workspace"))
+	assert.Empty(t, f.workspaceFolders(t, "review.code-workspace"))
+}
+
+// TestSyncDeclinesOnNAndDeletesTheCandidate: the pty case "sync
+// declines on N and deletes the candidate" (I7): N exits 1 with
+// candidate-declined naming foo, no candidate dir remains, and nothing
+// is promoted or recorded.
+func TestSyncDeclinesOnNAndDeletesTheCandidate(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+
+	res := f.e.RunTerminal(t, romeu.GatePrompt, "N\n", []string{"sync", "foo"})
+
+	assert.Equal(t, 1, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "candidate-declined")
+	assert.Contains(t, res.Stderr, "romeu sync foo")
+	assert.Empty(t, f.candidates(t))
+	assert.NoFileExists(t, f.env("sbxenv.yaml"))
+	assert.NoFileExists(t, filepath.Join(f.e.StateDir(), "projects", "foo.json"))
+	assert.NoFileExists(t, filepath.Join(f.e.Root, "dev.code-workspace"), "a run that promotes nothing writes no workspace file")
+}
+
+// TestSyncJ11Step5 runs step 5 of J11 as the scenario function reads it:
+// after an approval, a spec change that widens egress is pushed, and a
+// sync without a terminal exits 3 with nothing kept (01 1.6,
+// REQ-1210); the rerun on a terminal, answered y, promotes it: its
+// render.json records the new domain (live egress is step 9, T047).
+func TestSyncJ11Step5(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+	f.approveFoo(t)
+	live, err := os.ReadFile(f.env("sbxenv.yaml"))
+	require.NoError(t, err)
+	f.o.Push(t, "owner/cfg", "main", map[string]string{"projects/foo.yaml": fooSpec + "egress:\n  extra: [api.example.com]\n"})
+	tbl, err := scenarios.Load("j11")
+	require.NoError(t, err)
+
+	s := j11.J11(tbl, j11.Vars{Name: "foo", Live: live})
+
+	require.NoError(t, s.Run(f.e.World(t)))
+	assert.Empty(t, tbl.Unread())
+	rec, err := os.ReadFile(f.env(".romeu/render.json"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(rec), "api.example.com", "nothing of the change is live")
+	res := f.approveFoo(t)
+	assert.Contains(t, res.Stderr, "api.example.com", "the diff names the new domain")
+	rec, err = os.ReadFile(f.env(".romeu/render.json"))
+	require.NoError(t, err)
+	assert.Contains(t, string(rec), "api.example.com", "the approved egress is promoted")
+}
+
+// idempotencyRows is the idempotency meta-test of 10 10.1 (REQ-0277): a
+// converging command, run a second time on unchanged inputs, leaves the
+// content and mode of every file of the root and of host state, every
+// ref of a clone among them, as they were, except lastRunAt. Each task
+// that adds a converging or an appending command adds its row here,
+// and T073 checks that no command lacks one.
+var idempotencyRows = []struct {
+	// command is the command line of the row.
+	command string
+	// first readies the fixture and runs the command once.
+	first func(t *testing.T) (*romeu.Env, []string)
+}{
+	{"sync", func(t *testing.T) (*romeu.Env, []string) {
+		t.Helper()
+		f := newSyncFixture(t)
+		f.approveFoo(t)
+		return f.e, []string{"sync", "foo"}
+	}},
+}
+
+// TestSyncIdempotency runs each row of idempotencyRows: the second run,
+// without a terminal, exits 0 and changes nothing but lastRunAt. For
+// sync, the second run reads its multi-arch workload's descriptor from
+// the cache by the index digest and the platform, with no registry read:
+// the cache keeps its one entry (REQ-0571).
+func TestSyncIdempotency(t *testing.T) {
+	t.Parallel()
+	for _, row := range idempotencyRows {
+		t.Run(row.command, func(t *testing.T) {
+			t.Parallel()
+			e, args := row.first(t)
+			root, state := romeu.Snapshot(t, e.Root), romeu.Snapshot(t, e.StateDir())
+
+			res := e.Run(t, args)
+
+			require.Equal(t, 0, res.Code, res.Stderr)
+			assert.Equal(t, root, romeu.Snapshot(t, e.Root), "the root is as it was")
+			after := romeu.Snapshot(t, e.StateDir())
+			for p := range after {
+				if strings.HasPrefix(p, "projects/") && strings.HasSuffix(p, ".json") {
+					after[p] = withoutLastRunAt(t, after[p])
+					state[p] = withoutLastRunAt(t, state[p])
+				}
+			}
+			assert.Equal(t, state, after, "host state is as it was, but lastRunAt")
+			entries, err := os.ReadDir(filepath.Join(e.StateDir(), "descriptors"))
+			require.NoError(t, err)
+			assert.Len(t, entries, 1, "no registry read wrote another entry")
+		})
+	}
+}
+
+// withoutLastRunAt returns the node of a project record with its
+// lastRunAt member removed.
+func withoutLastRunAt(t *testing.T, n romeu.Node) romeu.Node {
+	t.Helper()
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal([]byte(n.Data), &doc))
+	delete(doc, "lastRunAt")
+	data, err := json.Marshal(doc, json.Deterministic(true))
+	require.NoError(t, err)
+	n.Data = string(data)
+	return n
 }

@@ -7,7 +7,7 @@ package sync
 
 import (
 	"bytes"
-	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"io"
 	"io/fs"
@@ -536,7 +536,7 @@ func (f *gateFixture) workspaceFolders(t *testing.T, name string) []string {
 			Path string `json:"path"`
 		} `json:"folders"`
 	}
-	require.NoError(t, json.Unmarshal(data, &doc))
+	require.NoError(t, jsonv2.Unmarshal(data, &doc))
 	out := []string{}
 	for _, d := range doc.Folders {
 		out = append(out, d.Path)

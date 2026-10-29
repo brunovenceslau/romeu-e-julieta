@@ -388,6 +388,28 @@ func TestRenderCandidatesFlipsGate2OnACapability(t *testing.T) {
 	assert.NotEqual(t, before, f.r.candidates[0].widening)
 }
 
+// TestRenderCandidatesFlipsGate2OnARef: changing a repo's ref to
+// another branch of its origin changes the egress commit and the
+// widening digest, so the change meets gate 2 (I9).
+func TestRenderCandidatesFlipsGate2OnARef(t *testing.T) {
+	f := renderRun(t)
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+	before, commit := f.r.candidates[0].widening, f.r.trees[0].repos[0].egressCommit
+	origin := f.origins[apiURL]
+	gitIn(t, origin, "checkout", "-q", "-b", "release")
+	commitFiles(t, origin, map[string]string{"README": "release"})
+	gitIn(t, origin, "checkout", "-q", "main")
+	f.r.targets[0].Repos[0].Ref = "release"
+	f.r.trees = nil
+	require.NoError(t, makeTree(t.Context(), f.r))
+	f.again()
+
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+
+	assert.NotEqual(t, commit, f.r.trees[0].repos[0].egressCommit)
+	assert.NotEqual(t, before, f.r.candidates[0].widening)
+}
+
 // TestRenderCandidatesFlipsGate2OnAPersonalKitCapability: a personal
 // kit read from the config commit's tree, and the same kit at a later
 // commit whose descriptor adds a capability a personal kit may hold:
