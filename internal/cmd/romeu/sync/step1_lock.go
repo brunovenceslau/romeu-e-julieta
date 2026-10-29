@@ -46,7 +46,7 @@ var (
 // which stops a stale toolchain with exit 3 before anything is
 // promoted. Everything before the lock only reads, so a romeu that
 // embeds no julieta (julieta-not-embedded, RJ-312) stops before any
-// write. It fills settings, home, store and lock.
+// write. It fills settings, home, bin, store and lock.
 //
 // Recovery runs on every <name>-env/ since the targets are known only
 // at step 3, and a promotion left by any command is finished before
@@ -81,7 +81,7 @@ func lockAndCheck(ctx context.Context, r *run) error {
 	if err := recoverPromotions(r.env.Stderr, h.Root, bin); err != nil {
 		return err
 	}
-	r.settings, r.home = h, home
+	r.settings, r.home, r.bin = h, home, bin
 	sbx := &sbxdrv.Runner{Sbx: h.Tools.Sbx, Home: home, Host: &r.settings}
 	return approve.CheckFunc(r.store, sbx, r.env.Version)(ctx)
 }
