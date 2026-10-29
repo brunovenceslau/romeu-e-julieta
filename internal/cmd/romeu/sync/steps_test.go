@@ -8,6 +8,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -168,8 +169,12 @@ func TestFromDefaultsToOrigin(t *testing.T) {
 }
 
 func TestAStepNotBuiltStopsTheRun(t *testing.T) {
-	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), steps)
-	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 1") {
-		t.Fatalf("got %v, want step 1 not built", err)
+	list := slices.Clone(steps)
+	for i := range 3 {
+		list[i].do = func(context.Context, *run) error { return nil }
+	}
+	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), list)
+	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 4") {
+		t.Fatalf("got %v, want step 4 not built", err)
 	}
 }

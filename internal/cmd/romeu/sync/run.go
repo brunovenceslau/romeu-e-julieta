@@ -7,6 +7,7 @@ package sync
 
 import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
@@ -22,6 +23,10 @@ type run struct {
 	// releases.
 	store *state.Store
 	lock  *state.Lock
+	// Step 1: the host settings, validated, and HOME, an absolute path,
+	// which every git and sbx call runs with.
+	settings spec.HostSettings
+	home     string
 }
 
 // newRun returns the run of one command line.
