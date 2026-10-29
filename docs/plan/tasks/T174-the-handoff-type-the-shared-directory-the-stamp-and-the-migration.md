@@ -22,6 +22,7 @@ needs:
 after:
   - T166
   - T043
+  - T178
 ask_first:
   - contracts
 sitting: none
@@ -89,6 +90,12 @@ merged) gains the optional member `sharedMemory`, with the shape test of
    fails the heading rule stays and is warned `handoff-legacy`; the
    directory is removed only once empty. A second run finds nothing.
    Under the store lock of both dirs.
+
+Re-plan (2026-10-28): after T178, and through it T177, for the file
+overlap of `internal/cmd/julieta/setup/migrate*.go` with their
+`internal/cmd/julieta/setup/*_test.go`; that order held through T172
+until T177 stopped waiting on it. It costs nothing, since this task
+already waits on T043.
 
 - Implements: REQ-1295 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
   REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-1302 (03 3.9), REQ-0237 (03 3.8), REQ-0244 (03 3.10), REQ-1300

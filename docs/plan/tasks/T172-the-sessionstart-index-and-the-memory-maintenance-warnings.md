@@ -89,8 +89,8 @@ T174 and this task carry what they did. The generated pages
    `KitDigest` (T171) changes with them.
 
 Re-plan (2026-10-28): after T178, and through it T177, for the file
-overlap on `internal/cmd/julieta/handoff/**` and
-`internal/cmd/julieta/setup/*_test.go`; those two tasks need only T051,
+overlaps on `internal/cmd/julieta/handoff/**` (with T177) and
+`internal/cmd/julieta/setup/*_test.go` (with both); those two tasks need only T051,
 while this one waits on T174 and T175. Both `needs` stand: T174 brings
 the shared directory, the `handoff` type, the stamp and the reader that
 parts (3) and (5) use, and T175 is the release order of ADR 0043 for the

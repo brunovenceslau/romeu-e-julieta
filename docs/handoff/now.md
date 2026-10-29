@@ -3,8 +3,9 @@
 ## Where we stopped
 
 T038 is merged (#301), and so are T171, T173 and T166. The plan was
-re-ordered on 2026-10-28: T177 and T178 come before T172, which waits
-on T174 and T175 and through them on T039. T111 sitting M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
+re-ordered on 2026-10-28: T177 and T178 come before T172 and T174;
+T172 waits on T174 and T175, and through them on T039. T111 sitting
+M1 (01m5zx3gp7wp1twg6rn6f63jd2) waits.
 Pushes and pull requests need no approval here, within the limits of
 01m5nbzfb4p92djhp10c92jprp. Work for another repository goes into an
 issue there (01m5rnxnykc2nbn1d2dvyyxmsw).
