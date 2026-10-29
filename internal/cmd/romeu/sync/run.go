@@ -56,8 +56,8 @@ type run struct {
 	candidates []candidate
 
 	// Step 7: the drifted live files --overwrite-drift lets step 8's
-	// promotion replace, in the order of targets, which step 8 reports
-	// as lost edits once their project is promoted.
+	// promotion replace, in the order of targets, which step 8 adds to
+	// the warnings as lost edits once their project is promoted.
 	overwritten []lostEdit
 
 	// Steps 4 and 5 (and each later step that warns): the warnings of

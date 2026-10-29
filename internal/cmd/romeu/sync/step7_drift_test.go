@@ -6,6 +6,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
@@ -109,7 +111,54 @@ func TestOverwriteDriftReplacesTheEditedFile(t *testing.T) {
 
 	assert.Equal(t, []lostEdit{{project: "shop", path: render.LiveEnvFile}}, f.r.overwritten)
 	assert.Equal(t, want, f.liveEnv(t), "the edit is replaced")
-	assert.Contains(t, f.stderr.String(), "replaced the edited sbxenv.yaml of shop; its edit is lost")
+	assert.Equal(t, "replaced the edited sbxenv.yaml of shop; its edit is lost\n", warned(f.r), "a warning, which step 10 prints last")
+	assert.NotContains(t, f.stderr.String(), "its edit is lost", "step 8 prints no warning itself")
+}
+
+// TestOverwriteDriftKeepsTheEditOnADecline: --overwrite-drift lets the
+// edited live file through, and a changed widening declined with n
+// promotes nothing, so the edit stays and nothing is reported replaced.
+func TestOverwriteDriftKeepsTheEditOnADecline(t *testing.T) {
+	f := promoted(t)
+	edited := []byte("edited: true\n")
+	require.NoError(t, os.WriteFile(f.in(render.LiveEnvFile), edited, 0o600))
+	f.r.targets[0].Kits = []spec.Kit{{Product: "plain"}, {Product: "withcaps"}}
+	f.rerender(t)
+	f.r.flags.overwriteDrift = true
+	require.NoError(t, checkDrift(t.Context(), f.r))
+
+	_, err := f.gateOnPTY(t, "n\n")
+
+	require.NoError(t, err)
+	assert.Equal(t, edited, f.liveEnv(t), "the edit stays")
+	assert.Empty(t, warned(f.r), "nothing is reported replaced")
+}
+
+// TestCheckDriftEscapesTheFileName: a live render.json that names a
+// path holding an ESC and a bidi control stops step 7 before any drift
+// is reported (render refuses a path that is not clean), and the error
+// holds neither byte (I29), so no drifted name of a record can reach a
+// terminal raw.
+//
+//romeu:invariant I29 test
+func TestCheckDriftEscapesTheFileName(t *testing.T) {
+	f := promoted(t)
+	data, err := os.ReadFile(f.in(render.LiveRecord))
+	require.NoError(t, err)
+	rec, err := render.DecodeRecord(data)
+	require.NoError(t, err)
+	rec.Files[".romeu/x\x1b[31m\u202e"] = plainSum([]byte("absent"))
+	out, err := json.Marshal(rec)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(f.in(render.LiveRecord), out, 0o600))
+
+	err = checkDrift(t.Context(), f.r)
+
+	require.ErrorIs(t, err, render.ErrRecordInvalid, "render refuses the name before it can drift")
+	assert.Contains(t, err.Error(), "shop", "the error names the project")
+	assert.NotContains(t, err.Error(), "\x1b", "no ESC reaches the message")
+	assert.NotContains(t, err.Error(), "\u202e", "no bidi control reaches the message")
+	assert.Empty(t, f.candidates(t), "the candidate is declined")
 }
 
 // TestOverwriteDriftCannotReplaceAnEditedKitDir: a kit dir is verified,

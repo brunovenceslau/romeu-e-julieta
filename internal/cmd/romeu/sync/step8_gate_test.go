@@ -140,13 +140,14 @@ const promptWait = 10 * time.Second
 
 // gateOnPTY runs step 8 with stdin and the file descriptor of stderr on
 // the terminal of a /dev/ptmx pair, types answer in the write that
-// shows the prompt, and returns what the step wrote to stderr and its
+// shows the prompt, and returns what this step wrote to stderr and its
 // error. A step that has not ended by promptWait fails the test; the
 // terminal is closed at the end of the test, which ends its read.
 func (f *gateFixture) gateOnPTY(t *testing.T, answer string) (string, error) {
 	t.Helper()
 	master, terminal := openPTY(t)
 	withTerminal(t, terminal, int(terminal.Fd()))
+	start := len(f.stderr.String())
 	typing := &typingBuffer{lockedBuffer: f.stderr, master: master, answer: answer}
 	f.r.env.Stderr = cli.NewWriter(typing)
 	done := make(chan error, 1)
@@ -154,11 +155,29 @@ func (f *gateFixture) gateOnPTY(t *testing.T, answer string) (string, error) {
 	select {
 	case err := <-done:
 		require.NoError(t, typing.err, "type the answer")
-		return f.stderr.String(), err
+		return f.stderr.String()[start:], err
 	case <-time.After(promptWait):
 		t.Fatalf("step 8 did not end in %s; stderr: %q", promptWait, f.stderr.String())
 		return "", nil
 	}
+}
+
+// later makes the clock of the package read at until the test ends.
+func later(t *testing.T, at time.Time) {
+	t.Helper()
+	old := seams.Now
+	seams.Now = func() time.Time { return at }
+	t.Cleanup(func() { seams.Now = old })
+}
+
+// warned returns what the warnings of the run print.
+func warned(r *run) string {
+	var b lockedBuffer
+	w := cli.NewWriter(&b)
+	for _, warn := range r.warnings {
+		warn(w)
+	}
+	return b.String()
 }
 
 // liveEnv reads the live sbxenv.yaml of shop.
@@ -302,13 +321,14 @@ func TestGateAndPromotePromotesAnEqualDigestWithNoTerminal(t *testing.T) {
 	f.rerender(t)
 	require.Len(t, f.candidates(t), 1, "one candidate at a time")
 	noTerminal(t)
+	later(t, first.LastRunAt.Add(time.Hour))
 
 	require.NoError(t, gateAndPromote(t.Context(), f.r))
 
 	assert.Equal(t, state.CandidatePromoted, f.r.candidates[0].dir.State())
 	assert.Empty(t, f.candidates(t))
 	assert.Equal(t, first.Approval, f.record(t).Approval, "the approval stays as it was")
-	assert.False(t, f.record(t).LastRunAt.Before(first.LastRunAt))
+	assert.True(t, f.record(t).LastRunAt.After(first.LastRunAt), "lastRunAt is recorded again")
 }
 
 // TestGateAndPromoteAgainChangesNothing: a second sync on unchanged
@@ -340,7 +360,7 @@ func TestGateAndPromoteShowsTheChangeFromTheApproval(t *testing.T) {
 	f := gateRun(t)
 	f.approve(t)
 	before := f.outsideCandidates(t)
-	f.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
+	f.r.targets[0].Kits = []spec.Kit{{Product: "plain"}, {Product: "withcaps"}}
 	f.rerender(t)
 
 	shown, err := f.gateOnPTY(t, "n\n")
@@ -349,8 +369,9 @@ func TestGateAndPromoteShowsTheChangeFromTheApproval(t *testing.T) {
 	assert.Equal(t, before, f.outsideCandidates(t), "N leaves the promoted live files byte-identical (I7)")
 	assert.Empty(t, f.candidates(t))
 	assert.NotContains(t, f.stderr.String(), "not the approved render", "the approved side is read from the live files")
-	assert.Contains(t, shown, "product:plain")
-	assert.Contains(t, shown, "withcaps")
+	assert.NotContains(t, shown, "kit content product:plain:", "the approved kit is not shown as a change")
+	assert.Contains(t, shown, "product:plain (unchanged)")
+	assert.Contains(t, shown, "kit content product:withcaps: 0 file(s) changed, 1 added", "the new kit is shown as added")
 }
 
 // TestGateAndPromoteShowsTheWholeCandidateWhenTheLiveFilesAreNotTheApproval:
@@ -361,29 +382,187 @@ func TestGateAndPromoteShowsTheWholeCandidateWhenTheLiveFilesAreNotTheApproval(t
 	f := gateRun(t)
 	f.approve(t)
 	require.NoError(t, os.WriteFile(f.in(render.LiveEnvFile), []byte("edited: true\n"), 0o600))
-	f.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
+	f.r.targets[0].Kits = []spec.Kit{{Product: "plain"}, {Product: "withcaps"}}
 	f.rerender(t)
 
 	shown, err := f.gateOnPTY(t, "n\n")
 
 	require.NoError(t, err)
 	assert.Contains(t, f.stderr.String(), "the live files are not the approved render")
-	assert.Contains(t, shown, gate.PromptLine)
+	assert.Contains(t, shown, "kit content product:plain: 0 file(s) changed, 2 added", "the approved kit is shown as added too")
+	assert.Contains(t, shown, "product:plain (added)")
+	assert.Contains(t, shown, "kit content product:withcaps: 0 file(s) changed, 1 added")
+}
+
+// twoTargets returns the fixture of steps 7 and 8 on the targets shop
+// and blog, both approved on a terminal and promoted, and rendered
+// again.
+func twoTargets(t *testing.T) *gateFixture {
+	t.Helper()
+	f := &gateFixture{
+		renderFixture: renderRunOf(t, func(h *hostTree) { h.addTarget(t, "blog", "blog-site") }),
+		stdout:        &lockedBuffer{}, stderr: &lockedBuffer{},
+	}
+	f.r.env = &cli.Env{Stdout: cli.NewWriter(f.stdout), Stderr: cli.NewWriter(f.stderr)}
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+	f.approve(t)
+	f.rerender(t)
+	return f
+}
+
+// editKit edits a file of the live kit dir of the target i: the next
+// promotion of a candidate that names that dir fails (ErrKitDirDiffers).
+func (f *gateFixture) editKit(t *testing.T, i int) {
+	t.Helper()
+	p := filepath.Join(f.r.trees[i].env, filepath.FromSlash(f.r.candidates[i].kits[0].LivePath()), "files", "run.sh")
+	require.NoError(t, os.Chmod(p, 0o755))
+	require.NoError(t, os.WriteFile(p, []byte("#!/bin/sh\necho edited\n"), 0o755))
 }
 
 // TestGateAndPromoteDeclinesTheRestOnAnError: a promotion that fails
 // stops the step and declines every candidate still rendered, so no
-// candidate dir is left; the project record is not written.
+// candidate dir is left; a target promoted before it stays promoted and
+// recorded, and the record of the failed one is not written.
 func TestGateAndPromoteDeclinesTheRestOnAnError(t *testing.T) {
+	f := twoTargets(t)
+	blogBefore, err := f.r.store.LoadProject("blog")
+	require.NoError(t, err)
+	shopBefore := f.record(t)
+	f.editKit(t, 1)
+	noTerminal(t)
+	later(t, shopBefore.LastRunAt.Add(time.Hour))
+
+	err = gateAndPromote(t.Context(), f.r)
+
+	require.ErrorIs(t, err, render.ErrKitDirDiffers)
+	assert.Equal(t, state.CandidatePromoted, f.r.candidates[0].dir.State())
+	assert.True(t, f.record(t).LastRunAt.After(shopBefore.LastRunAt), "shop is promoted and recorded")
+	assert.Equal(t, state.CandidateDeclined, f.r.candidates[1].dir.State())
+	assert.NoDirExists(t, f.r.candidates[1].dir.Path(), "blog's candidate dir is gone")
+	blogAfter, err := f.r.store.LoadProject("blog")
+	require.NoError(t, err)
+	assert.Equal(t, blogBefore, blogAfter, "the record of the failed target is not written")
+}
+
+// TestGateAndPromoteOfTwoTargetsWithoutATerminal: without a terminal, a
+// target whose digest equals its approval promotes, a later one whose
+// digest differs is deleted, and the interim refusal comes back; when a
+// later target then fails, the refusal is joined to its error, not lost.
+func TestGateAndPromoteOfTwoTargetsWithoutATerminal(t *testing.T) {
+	t.Run("the equal one promotes and the other is refused", func(t *testing.T) {
+		f := twoTargets(t)
+		f.r.targets[1].Kits = []spec.Kit{{Product: "withcaps"}}
+		f.rerender(t)
+		noTerminal(t)
+
+		err := gateAndPromote(t.Context(), f.r)
+
+		require.ErrorIs(t, err, errApprovalRequired)
+		assert.Equal(t, state.CandidatePromoted, f.r.candidates[0].dir.State())
+		assert.Equal(t, state.CandidateDeclined, f.r.candidates[1].dir.State())
+		assert.NoDirExists(t, f.r.candidates[1].dir.Path())
+		assert.Contains(t, f.stdout.String(), "promoted  shop")
+		assert.Contains(t, f.stdout.String(), f.r.candidates[1].widening.String())
+	})
+	t.Run("a refusal and a later error", func(t *testing.T) {
+		f := twoTargets(t)
+		f.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
+		f.rerender(t)
+		f.editKit(t, 1)
+		noTerminal(t)
+
+		err := gateAndPromote(t.Context(), f.r)
+
+		require.ErrorIs(t, err, errApprovalRequired)
+		require.ErrorIs(t, err, render.ErrKitDirDiffers)
+		assert.Empty(t, f.candidates(t))
+	})
+}
+
+// TestGateAndPromoteRefusesACandidateChangedAfterTheRender: a candidate
+// dir rewritten after step 6, its sbxenv.yaml and its render.json
+// consistent with each other, is not the one the diff showed: it is
+// declined before an approval or a promotion, on y and on an equal
+// digest, and the live files are unchanged.
+func TestGateAndPromoteRefusesACandidateChangedAfterTheRender(t *testing.T) {
+	tamper := func(t *testing.T, c candidate) {
+		t.Helper()
+		env := []byte("tampered: true\n")
+		require.NoError(t, os.WriteFile(filepath.Join(c.dir.Path(), render.CandidateEnvFile), env, 0o600))
+		data, err := os.ReadFile(filepath.Join(c.dir.Path(), render.CandidateRecord))
+		require.NoError(t, err)
+		rec, err := render.DecodeRecord(data)
+		require.NoError(t, err)
+		rec.Files[render.LiveEnvFile] = plainSum(env)
+		require.NoError(t, render.WriteRecord(render.Candidate{Dir: c.dir.Path()}, rec))
+	}
+	t.Run("answered y", func(t *testing.T) {
+		f := gateRun(t)
+		tamper(t, f.r.candidates[0])
+		before := f.outsideCandidates(t)
+
+		_, err := f.gateOnPTY(t, "y\n")
+
+		require.ErrorIs(t, err, errCandidateChanged)
+		assert.Equal(t, state.CandidateDeclined, f.r.candidates[0].dir.State())
+		assert.Empty(t, f.candidates(t))
+		assert.Equal(t, before, f.outsideCandidates(t), "nothing is promoted")
+		_, err = f.r.store.LoadProject("shop")
+		require.ErrorIs(t, err, fs.ErrNotExist, "no approval is recorded")
+	})
+	t.Run("an equal digest", func(t *testing.T) {
+		f := gateRun(t)
+		f.approve(t)
+		f.rerender(t)
+		tamper(t, f.r.candidates[0])
+		before := f.outsideCandidates(t)
+		noTerminal(t)
+
+		err := gateAndPromote(t.Context(), f.r)
+
+		require.ErrorIs(t, err, errCandidateChanged)
+		assert.Empty(t, f.candidates(t))
+		assert.Equal(t, before, f.outsideCandidates(t), "nothing is promoted")
+	})
+}
+
+// TestGateAndPromoteSaysTheRecordWasNotWritten: a project record that
+// cannot be written after the promotion commit fails the step with an
+// error that says the promotion happened.
+func TestGateAndPromoteSaysTheRecordWasNotWritten(t *testing.T) {
 	f := gateRun(t)
 	f.approve(t)
 	f.rerender(t)
 	noTerminal(t)
-	f.r.bin = render.Bin{} // not the julieta the candidate's record names
+	f.r.lock.Unlock() // UpdateProject refuses a write without the lock
 
 	err := gateAndPromote(t.Context(), f.r)
 
-	require.Error(t, err)
-	assert.Empty(t, f.candidates(t))
-	assert.Equal(t, state.CandidateDeclined, f.r.candidates[0].dir.State())
+	require.ErrorIs(t, err, state.ErrNotLocked)
+	assert.Contains(t, err.Error(), "shop was promoted, and its project record was not written")
+	assert.Equal(t, state.CandidatePromoted, f.r.candidates[0].dir.State())
+}
+
+// TestGateAndPromoteLeavesAnApprovedCandidateWhosePromotionFailedUntilAnApprovedToDeclinedRow
+// pins today's behavior: a candidate approved on y whose promotion
+// fails stays approved, the candidate machine having no row from
+// approved to declined, so its dir is left for the next sync's render
+// to delete (REQ-0082); the approval is not recorded and the live files
+// are unchanged. A row from approved to declined would delete it.
+func TestGateAndPromoteLeavesAnApprovedCandidateWhosePromotionFailedUntilAnApprovedToDeclinedRow(t *testing.T) {
+	f := gateRun(t)
+	f.approve(t)
+	approved := f.record(t).Approval
+	f.r.targets[0].Kits = []spec.Kit{{Product: "plain"}, {Product: "withcaps"}}
+	f.rerender(t)
+	f.editKit(t, 0)
+	before := f.outsideCandidates(t)
+
+	_, err := f.gateOnPTY(t, "y\n")
+
+	require.ErrorIs(t, err, render.ErrKitDirDiffers)
+	assert.Equal(t, state.CandidateApproved, f.r.candidates[0].dir.State())
+	assert.DirExists(t, f.r.candidates[0].dir.Path(), "the approved candidate's dir is left")
+	assert.Equal(t, approved, f.record(t).Approval, "the new approval is not recorded")
+	assert.Equal(t, before, f.outsideCandidates(t), "the live files are unchanged")
 }

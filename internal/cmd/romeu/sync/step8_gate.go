@@ -17,6 +17,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -38,6 +39,11 @@ var (
 // (RJ-301, exit 3) is declared, with the slice that links sync into the
 // binary.
 var errApprovalRequired = errors.New("gate 2 needs a terminal to approve a changed widening; run romeu sync again on one")
+
+// errCandidateChanged is the refusal of a candidate dir whose files
+// are no longer those step 6 rendered, which the gate 2 diff showed: it
+// is declined, and nothing of it is promoted.
+var errCandidateChanged = errors.New("the candidate dir changed after it was rendered, so it is not the one the gate showed; it is declined")
 
 // gateAndPromote is step 8 of 04 4.2 (REQ-0343): gate 2 and the
 // candidate machine of 01 1.6, for each target in order.
@@ -65,16 +71,21 @@ var errApprovalRequired = errors.New("gate 2 needs a terminal to approve a chang
 // the project record is written through Store.UpdateProject: the
 // approval, when this run gave one, and lastRunAt. The approval is
 // written once the promotion commit is done, so a command killed
-// before it asks again on the next sync (REQ-0082). A live file that
-// --overwrite-drift let through (step 7) is reported, once its project
-// is promoted, as replaced, its edit lost.
+// before it asks again on the next sync (REQ-0082). Right before a
+// candidate is approved or promoted, the digest of its dir is computed
+// again and must be the one step 6 rendered, so the bytes promoted are
+// those the diff showed; one that differs is declined
+// (errCandidateChanged). A live file that --overwrite-drift let through
+// (step 7) is added to the warnings, once its project is promoted, as
+// replaced, its edit lost.
 //
-// On an error each candidate not yet promoted or declined is declined,
-// so a command that returns leaves no candidate dir; an approved one
-// whose promotion failed has no event that deletes it, and the next
-// sync's render deletes its dir (REQ-0082). The workspace
-// files are not written yet: render.Live takes them, and they need
-// every clone of host state.
+// On an error each candidate still rendered is declined, which deletes
+// its dir, and a refusal without a terminal of an earlier target is
+// joined to the error. An approved candidate whose promotion failed is
+// the one exception: the candidate machine has no row from approved to
+// declined, so its dir is left, and the next sync's render deletes it
+// (REQ-0082). The workspace files are not written yet: render.Live
+// takes them, and they need every clone of host state.
 func gateAndPromote(ctx context.Context, r *run) error {
 	var refused error
 	for i, p := range r.targets {
@@ -83,7 +94,7 @@ func gateAndPromote(ctx context.Context, r *run) error {
 		case errors.Is(err, errApprovalRequired):
 			refused = err
 		case err != nil:
-			return errors.Join(err, decline(rendered(r.candidates)))
+			return errors.Join(refused, err, decline(rendered(r.candidates)))
 		}
 	}
 	return refused
@@ -105,6 +116,9 @@ func rendered(cs []candidate) []candidate {
 // candidate c.
 func gateOne(ctx context.Context, r *run, p spec.Project, env string, c *candidate) error {
 	if a := c.project.Approval; a != nil && a.WideningDigest == c.widening {
+		if err := unchanged(c); err != nil {
+			return err
+		}
 		return promote(r, p, env, c, nil)
 	}
 	d, err := diff(r, env, c)
@@ -139,6 +153,9 @@ func gateOne(ctx context.Context, r *run, p spec.Project, env string, c *candida
 		_, err := fmt.Fprintf(r.env.Stdout, "gate 2: declined for %s; the candidate is deleted and the live files are unchanged\n", termsafe.Escape(p.Name))
 		return err
 	}
+	if err := unchanged(c); err != nil {
+		return err
+	}
 	a := state.Approval{
 		WideningDigest: c.widening, Set: c.set, RenderDigest: c.set.RenderDigest,
 		SpecCommit: r.specCommit, CandidateID: c.dir.ID(), ApprovedAt: seams.Now(),
@@ -147,6 +164,22 @@ func gateOne(ctx context.Context, r *run, p spec.Project, env string, c *candida
 		return err
 	}
 	return promote(r, p, env, c, &a)
+}
+
+// unchanged checks that the dir of the rendered candidate c holds the
+// files step 6 rendered, and declines it when it does not. The check
+// runs right before the approval and the promotion commit, which reads
+// the dir again; render.Live.Promote checks the widening digest against
+// the candidate's own render.json alone.
+func unchanged(c *candidate) error {
+	sum, err := render.CandidateFilesDigest(c.dir.Path())
+	if err == nil && sum == c.filesSum {
+		return nil
+	}
+	if _, derr := c.dir.Apply(state.CandidateDecline, nil, state.Approval{}); derr != nil {
+		return errors.Join(errCandidateChanged, err, derr)
+	}
+	return errors.Join(errCandidateChanged, err)
 }
 
 // promote runs the promotion commit of the candidate c of p, whose env
@@ -175,20 +208,17 @@ func promote(r *run, p spec.Project, env string, c *candidate, a *state.Approval
 		rec.LastRunAt = seams.Now()
 		return nil
 	}); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(r.env.Stdout, "promoted  %s\n", termsafe.Escape(p.Name)); err != nil {
-		return err
+		return fmt.Errorf("%s was promoted, and its project record was not written: %w", termsafe.Escape(p.Name), err)
 	}
 	for _, e := range r.overwritten {
 		if e.project != p.Name {
 			continue
 		}
-		if _, err := fmt.Fprintf(r.env.Stderr, "replaced the edited %s of %s; its edit is lost\n", termsafe.Escape(e.path), termsafe.Escape(p.Name)); err != nil {
-			return err
-		}
+		line := "replaced the edited " + termsafe.Escape(e.path) + " of " + termsafe.Escape(p.Name) + "; its edit is lost"
+		r.warnings = append(r.warnings, func(w *cli.Writer) { _, _ = fmt.Fprintln(w, line) })
 	}
-	return nil
+	_, err := fmt.Fprintf(r.env.Stdout, "promoted  %s\n", termsafe.Escape(p.Name))
+	return err
 }
 
 // diff returns the gate 2 diff of the candidate c, whose env dir is env,
