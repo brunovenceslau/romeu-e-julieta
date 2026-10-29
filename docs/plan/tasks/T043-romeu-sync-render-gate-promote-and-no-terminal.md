@@ -14,6 +14,13 @@ owns:
   - e2e/internal/romeu/env.go
   - tools/release/main.go
   - tools/release/internal/build/host*.go
+  - internal/gate/prompt.go
+  - internal/gate/prompt_test.go
+  - internal/gate/diff.go
+  - internal/render/workspace.go
+  - internal/render/workspace_test.go
+  - docs/spec/01-system-model.md
+  - docs/spec/04-cli.md
 needs:
   - T040
   - T041
@@ -27,10 +34,13 @@ needs:
   - T183
   - T184
   - T186
+  - T187
 after: []
 ask_first:
   - contracts
+  - gates
   - release
+  - spec
 sitting: none
 ---
 
@@ -65,21 +75,50 @@ host-native `tools/release` build, since only that build embeds
 julieta (REQ-0131, the e2e row of 10 10.2): this task adds that build
 to `tools/release` (`host*.go`, a flag in `main.go`) and has the e2e
 harness of T041 (`env.go`) build romeu through it, so it asks first for
-`release` too.
+`release` too. Deferred (2026-10-29): step 4 creates the fixed
+subdirectories of each memory dir before step 5 checks its layout, the
+order of 04 4.2, so a `sync` that step 5 refuses leaves the empty
+allowlisted dirs step 4 made, and nothing that existed changes; kept as
+it is, reopened by the first operator who trips on it. Step 6 looks the
+workload descriptor up by index digest and platform through
+`FindDescriptor` of T187 before the digest, so a second `sync` of a
+multi-arch workload reads no registry (2026-10-29); the test of slice C
+that pins the miss is rewritten. The exit 2 of a kit error the spec
+causes is T188's, after this task. From the review of slice D
+(2026-10-29): `N` to gate 2 on a terminal exits 1, as gate 1's decline
+does (REQ-1276), with the row `candidate-declined` in 04 4.4 and the
+exit named in 04 4.2 step 8, both landing with the code that links
+`sync` (`contracts`, `spec`); the workspace files `dev.code-workspace`
+and `review.code-workspace` are written once, after the last promotion
+of a run, from every project's record, since they list every clone
+under the root, through an exported atomic writer in
+`internal/render/workspace.go` (today the writer is the unexported
+`Live.writeWorkspace` of the promotion; `retire` and `pull`, T067 and
+T069, write the same files through it), and REQ-0086 step 2 and the
+row of REQ-0048 say so in place of the write of each promotion
+(`spec`); 04 4.2 step 4 names the fetch of the origin's HEAD into
+`refs/romeu/origin/<dir>/HEAD` for a repo with no `ref` (T183);
+`gate.Ask`, which no command calls since step 8 confirms through
+`gate.Confirm` and `Diff.WriteTo`, is deleted with its tests, and the
+mentions of it in `prompt.go` and `diff.go` go with it. The promotion
+failing closed on the candidate digest, and an edited kit dir under
+`--overwrite-drift`, are T189's, after this task.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
-directory, `memory/_shared/`, 0700, writes it into the manifest as
-`sharedMemory` and renders its mount beside the repo dirs (REQ-0646,
-REQ-0140, 03 3.3, 03 3.6; ADR 0042, T174); acceptance: after `sync` the
-dir exists at 0700, the manifest holds the member, the render golden
-lists `./memory/_shared`, and a repo dir with a `handoff/` of before
-warns `handoff-legacy` and is not refused.
+directory, `memory/_shared/`, 0700 (REQ-0646, REQ-0140, 03 3.3; ADR
+0042, T174); acceptance: after `sync` the dir exists at 0700, and a repo
+dir with a `handoff/` of before warns `handoff-legacy` and is not
+refused. The manifest member `sharedMemory`, its mount beside the repo
+dirs and the manifest of `RJ-313` sized with it are T174's, which owns
+`internal/manifest` and comes after this task; until then the manifest
+has no member for the dir (decided on 2026-10-29, in place of the
+member and the mount this note gave this task).
 
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
-  REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01 1.3), REQ-0059 (01
-  1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6), REQ-0084 (01 1.6),
-  REQ-0085 (01 1.6), REQ-0086 (01 1.6), REQ-0087 (01 1.6), REQ-0130 (02
-  2.1), REQ-0135 (02 2.2), REQ-0138 (02 2.3), REQ-0140 (02 2.3),
+  REQ-0048 (01 1.2), REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01
+  1.3), REQ-0059 (01 1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6),
+  REQ-0084 (01 1.6), REQ-0085 (01 1.6), REQ-0086 (01 1.6), REQ-0087 (01
+  1.6), REQ-0130 (02 2.1), REQ-0135 (02 2.2), REQ-0138 (02 2.3),
   REQ-0141 (02 2.3), REQ-0143 (02 2.3), REQ-0147 (02 2.3), REQ-0175 (03
   3.1), REQ-0177 (03 3.1), REQ-0178 (03 3.1), REQ-0179 (03 3.1),
   REQ-0180 (03 3.1), REQ-0185 (03 3.1), REQ-0206 (03 3.4), REQ-0220 (03
@@ -103,7 +142,14 @@ warns `handoff-legacy` and is not refused.
     promotes after `y`, and leaves the live files byte-identical after
     `N` (I7): the pty cases "sync approves on y and promotes" and "sync
     declines on N and deletes the candidate"; the gate prompt is written
-    to stderr and the TTY condition is stdin.
+    to stderr and the TTY condition is stdin. `N` exits 1 with
+    `candidate-declined` naming the project, and the targets after it
+    go on.
+  - After the last promotion of a run, `$ROMEU_ROOT/dev.code-workspace`
+    and `review.code-workspace` list every clone of every project's
+    record, written by atomic rename; a run that promotes nothing
+    leaves them as they were.
+  - `gate.Ask` is gone from `internal/gate`.
   - A candidate dir planted as if left by a killed command is deleted
     before the next render; after `N` no candidate dir remains; a `sync`
     whose widening digest equals the approval promotes with no TTY; at
