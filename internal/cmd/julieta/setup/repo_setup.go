@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
@@ -24,40 +25,36 @@ const RepoSetupFailed = "repo-setup-failed"
 // its own checks need (04 4.3, REQ-1307).
 const setupTask = "setup"
 
-// miseRepos returns the repos of the manifest whose mise.toml is a
-// regular file, the ones install reads (04 4.3, REQ-0400).
-func miseRepos(r *run) []string {
-	var dirs []string
+// miseRepos returns the repos of the manifest whose mise.toml install
+// reads: a regular file that readRepo accepts. A repo install refuses
+// (lock-missing, lock-unparsed, check-findings) is neither trusted nor
+// asked for its task (04 4.3, REQ-1306).
+func miseRepos(r *run) []manifest.Repo {
+	var repos []manifest.Repo
 	for _, repo := range r.m.Repos {
 		info, err := os.Lstat(filepath.Join(repo.Path, mise.ConfigFile))
-		if err == nil && info.Mode().IsRegular() {
-			dirs = append(dirs, repo.Dir)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
 		}
+		if f, err := readRepo(repo); err != nil || !f.HasConfig {
+			continue
+		}
+		repos = append(repos, repo)
 	}
-	return dirs
+	return repos
 }
 
-// repoPath returns the path of the repo with the dir dir.
-func repoPath(r *run, dir string) string {
-	for _, repo := range r.m.Repos {
-		if repo.Dir == dir {
-			return repo.Path
-		}
-	}
-	return ""
-}
-
-// target returns the mise target of the repo with the dir dir.
-func target(r *run, dir string) mise.Target {
-	return mise.Target{Dir: repoPath(r, dir), Repo: dir, Sandbox: r.m.Project, Egress: r.m.Egress}
+// target returns the mise target of the repo.
+func target(r *run, repo manifest.Repo) mise.Target {
+	return mise.Target{Dir: repo.Path, Repo: repo.Dir, Sandbox: r.m.Project, Egress: r.m.Egress}
 }
 
 // trustRepos is the step trust of setup (04 4.3, REQ-1306): mise trust
-// on the mise.toml of each repo that has one, before install, in the
+// on the mise.toml of each repo install reads, before install, in the
 // sandbox only. A failure is reported and leaves the sandbox usable.
 func trustRepos(ctx context.Context, r *run) {
-	dirs := miseRepos(r)
-	if len(dirs) == 0 {
+	repos := miseRepos(r)
+	if len(repos) == 0 {
 		return
 	}
 	d, err := mise.New(os.LookupEnv, r.home, repoPaths(r.m))
@@ -65,22 +62,22 @@ func trustRepos(ctx context.Context, r *run) {
 		r.report.Errors = append(r.report.Errors, "trust: "+Describe(err))
 		return
 	}
-	for _, dir := range dirs {
-		if err := d.Trust(ctx, target(r, dir)); err != nil {
+	for _, repo := range repos {
+		if err := d.Trust(ctx, target(r, repo)); err != nil {
 			r.report.Errors = append(r.report.Errors, "trust: "+Describe(err))
 		}
 	}
 }
 
 // runRepoTasks is the step repo-setup of setup (04 4.3, REQ-1307): after
-// install, mise run setup in each repo whose mise configuration defines
-// the task setup, with the environment of install and the budget of its
-// class. A task that fails or runs past the budget is the warning
+// install, mise run setup in each repo whose mise.toml defines the task
+// setup, with the environment of install and the budget of its class. A
+// task that fails or runs past the budget is the warning
 // repo-setup-failed and setup goes on; a repo without the task is
 // skipped silently.
 func runRepoTasks(ctx context.Context, r *run) {
-	dirs := miseRepos(r)
-	if len(dirs) == 0 {
+	repos := miseRepos(r)
+	if len(repos) == 0 {
 		return
 	}
 	d, err := mise.New(os.LookupEnv, r.home, repoPaths(r.m))
@@ -88,18 +85,19 @@ func runRepoTasks(ctx context.Context, r *run) {
 		r.report.Errors = append(r.report.Errors, "repo setup: "+Describe(err))
 		return
 	}
-	for _, dir := range dirs {
-		t := target(r, dir)
+	for _, repo := range repos {
+		t := target(r, repo)
+		dir := termsafe.Escape(repo.Dir)
 		defined, err := d.HasTask(ctx, t, setupTask)
 		if err != nil {
-			r.warn(RepoSetupFailed, fmt.Sprintf("%s the tasks cannot be listed: %s", termsafe.Escape(dir), failure(err)))
+			r.warn(RepoSetupFailed, fmt.Sprintf("%s the tasks cannot be listed: %s", dir, failure(err)))
 			continue
 		}
 		if !defined {
 			continue
 		}
 		if err := d.RunTask(ctx, t, setupTask); err != nil {
-			r.warn(RepoSetupFailed, fmt.Sprintf("%s %s", termsafe.Escape(dir), failure(err)))
+			r.warn(RepoSetupFailed, fmt.Sprintf("%s %s", dir, failure(err)))
 		}
 	}
 }

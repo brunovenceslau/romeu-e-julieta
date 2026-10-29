@@ -58,9 +58,19 @@ func (l *limited) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// listedTask is the part of a task of "mise tasks ls --json" HasTask
+// reads: its name and the file that defines it.
+type listedTask struct {
+	Name   string `json:"name"`
+	Source string `json:"source"`
+}
+
 // HasTask reports whether "mise tasks ls --json" lists a task named name
-// in the repo, with the environment of Install (04 4.3, REQ-1307). No
-// output at all is no task. The error is the one of the run, as
+// that the repo's mise.toml defines, with the environment of Install
+// (04 4.3, REQ-1307). A file task of a directory such as mise-tasks is
+// not the mise.toml's, which the guard of the repo's configuration
+// judges (tools/ci/internal/lint), so it is not run. No output at all is
+// no task. The error is the one of the run, as
 // internal/procgroup returns it, or of reading the list.
 func (d *Driver) HasTask(ctx context.Context, t Target, name string) (bool, error) {
 	var stdout limited
@@ -77,16 +87,13 @@ func (d *Driver) HasTask(ctx context.Context, t Target, name string) (bool, erro
 	if len(bytes.TrimSpace(stdout.buf.Bytes())) == 0 {
 		return false, nil
 	}
-	var tasks []struct {
-		Name string `json:"name"`
-	}
+	var tasks []listedTask
 	if err := json.Unmarshal(stdout.buf.Bytes(), &tasks); err != nil {
 		return false, err
 	}
-	return slices.ContainsFunc(tasks, func(task struct {
-		Name string `json:"name"`
-	}) bool {
-		return task.Name == name
+	source := filepath.Join(t.Dir, ConfigFile)
+	return slices.ContainsFunc(tasks, func(task listedTask) bool {
+		return task.Name == name && filepath.Clean(task.Source) == source
 	}), nil
 }
 

@@ -53,15 +53,20 @@ func TestTrustFailure(t *testing.T) {
 	assert.Equal(t, "RJ-323", cli.Of(err).ID)
 }
 
-// TestHasTask: the list of tasks names setup or not; no output is no
-// task; a list that does not parse and a mise that fails are errors.
+// TestHasTask: the list of tasks names setup defined by the mise.toml of
+// the repo or not; a task a file defines, another repo's and a name that
+// is not setup are not it; no output is no task; a list that does not
+// parse and a mise that fails are errors.
 func TestHasTask(t *testing.T) {
 	for _, tc := range []struct {
 		name, script string
 		want, fails  bool
 	}{
-		{"listed", `echo '[{"name":"build"},{"name":"setup","aliases":[]}]'`, true, false},
-		{"not listed", `echo '[{"name":"build"}]'`, false, false},
+		{"listed", `echo '[{"name":"build","source":"'"$PWD"'/mise.toml"},{"name":"setup","aliases":[],"source":"'"$PWD"'/mise.toml"}]'`, true, false},
+		{"not listed", `echo '[{"name":"build","source":"'"$PWD"'/mise.toml"}]'`, false, false},
+		{"defined by a file", `echo '[{"name":"setup","source":"'"$PWD"'/mise-tasks/setup"}]'`, false, false},
+		{"defined elsewhere", `echo '[{"name":"setup","source":"/other/mise.toml"}]'`, false, false},
+		{"no source", `echo '[{"name":"setup"}]'`, false, false},
 		{"empty list", `echo '[]'`, false, false},
 		{"no output", `:`, false, false},
 		{"not json", `echo nope`, false, true},
@@ -81,12 +86,14 @@ func TestHasTask(t *testing.T) {
 func TestRunTask(t *testing.T) {
 	repo := t.TempDir()
 	rec := filepath.Join(t.TempDir(), "rec")
-	d := fakeMise(t, `echo "$@" > '`+rec+`'; exit 3`)
+	d := fakeMise(t, `{ echo "$@"; env | sort; } > '`+rec+`'; exit 3`)
 	err := d.RunTask(t.Context(), mise.Target{Dir: repo, Repo: "api"}, "setup")
 	exit, ok := errors.AsType[*procgroup.ExitError](err)
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, 3, exit.Code)
 	b, readErr := os.ReadFile(rec)
 	require.NoError(t, readErr)
-	assert.Equal(t, "run setup\n", string(b))
+	assert.Contains(t, string(b), "run setup\n")
+	assert.Contains(t, string(b), "MISE_PARANOID=1\n", "the task runs with the environment of install")
+	assert.Contains(t, string(b), "MISE_TRUSTED_CONFIG_PATHS=/w/api\n")
 }

@@ -23,7 +23,7 @@ func taskMise(t *testing.T, body string) (calls, envFile string) {
 	t.Helper()
 	envFile = filepath.Join(t.TempDir(), "trust-env")
 	calls = fakeMise(t, `case "$1" in
-tasks) echo '[{"name":"build"},{"name":"setup"}]';;
+tasks) echo '[{"name":"build","source":"'"$PWD"'/mise.toml"},{"name":"setup","source":"'"$PWD"'/mise.toml"}]';;
 trust) env > '`+envFile+`';;
 run) `+body+`;;
 esac`)
@@ -115,7 +115,7 @@ func TestSetupRepoTaskTimeout(t *testing.T) {
 func TestSetupRepoWithoutTheTask(t *testing.T) {
 	s := newSandbox(t)
 	miseFiles(t, s.primary())
-	calls := fakeMise(t, `[ "$1" = tasks ] && echo '[{"name":"build"}]'; exit 0`)
+	calls := fakeMise(t, `[ "$1" = tasks ] && echo '[{"name":"build","source":"'"$PWD"'/mise.toml"}]'; exit 0`)
 
 	code, rep, stderr := setupJSON(t)
 	require.Equal(t, 0, code, stderr)
@@ -153,4 +153,66 @@ func TestSetupTrustFailure(t *testing.T) {
 	assert.Contains(t, rep.Errors[0], "mise trust failed in api")
 	assert.Contains(t, rep.Errors[0], "denied")
 	assert.Equal(t, 1, count(t, calls))
+}
+
+// TestSetupRepoTaskOfAFile: a task setup that a file task defines, as
+// mise-tasks/setup does, is not the mise.toml's and is not run.
+func TestSetupRepoTaskOfAFile(t *testing.T) {
+	s := newSandbox(t)
+	miseFiles(t, s.primary())
+	calls := fakeMise(t, `[ "$1" = tasks ] && echo '[{"name":"setup","source":"'"$PWD"'/mise-tasks/setup"}]'; exit 0`)
+
+	code, rep, stderr := setupJSON(t)
+	require.Equal(t, 0, code, stderr)
+	assert.Empty(t, warningsOf(rep, setup.RepoSetupFailed), stderr)
+	b, err := os.ReadFile(calls)
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "run setup")
+}
+
+// TestSetupRepoTasksCannotBeListed: a mise that fails to list the tasks
+// is the warning repo-setup-failed, and setup exits 0.
+func TestSetupRepoTasksCannotBeListed(t *testing.T) {
+	s := newSandbox(t)
+	miseFiles(t, s.primary())
+	fakeMise(t, `[ "$1" = tasks ] && exit 2; exit 0`)
+
+	code, rep, stderr := setupJSON(t)
+	assert.Equal(t, 0, code, stderr)
+	require.Equal(t, []string{"api the tasks cannot be listed: exit 2"}, warningsOf(rep, setup.RepoSetupFailed))
+}
+
+// TestSetupRepoTasksInEachRepo: the task runs in each repo that defines
+// it, and the failure of one is the warning of its repo alone (REQ-1307).
+func TestSetupRepoTasksInEachRepo(t *testing.T) {
+	s := newSandbox(t)
+	code, _, stderr := setupJSON(t) // clones web
+	require.Equal(t, 0, code, stderr)
+	web := filepath.Join(s.home, "src", "shop", "web")
+	miseFiles(t, s.primary())
+	miseFiles(t, web)
+	marker := filepath.Join(t.TempDir(), "marker")
+	taskMise(t, `case "$PWD" in */api) exit 3;; *) pwd > '`+marker+`';; esac`)
+
+	code, rep, stderr := setupJSON(t)
+	require.Equal(t, 0, code, stderr)
+	assert.Equal(t, []string{"api exit 3"}, warningsOf(rep, setup.RepoSetupFailed))
+	got, err := os.ReadFile(marker)
+	require.NoError(t, err, "the task of web ran after the failure of api")
+	assert.Equal(t, web, strings.TrimSpace(string(got)))
+}
+
+// TestSetupRefusedRepoIsNotTrusted: a repo whose mise.toml install
+// refuses, here for want of a mise.lock, is neither trusted nor asked
+// for its task.
+func TestSetupRefusedRepoIsNotTrusted(t *testing.T) {
+	s := newSandbox(t)
+	require.NoError(t, os.WriteFile(filepath.Join(s.primary(), "mise.toml"), []byte("[tools]\ngh = \"2.102.0\"\n"), 0o600))
+	calls, _ := taskMise(t, "exit 3")
+
+	code, rep, stderr := setupJSON(t)
+	assert.Equal(t, 0, code, stderr)
+	assert.Empty(t, warningsOf(rep, setup.RepoSetupFailed))
+	_, err := os.Stat(calls)
+	assert.ErrorIs(t, err, os.ErrNotExist, "no mise was started")
 }
