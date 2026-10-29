@@ -74,7 +74,9 @@ func TestHasTask(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := fakeMise(t, tc.script)
-			got, err := d.HasTask(t.Context(), mise.Target{Dir: t.TempDir(), Repo: "api"}, "setup")
+			repo := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(repo, "mise.toml"), nil, 0o600))
+			got, err := d.HasTask(t.Context(), mise.Target{Dir: repo, Repo: "api"}, "setup")
 			assert.Equal(t, tc.fails, err != nil, "%v", err)
 			assert.Equal(t, tc.want, got)
 		})

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -91,9 +92,16 @@ func (d *Driver) HasTask(ctx context.Context, t Target, name string) (bool, erro
 	if err := json.Unmarshal(stdout.buf.Bytes(), &tasks); err != nil {
 		return false, err
 	}
-	source := filepath.Join(t.Dir, ConfigFile)
+	own, ownErr := os.Stat(filepath.Join(t.Dir, ConfigFile))
 	return slices.ContainsFunc(tasks, func(task listedTask) bool {
-		return task.Name == name && filepath.Clean(task.Source) == source
+		if ownErr != nil || task.Name != name || task.Source == "" {
+			return false
+		}
+		// The same file, not the same spelling: mise may print the
+		// resolved form of a path that holds a link (a macOS temporary
+		// directory does).
+		src, err := os.Stat(task.Source)
+		return err == nil && os.SameFile(own, src)
 	}), nil
 }
 
