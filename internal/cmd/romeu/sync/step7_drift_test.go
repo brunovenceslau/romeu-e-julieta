@@ -6,7 +6,7 @@
 package sync
 
 import (
-	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -148,7 +148,7 @@ func TestCheckDriftEscapesTheFileName(t *testing.T) {
 	rec, err := render.DecodeRecord(data)
 	require.NoError(t, err)
 	rec.Files[".romeu/x\x1b[31m\u202e"] = plainSum([]byte("absent"))
-	out, err := json.Marshal(rec)
+	out, err := jsonv2.Marshal(rec)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(f.in(render.LiveRecord), out, 0o600))
 
