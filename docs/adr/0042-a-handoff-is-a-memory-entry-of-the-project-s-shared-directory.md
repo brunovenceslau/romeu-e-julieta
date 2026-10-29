@@ -86,7 +86,9 @@ changes the kit they run.
   git repository per project of [08 8.1](../spec/08-memory-handoff-salvage.md#81-memory-store),
   pushed by romeu after each host command (Q14, decided on 2026-10-28).
   A project moves its state into memory only once that copy exists, and
-  `docs/handoff/` of this repository stays until then.
+  `docs/handoff/` of this repository stays until then, read-only from
+  2026-10-29: a session writes its state into `julieta memory` only,
+  and T176 moves what the tree holds (decided on 2026-10-29).
 - [ADR 0021](0021-keep-memory-as-plain-per-repo-files.md) stands: plain
   files, one directory per repo per project, plus the shared one; the
   entry format gains a key julieta writes, and still no field that
