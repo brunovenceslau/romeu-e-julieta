@@ -3,7 +3,7 @@ id: T039
 title: "`render`: the promotion commit, recovery and drift"
 milestone: M3
 module: render
-fate: kept
+fate: merged
 owns:
   - internal/render/promote*.go
   - internal/render/drift*.go
@@ -24,6 +24,8 @@ ask_first:
   - ask-first
   - spec
 sitting: none
+merged: 2026-10-29
+pr: 315
 ---
 
 # T039 - `render`: the promotion commit, recovery and drift
