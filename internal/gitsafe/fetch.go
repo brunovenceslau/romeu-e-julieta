@@ -19,7 +19,9 @@ var fetchFlags = []string{"--no-tags", "--no-prune", "--no-recurse-submodules", 
 // Fetch fetches the refspecs from url into the repository in dir. The
 // URL is explicit, never a remote name, and both it and what the
 // repository's config rewrites it to must pass CheckURL; each refspec
-// must write into a fetch destination of the mode (I5).
+// must write into a fetch destination of the mode (I5). A server that
+// answers with a redirect, which host mode does not follow, fails the
+// fetch with ErrMoved.
 func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) error {
 	if err := checkRepo(dir); err != nil {
 		return err
@@ -32,11 +34,12 @@ func (r *Runner) Fetch(ctx context.Context, dir, url string, refspecs []string) 
 			return err
 		}
 	}
-	if _, err := r.resolveURL(ctx, dir, url); err != nil {
+	resolved, err := r.resolveURL(ctx, dir, url)
+	if err != nil {
 		return err
 	}
 	args := slices.Concat([]string{"fetch"}, fetchFlags, []string{url}, refspecs)
-	return r.runWith(ctx, dir, r.hostSettings(url), nil, args...)
+	return movedError(r.runWith(ctx, dir, r.hostSettings(url), nil, args...), url, resolved)
 }
 
 // FastForward moves the branch checked out in the sandbox clone in dir
