@@ -15,6 +15,8 @@ owns:
   - internal/cmd/julieta/memory/add*.go
   - internal/cmd/julieta/setup/migrate*.go
   - internal/manifest/**
+  - internal/render/env.go
+  - internal/render/env_test.go
   - internal/cmd/romeu/sync/step4_tree.go
   - internal/cmd/romeu/sync/step5_memory.go
   - e2e/julieta_stamp_test.go
@@ -45,7 +47,12 @@ owned by T166 and the `_shared/` creation of `sync` by T043; this task
 amends `schemas/stamp.v1.json` and waits for both (`after`), and T043
 gains the one sentence of REQ-0646 below. `internal/manifest` (T135,
 merged) gains the optional member `sharedMemory`, with the shape test of
-03 3.6 saying it bumps no protocol.
+03 3.6 saying it bumps no protocol. The mount of the shared dir,
+`./memory/_shared` beside the repo dirs of `sbxenv.yaml`
+(`internal/render/env.go`), and the manifest of `RJ-313` sized with the
+member are this task's too: T043's re-plan of 2026-10-28 gave the member
+and the mount to T043, which cannot write a member `internal/manifest`
+does not have before this task (decided on 2026-10-29).
 
 1. The shared directory (REQ-0642, REQ-0645, REQ-0646, REQ-1295).
    `memstore` knows two layouts, the repo dir (`entries/`, `snapshot/`,
@@ -114,6 +121,9 @@ already waits on T043.
     `entries/`, and step 5 warns when `stamps/` is over its cap: T043
     makes `_shared/` with `entries/` only, since memstore's allowlist
     has no `stamps/` before this task (decided on 2026-10-29).
+  - After `sync`, the manifest holds `sharedMemory`, the render golden
+    lists `./memory/_shared` beside the repo dirs, and the manifest
+    sized for `RJ-313` counts the member.
   - A manifest without `sharedMemory`: `add --shared` and `add --tag
     handoff` exit 2 naming the member; with it, `add --shared --tag
     project` writes under `_shared/entries/` and `list` shows `shared`
