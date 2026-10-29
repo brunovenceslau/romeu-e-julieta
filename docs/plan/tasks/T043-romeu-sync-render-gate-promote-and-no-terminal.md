@@ -49,6 +49,13 @@ encoder and the size function come from T135. The helper file it adds to
 the harness of T041 is `e2e/internal/romeu/sync_helpers.go`.
 
 
+Re-plan (2026-10-29): built in slices, one file per step under
+`internal/cmd/romeu/sync/` (`step1_lock.go`, `step2_fetch.go`,
+`step3_specs.go`, `step4_tree.go`, `step5_memory.go`,
+`step6_render.go`, `step7_drift.go`, `step8_gate.go`,
+`step10_report.go`), and the part that links `sync` into the binary
+(`import_sync.go`) waits on T183 and T184.
+
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700, writes it into the manifest as
 `sharedMemory` and renders its mount beside the repo dirs (REQ-0646,
@@ -94,7 +101,13 @@ warns `handoff-legacy` and is not refused.
   - `--from <sha>` refuses a commit not reachable from
     `refs/romeu/origin/*`.
   - A spec secret without its `name@project` binding is exit 2 naming
-    the key, and `github@other` does not satisfy project `shop` (I8).
+    the key, and `github@other` does not satisfy project `shop` (I8);
+    the check runs at the end of step 3, on the targets only (an
+    unbound secret of a project not synced does not fail), before step
+    4 writes (no `<name>-env/` is made).
+  - Every product kit of `kits.FS` renders through step 6
+    (`TestRenderCandidatesRendersEveryProductKit`), once T184's
+    `egress.Split` takes their hosts with a port.
   - An uncommitted lock change, a commit on another branch and a local
     `refs/remotes/origin` rewrite leave egress unchanged; changing `ref`
     changes egress and meets gate 2 (I9).
@@ -121,8 +134,8 @@ warns `handoff-legacy` and is not refused.
   - A memory directory with a symlink, a FIFO or a `..` name, or any
     other layout violation of 08 8.1, makes `sync` exit 2 naming the
     offending path and is not followed (I12, I24); a leftover
-    `.tmp-<ULID>` makes it warn and not refuse; a `stamps/` over its
-    cap makes the command warn and not refuse.
+    `.tmp-<ULID>` makes it warn and not refuse (the cap of `stamps/`
+    is T174's).
   - A personal kit with each hostile entry of I27 fails `sync` before a
     file is written outside `.romeu/candidates/`, on the macOS runners
     too, selected by the runner table of 10 10.2; a hostile tree

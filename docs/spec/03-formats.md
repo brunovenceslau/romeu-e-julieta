@@ -366,8 +366,9 @@ argv element that holds, at its start or after whitespace or `=` (so
 `ghr_` or `github_pat_`, or 40 hex digits of either case that end the
 element or a word, is refused with the error
 `secret-in-argv` (`RJ-314`; a best-effort guard against the common token
-shapes, not a detector); a spec secret name of a target without a matching
-`name@project` entry is exit 2 naming the key; `REQ-0207` a `name@other-project` entry never
+shapes, not a detector); a spec secret name of a target without a
+matching `name@project` entry is exit 2 naming the key; `REQ-0207` a
+`name@other-project` entry never
 satisfies a different project; entries for unknown projects are
 reported by `doctor`. `REQ-0208` A secret argv and the credential helper run with
 exactly `HOME` and `PATH=/usr/bin:/bin`, so a manager must work from

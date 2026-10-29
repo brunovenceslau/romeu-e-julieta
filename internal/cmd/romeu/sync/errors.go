@@ -30,6 +30,6 @@ var (
 		Slug:        "secret-unbound",
 		Exit:        2,
 		Fix:         "decide: add the entry <secret>@<name> to the secrets of the host settings, then run romeu sync <name>",
-		RecoveredIn: "none: nothing was rendered or promoted, and the edit of the hint binds the secret",
+		RecoveredIn: "none: nothing was rendered or promoted, and adding the entry binds the secret",
 	}
 )

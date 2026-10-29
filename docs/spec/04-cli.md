@@ -239,7 +239,9 @@ dir`, see J13).
    a branch is read after the branch is pushed.
 3. `REQ-0337` `git fsck --strict` on the spec commit; read `projects/*.yaml` via
    `git cat-file`; strict decode and validate all specs (cross-project
-   rules: unique names, unique URLs); exit 2 listing every error. `REQ-0338` A file
+   rules: unique names, unique URLs); exit 2 listing every error. The
+   targets are the projects named on the command line, or every one
+   with `--all`. `REQ-0338` A file
    under `projects/` that is not `*.yaml` is an error naming the path
    (`projects-stray-file`, `RJ-345`, exit 2), and no spec whose primary
    repo URL equals `config.url` is an error naming `config.url`

@@ -6,6 +6,7 @@ module: egress
 fate: new
 owns:
   - internal/egress/split*.go
+  - docs/spec/07-mise-egress.md
 needs: []
 after: []
 ask_first:
@@ -21,13 +22,16 @@ kits declare hosts with a port (`github.com:443` in
 `kits/os-base/os-base.yaml`), and the derivation refuses a port, so
 `romeu sync` step 6 fails on every project that uses them (found in the
 review of T043, #336; decided on 2026-10-29, scope this repository).
-T043's last slice calls Split before the derivation.
+The part of T043 that links `sync` into the binary
+(`import_sync.go`) calls Split before the derivation.
 
 1. Split takes the network hosts of a kit's capability set as the
    descriptor writes them and returns the domains the derivation reads:
    a numeric port stripped, the host lower-cased; a wildcard, an IP
    literal or a name `spec.ValidDomain` refuses is an error naming the
-   kit and the host.
+   kit and the host. That is all Split does, since no spec text defines
+   it beyond REQ-0069: the catalog's upload flags and the gating stay in
+   the derivation (`internal/egress/derive.go`).
 2. Decide in 07 7.5 whether the hosts of a kit's install phase and of
    its runtime phase stay apart: T043 merges both into one list, so a
    host allowed at install only (the julieta kit chose the install phase
@@ -38,8 +42,5 @@ T043's last slice calls Split before the derivation.
 - Acceptance:
   - A table test of Split: a port stripped, upper case lowered, a
     wildcard, an IP literal and a bad name refused.
-  - The test `TestRenderCandidatesRendersEveryProductKit`, kept in the
-    T043 memory entry on egress.Split, joins
-    `internal/cmd/romeu/sync/step6_render_test.go` with T043's last
-    slice and passes: every product kit renders through step 6.
+  - 07 7.5 says whether a kit's install and runtime hosts stay apart.
 - Verify: `go test ./internal/egress/ -run Split -v`.
