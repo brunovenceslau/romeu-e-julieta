@@ -46,7 +46,7 @@ func TestWorkflowsGrammar(t *testing.T) {
 		{"an env with a boolean", `MISE_AUTO_ENV: "false"`, "MISE_AUTO_ENV: false", "env holds exactly the mise environment"},
 		{"an env in another order", "  MISE_ENV: \"\"\n  MISE_AUTO_ENV: \"false\"\n", "  MISE_AUTO_ENV: \"false\"\n  MISE_ENV: \"\"\n", "env holds exactly the mise environment"},
 		{"an env that is a list", citest.WorkflowEnv, "env: [a]\n", "env holds exactly the mise environment"},
-		{"an event outside the list", "  workflow_dispatch:\n", "  pull_request_target:\n", `the event "pull_request_target"`},
+		{"an event outside the list", "  workflow_dispatch:\n", "  issues:\n", `the event "issues"`},
 		{"an expression with an operator", "group: ci-${{ github.ref }}", "group: ci-${{ github.ref || 'main' }}", "one context path"},
 		{"an expression with a function call", "group: ci-${{ github.ref }}", "group: ci-${{ format('{0}', github.ref) }}", "one context path"},
 		{"an expression with a literal", "group: ci-${{ github.ref }}", "group: ci-${{ true }}", "one context path"},
@@ -234,8 +234,7 @@ func TestWorkflowsStepEnvRefusesEventText(t *testing.T) {
 }
 
 // TestWorkflowsFile fails what the grammar refuses as a whole file: a
-// name with another ending, text that is not one YAML mapping, and a
-// ci.yml that a change to a pull request's text does not run again.
+// name with another ending, and text that is not one YAML mapping.
 func TestWorkflowsFile(t *testing.T) {
 	tests := []struct {
 		name, path, src, want string
@@ -247,11 +246,6 @@ func TestWorkflowsFile(t *testing.T) {
 		{"two documents", ".github/workflows/x.yml", citest.GoodWorkflow + "---\nname: two\n", "one YAML document"},
 		{"a list", ".github/workflows/x.yml", "- a\n", "a mapping"},
 		{"empty", ".github/workflows/x.yml", "", "not YAML"},
-		{"a ci.yml without edited", ".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, ", edited]", "]", 1), "edited"},
-		{"a ci.yml without pull_request", ".github/workflows/ci.yml", strings.Replace(citest.GoodWorkflow, "  pull_request:\n    types: [opened, synchronize, reopened, edited]\n", "", 1), "edited"},
-		{"a ci.yml without on", ".github/workflows/ci.yml", "name: ci\njobs: {}\n" + citest.WorkflowEnv, "edited"},
-		{"a ci.yml whose on is one name", ".github/workflows/ci.yml", "on: pull_request\njobs: {}\n" + citest.WorkflowEnv, "edited"},
-		{"a ci.yml whose on is a list", ".github/workflows/ci.yml", "on: [pull_request, push]\njobs: {}\n" + citest.WorkflowEnv, "edited"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -260,9 +254,11 @@ func TestWorkflowsFile(t *testing.T) {
 			assert.Contains(t, got[0].Msg, tt.want)
 		})
 	}
-	t.Run("another file without edited", func(t *testing.T) {
+	// The edited rule is pr.yml's (TestWorkflowsPRRefused): a ci.yml
+	// with or without it passes.
+	t.Run("a ci.yml without edited", func(t *testing.T) {
 		src := strings.Replace(citest.GoodWorkflow, ", edited]", "]", 1)
-		assert.Empty(t, workflowFindings(".github/workflows/fuzz.yml", []byte(src)))
+		assert.Empty(t, withoutHosted(workflowFindings(".github/workflows/ci.yml", []byte(src))))
 	})
 	t.Run("a ci.yml with edited", func(t *testing.T) {
 		assert.Empty(t, withoutHosted(workflowFindings(".github/workflows/ci.yml", []byte(citest.GoodWorkflow))))

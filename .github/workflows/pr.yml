@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The pr job of 12 12.4: it judges the approval lines of every pull
+# request into main with the code of the default branch. Under
+# pull_request_target GitHub runs this file as the default branch holds
+# it, never as the pull request changes it, so no code that a pull
+# request changes judges that pull request (05 5.3). The job checks out
+# the default branch's commit, builds pr from it and reads the head only
+# as git objects, fetched by pr itself without credentials; it runs no
+# other code. "go run ./tools/ci workflows" holds this file to the pr job
+# row of 10 10.2.
+name: pr
+
+on:
+  pull_request_target:
+    branches: [main]
+    # edited: a change to the title or the body, a ticked approval line
+    # among them, runs pr again (REQ-0813).
+    types: [opened, synchronize, reopened, edited]
+
+# One run in progress per pull request: a new event cancels the run it
+# replaces, so the last check of the head is the one of the last event.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# The environment of every mise run, as in ci.yml: miseEnv in
+# tools/ci/internal/mise/misefiles.go, which the workflows check holds
+# this table to.
+env:
+  MISE_OVERRIDE_CONFIG_FILENAMES: mise.toml
+  MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES: none
+  MISE_ENV: ""
+  MISE_AUTO_ENV: "false"
+  MISE_GLOBAL_CONFIG_FILE: /dev/null/mise-global.toml
+  MISE_SYSTEM_CONFIG_FILE: /dev/null/mise-system.toml
+  MISE_AUTO_INSTALL: "false"
+  MISE_NOT_FOUND_AUTO_INSTALL: "false"
+  GOENV: "off"
+  GOTOOLCHAIN: local
+
+jobs:
+  pr:
+    name: pr
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the default branch
+        # actions/checkout v7.0.1. With no ref it checks out github.sha,
+        # the default branch's commit under this event; the whole history,
+        # so the base and the merge base are in the clone.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install mise and the tools of mise.lock
+        # jdx/mise-action v5.1.1; the sha256 of mise 2026.10.3 for
+        # ubuntu-26.04-arm, as ci.yml pins it.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca
+        with:
+          version: 2026.10.3
+          sha256: 357260e28904569a6e7124d33b65cef6d043846c07bb8f4906ddf22cc353d61d
+          cache: false
+          env: false
+          persist_github_token: false
+      # The code of pr alone (the approval package and what it imports,
+      # every package on the approvals surface), on the event's payload.
+      - name: Judge the pull request
+        run: go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"
