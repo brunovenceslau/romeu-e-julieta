@@ -18,7 +18,8 @@ owns:
 needs:
   - T042
   - T103
-after: []
+after:
+  - T181
 ask_first:
   - checks
   - release
@@ -32,7 +33,8 @@ Goal: the package of romeu that reads the julieta binary
 deferred it to "T043 and T066, whose embed package consumes the path",
 but neither task owned the path, so no task made it. Decided on
 2026-10-29, scope this repository: a task of its own, which starts now,
-in parallel with T183 and T184, and which `sync` (T043) and `run`
+after T181 (which also edits 12) and in parallel
+with T183 and T184, and which `sync` (T043) and `run`
 (T066) read.
 
 1. `internal/embedded/` holds a checked-in empty placeholder file at

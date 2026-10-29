@@ -11,6 +11,9 @@ owns:
   - e2e/scenarios/j11/**
   - e2e/sync_test.go
   - e2e/internal/romeu/sync_helpers.go
+  - e2e/internal/romeu/env.go
+  - tools/release/main.go
+  - tools/release/internal/build/host*.go
 needs:
   - T040
   - T041
@@ -59,8 +62,10 @@ Re-plan (2026-10-29): built in slices, one file per step under
 (`import_sync.go`) waits on T183 and T184. Step 1 reads julieta from
 the package of T186. The `sync` e2e builds its romeu through a
 host-native `tools/release` build, since only that build embeds
-julieta (REQ-0131, the e2e row of 10 10.2), so this task asks first
-for `release` too.
+julieta (REQ-0131, the e2e row of 10 10.2): this task adds that build
+to `tools/release` (`host*.go`, a flag in `main.go`) and has the e2e
+harness of T041 (`env.go`) build romeu through it, so it asks first for
+`release` too.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700, writes it into the manifest as
@@ -164,6 +169,9 @@ warns `handoff-legacy` and is not refused.
   - A romeu built with plain `go build` exits 2 with
     `julieta-not-embedded` on `sync` and `run`, and `status`, `doctor`
     and `version` work.
+  - The e2e harness builds romeu through the host-native embedded
+    build of `tools/release`, and a J2 `sync` passes step 1 with the
+    julieta it embeds.
   - The idempotency meta-test of 10 10.1 lands here as a table with
     `sync`'s row: a second run on unchanged inputs leaves every file's
     content and mode and every ref as they were, except `lastRunAt`.
