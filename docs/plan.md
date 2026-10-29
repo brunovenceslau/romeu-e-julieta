@@ -654,7 +654,7 @@ its front matter until the task merges; the file's fate then reads
 |---|---|---|
 | T001, T002, T003 | merged | done |
 | T004 `sequences` | deferred to M6 | `tools/new adr` and `tools/ci plan` remove the main errors; trigger: the first duplicate id or one-way supersede link found in review |
-| T005 `pr` | deferred to M6 | the approval-line check alone may land early by its trigger; the sections and trailers are friction before a product exists |
+| T005 `pr` | deferred to M6 | its first slice, the approval-line and grant check, is T180 and T181 (re-plan of 2026-10-29); the sections and trailers are friction before a product exists |
 | T006 lessons, docs rules, contributor skeletons | deferred to M6 | checks before the documents exist; trigger: the first outside contributor or the release candidate |
 | T007 | kept, narrowed | the invariant tooling is T133; the guard tags are written now |
 | T008 | kept, changed | ids per package, registration by file |
@@ -775,7 +775,7 @@ These rows meet a task of this plan:
 | a scheduled workflow that checks external links | T102 | a dead link in that run reopens it |
 | a scheduled run of the pin-freshness check | T088 | the task builds the check and runs it once by hand |
 | how a local-gate run is recorded | each task | reopened the first time the maintainer chooses the local gates for a merge (10 10.2) |
-| what replaces the code-owner review | T005 | the task adds the first check that reads the approval line, which is the row's event |
+| what replaces the code-owner review | T181 | the task runs the first check that reads the approval line on every pull request, which is the row's event |
 | `release.yml` taking its own file from `main` | T088 | the pull request decides it and closes the row |
 | a check that reads the rulesets again | T088 | its trigger |
 | required status checks without the administrator bypass | T126 | the acceptance of ADR 0011 |
@@ -789,12 +789,13 @@ re-plan come first; the rows of the earlier plan that still stand
 follow them. The earlier row "splitting this page into one file per
 phase" fired and is gone, and so is the row of the timeout classes of
 `tools/ci` and `tools/mutants`, whose trigger, T105 starting, fired on
-2026-10-13; its decision is in T105's file.
+2026-10-13; its decision is in T105's file. The row of the
+approval-line and grant part of `tools/ci pr` is gone too: decided on
+2026-10-29, it is T180 and T181.
 
 | Deferred | Until then | Reopened by |
 |---|---|---|
 | the recorder and the probe harness (T014, T018 to T020, T026 to T028, T082, T092, T093) | hand-written sessions marked `synthetic: true`; the maintainer's daily runs | a real-sbx behaviour the fake cannot model breaks a daily run; or the first release candidate |
-| the approval-line and grant part of `tools/ci pr`, run in the base-defined pr job of 12 12.4 (the first slice of T005) | the maintainer's eyes at merge; the grant file as a recorded intent | the first grant written for a milestone with parallel lanes (sitting M0 writes M1's, rule 13, and reads this row then); or the first merged pull request missing an approval line it needed |
 | `tools/ci pr` sections, the Middleware and Lessons fields, the `Fixes-release:` trailer (T005) | the sections are read in review | the first merged pull request missing a section the review wanted; or before the first release-candidate tag |
 | `sequences`, `lessons`, `docs`, `vocabulary` (T004, T006, T011, T085, T086) | `tools/new adr`, `tools/ci plan` and review | a duplicate id or one-way supersede link found in review; the first outside contributor |
 | the `invariant` kind, `tools/ci invariants` and `mutate` (T133) | tags written by hand; `tools/mutants` by hand on a security invariant | the first invariant whose guard has code and whose test could be green by omission, found in review; or the release candidate |
@@ -835,12 +836,12 @@ window it covers, why it is accepted and what reopens it.
 | uncommitted work lost to a recreate before salvage exists | the wave of sitting M2 and the slots of sitting M3, until M4 | the window has no salvage, narrowed by `julieta snapshot` from M1 and by `/handoff --final` plus push per slot | the first uncommitted change lost to a recreate: T068 then moves ahead of any remaining M3 task |
 | the bridge's hand-written manifest and mounts are the "remember" pattern | M1 to sitting M3 | one committed runbook per project in the config repository with the undo of each step; `julieta status` prints the manifest's repos, so a drift is read at sitting M1 | sitting M3 writes every manifest through `sync` |
 | the signing rule (I34) is enforced by no code while the `git-ssh-sign` kit is in daily use before T080: accepted by name in 05 5.4, the row "I34 is enforced by no code" | M2 to T080 (M3) | as 05 5.4 says; the outcome of an unanswered confirmation is read at sitting M2 (T115) and named here with the away window it covers | T080 lands; or a sandbox whose `ssh-add -L` lists more than one key |
-| a grant is read by no check until `tools/ci pr` lands: accepted by name in 05 5.4, the row "no check reads the approval line or a checkpoint grant" | the first grant (sitting M0) to T005 (M6) | as 05 5.4 says | T005 lands; or a merged pull request whose grant matched no approval line |
+| a grant is read by no check until `tools/ci pr` lands: accepted by name in 05 5.4, the row "no check reads the approval line or a checkpoint grant" | the first grant (sitting M0) to T181 (M2); the 05 5.4 row stays until T005 | as 05 5.4 says | T181 lands; or a merged pull request whose grant matched no approval line |
 | the inbox skill's one-step prefix capture is gone (item 19 of [Decisions of the re-plan](#decisions-of-the-re-plan)) | from sitting M1 | the julieta skill's rule that anything worth keeping goes to `julieta memory` covers it | a capture missed in daily use |
 | hand-written sbx sessions diverge from the real binary | until the harness (M6) | the maintainer runs the real binary daily from sitting M3; a divergence is a one-line session fix | the harness's trigger above |
 | the facts of sitting M2 drive `oci`, `kits` and the signing kit by hand | M2, M3 | each fact is a fixture marked `source: sitting M2`, re-measured by block A in M6 with the version rule | a changed fact is a re-probe, as the pin file's rule says today |
 | the security invariants' tooling (tag pairing, mutate, the `pr` rule that a pull request removes no last guard or test tag) is thinner than the earlier plan's until M6: accepted by name in 05 5.4, the row "the invariant tag pairing and `mutate` land in M6" | all | as 05 5.4 says; the I-level cases sit in the task that lands the code, never in a breadth task | a reviewer finds an untested guard before M6: a tag-pairing check is one small task |
-| the forbidden-name check over PR titles and bodies runs from no check of this repository | M0 to T005's first slice | the hook checks commits and ref names; the agents' own pre-PR gate checks the text before opening | the first title or body found holding a denylisted name |
+| the forbidden-name check over PR titles and bodies runs from no check of this repository | M0 to T005 | the hook checks commits and ref names; the agents' own pre-PR gate checks the text before opening | the first title or body found holding a denylisted name |
 
 ## Decisions of the re-plan
 
