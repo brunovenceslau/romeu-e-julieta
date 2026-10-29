@@ -12,14 +12,18 @@ owns:
   - tools/ci/internal/workflows/**
   - .github/ask-first.yaml
   - docs/spec/12-engineering.md
+  - docs/spec/05-security.md
 needs:
   - T180
-after: []
+after:
+  - T167
+  - T182
 ask_first:
   - approvals
   - ask-first
   - checks
   - dependencies
+  - spec
 sitting: none
 ---
 
@@ -43,30 +47,45 @@ T180, scope this repository.
    author's text behind a fixed prefix (REQ-1153), and refuses a head
    that could impersonate the job (REQ-1154, REQ-1155).
 3. Invariant (b) does not hold today: `tools/ci` and the askfirst
-   package import packages outside the `approvals` globs (the `check`
-   package, and the YAML library, a module dependency). This task
-   decides where the code `pr` builds lives: the job builds a `main`
-   whose imports stay under `approvals` globs, with
-   `.github/ask-first.yaml` gaining a glob when one is needed, and
-   `go run ./tools/ci pr` stays the local command over the same code.
-   REQ-0539 lists the `approvals` globs in 05 5.3, which T167 owns: a
-   new glob makes this task re-planned with `after: T167` before its
-   pull request opens. The local name stays `tools/ci pr`, so 05 is not
-   otherwise edited. REQ-0541, invariant (d) and the 05 5.4 row "no
-   check reads the approval line or a checkpoint grant" stay in T005
-   (decided on 2026-10-29).
+   package import packages outside the `approvals` globs. Measured on
+   2026-10-29 with `go list -deps`, the path of `pr` reaches, outside
+   the standard library, `tools/ci/git` and `internal/procgroup` (both
+   import only the standard library), `tools/ci/internal/check` (which
+   brings `renameio`, and which the `pr` path can drop) and the YAML
+   library, a module dependency. Decided by the operator on
+   2026-10-29, scope this repository:
+   - the job builds a `main` under `tools/ci/internal/askfirst/**`
+     that does not import `check`, and `go run ./tools/ci pr` stays
+     the local command over the same code;
+   - the `approvals` surface gains `tools/ci/git/**` and
+     `internal/procgroup/**`, so the one process starter stays the one
+     `pr` uses, and a change to either needs the `approvals` line,
+     which no grant covers;
+   - a module dependency counts by its pin: `go.sum` joins the
+     `approvals` globs, so a change to a dependency's code needs the
+     `approvals` line too. `go.mod` stays off it: its `go` line stays
+     a grantable input under REQ-0541, which T005 keeps, and a local
+     `replace` in it is caught by the import test of invariant (b).
+   These change REQ-0539 in 05 5.3, which T167 and T182 also own, hence
+   `after: T167, T182`. That pull request also amends the sentence "Each path on
+   `approvals` is also on `checks` or `dependencies`", which
+   `internal/procgroup/**` breaks, and updates REQ-1150 in 12 12.4 with
+   the command line of the step. The local name stays `tools/ci pr`.
+   REQ-0541, invariant (d) and the 05 5.4 row "no check reads the
+   approval line or a checkpoint grant" stay in T005 (decided on
+   2026-10-29).
 
 - Implements: REQ-0540 (05 5.3), REQ-0813 (10 10.2), REQ-0815 (10 10.2),
   REQ-0816 (10 10.2), REQ-1148 (12 12.4), REQ-1149 (12 12.4), REQ-1150
   (12 12.4), REQ-1151 (12 12.4), REQ-1152 (12 12.4), REQ-1153 (12 12.4),
   REQ-1154 (12 12.4), REQ-1155 (12 12.4).
-- Operator: decide how invariant (b) counts a module dependency such
-  as the YAML library (its pin is `go.sum`, on `dependencies`), before
-  the pull request is ready. Before `pr.yml` is wired, open a throwaway pull request and
-  measure whether ticking a checklist line in the GitHub UI fires
-  `pull_request_target` `edited` and runs the job again; the result
-  goes under Evidence and decides whether the tick needs another event.
-  After the merge, add the pr job to the default-branch ruleset's
+- Operator: `pr.yml` is wired with `edited`, and whether ticking a
+  checklist line in the GitHub UI fires `pull_request_target` `edited`
+  and runs the job again is measured on the first pull request after
+  this one, since the event runs only a file already on the default
+  branch (decided on 2026-10-29, instead of a probe workflow merged
+  first); the result goes under that pull request's Evidence, and a
+  tick that fires nothing reopens the job's events. After the merge, add the pr job to the default-branch ruleset's
   required checks (REQ-1140) and record under the next pull request's
   Evidence the `head_sha` of its check run and whether the ruleset
   blocks and then allows a merge, or that it cannot be required. The
