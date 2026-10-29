@@ -91,10 +91,32 @@ func TestInitRefusesToOverwriteSettings(t *testing.T) {
 	res := e.Run(t, args)
 
 	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "RJ-353")
 	assert.Contains(t, res.Stderr, "settings-exist")
 	after, err := os.ReadFile(e.Settings())
 	require.NoError(t, err)
 	assert.Equal(t, before, after)
+}
+
+// TestInitRefusesWhenTheSettingsDirIsUnwritable: a settings directory
+// init cannot write is settings-unwritable (RJ-354), exit 2, and
+// nothing is written.
+func TestInitRefusesWhenTheSettingsDirIsUnwritable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		return // root writes into a 0500 directory
+	}
+	e, _, args := initSetup(t, nil)
+	dir := filepath.Dir(e.Settings())
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	res := e.Run(t, args)
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "RJ-354")
+	assert.Contains(t, res.Stderr, "settings-unwritable")
+	assert.NoFileExists(t, e.Settings())
 }
 
 // TestInitRefusesAnUnsafeRoot: a root inside a git repository, equal to
@@ -133,6 +155,7 @@ func TestInitRefusesAnUnsafeRoot(t *testing.T) {
 			res := e.Run(t, append(args, "--root", root))
 
 			assert.Equal(t, 2, res.Code, res.Stderr)
+			assert.Contains(t, res.Stderr, "RJ-352")
 			assert.Contains(t, res.Stderr, "root-unsafe")
 			assert.Contains(t, res.Stderr, tc.reason)
 			assert.NoFileExists(t, e.Settings())
@@ -264,7 +287,8 @@ func TestInitRefusesARemoteWithoutADefaultBranch(t *testing.T) {
 	res := e.Run(t, append(args, "--config-ref", "release"))
 
 	assert.Equal(t, 2, res.Code, res.Stderr)
-	assert.Contains(t, res.Stderr, "config-ref-not-default")
+	assert.Contains(t, res.Stderr, "config-no-default-branch")
+	assert.NotContains(t, res.Stderr, "config-ref-not-default")
 	assert.Contains(t, res.Stderr, "no default branch")
 	assert.NoFileExists(t, e.Settings())
 	envs, err := filepath.Glob(filepath.Join(e.Root, "*-env", "*"))
@@ -286,6 +310,7 @@ func TestInitDoesNotFollowALinkedEnvDir(t *testing.T) {
 	res := e.Run(t, args)
 
 	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "RJ-352")
 	assert.Contains(t, res.Stderr, "root-unsafe")
 	assert.Contains(t, res.Stderr, "symbolic link")
 	fi, err := os.Stat(victim)
@@ -307,6 +332,7 @@ func TestInitRefusesAGroupWritableRoot(t *testing.T) {
 	res := e.Run(t, args)
 
 	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "RJ-352")
 	assert.Contains(t, res.Stderr, "root-unsafe")
 	assert.Contains(t, res.Stderr, "writable by its group or others")
 	entries, err := os.ReadDir(e.Root)

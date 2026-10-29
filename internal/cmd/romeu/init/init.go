@@ -99,9 +99,17 @@ func usage(cmd *cobra.Command, message string) error {
 	return e
 }
 
+// unwritable is the error settings-unwritable (RJ-354), with the
+// system's message in the details (REQ-1280).
+func unwritable(err error) error {
+	return SettingsUnwritable.New("init cannot make or write the host settings",
+		cli.Detail{Key: "error", Value: err.Error()})
+}
+
 // refuse is a precondition init stops at, named by the slug of the rule
 // it breaks, with exit 2 (REQ-1258: a rule with no row of 04 4.4 has no
-// id of its own).
+// id of its own): config-ref-not-default, config-no-default-branch and
+// clone-exists. A rule with a row raises the row.
 func refuse(cmd *cobra.Command, slug, message string) error {
 	return usage(cmd, slug+": "+message)
 }
@@ -127,7 +135,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	if err != nil {
 		return err
 	}
-	if err := absent(cmd, settings); err != nil {
+	if err := absent(settings); err != nil {
 		return err
 	}
 
@@ -150,7 +158,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return usage(cmd, "HOME: "+err.Error())
 	}
 	if why := rootProblem(h.Root, rhome, rs, rstate); why != "" {
-		return refuse(cmd, "root-unsafe", why+"; pass another root with --root")
+		return RootUnsafe.New(why)
 	}
 
 	g, err := tools(cmd, &h, home)
@@ -171,11 +179,11 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 	defer lk.Unlock()
-	if err := absent(cmd, settings); err != nil { // another init may have won
+	if err := absent(settings); err != nil { // another init may have won
 		return err
 	}
 
-	rt, envDir, made, err := openTree(cmd, h.Root, h.Config.Project+"-env")
+	rt, envDir, made, err := openTree(h.Root, h.Config.Project+"-env")
 	if err != nil {
 		return err
 	}
@@ -187,7 +195,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	if err != nil {
 		return err
 	}
-	pending, err := prepareSettings(cmd, settings)
+	pending, err := prepareSettings(settings)
 	if err != nil {
 		return err
 	}
@@ -200,7 +208,7 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		made.undo(rt, filepath.Base(envDir), h.Root)
 		return err
 	}
-	if err := commitSettings(cmd, pending, settings, data); err != nil {
+	if err := commitSettings(pending, settings, data); err != nil {
 		// dest is this run's clone: absent proved <envDir>/<dir> did not
 		// exist, so nothing of the operator's goes with it.
 		err = errors.Join(err, os.RemoveAll(dest))
@@ -213,15 +221,15 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 
 // prepareSettings makes the directory of settings, mode 0700, and the
 // temporary file the settings are written to, mode 0600. A directory or
-// a file init cannot make is settings-unwritable: a precondition (exit
-// 2, as usage, since 04 4.4 has no row for it) and not an internal error.
-func prepareSettings(cmd *cobra.Command, settings string) (*renameio.PendingFile, error) {
+// a file init cannot make is settings-unwritable: a precondition (RJ-354,
+// exit 2) and not an internal error.
+func prepareSettings(settings string) (*renameio.PendingFile, error) {
 	if err := os.MkdirAll(filepath.Dir(settings), dirMode); err != nil {
-		return nil, refuse(cmd, "settings-unwritable", err.Error())
+		return nil, unwritable(err)
 	}
 	pf, err := renameio.NewPendingFile(settings, renameio.WithStaticPermissions(0o600))
 	if err != nil {
-		return nil, refuse(cmd, "settings-unwritable", err.Error())
+		return nil, unwritable(err)
 	}
 	return pf, nil
 }
@@ -230,28 +238,28 @@ func prepareSettings(cmd *cobra.Command, settings string) (*renameio.PendingFile
 // place, which fails if a file appeared there meanwhile (settings-exist),
 // where a rename would silently replace it. The temporary file is
 // removed by the caller's Cleanup.
-func commitSettings(cmd *cobra.Command, pf *renameio.PendingFile, settings string, data []byte) error {
+func commitSettings(pf *renameio.PendingFile, settings string, data []byte) error {
 	if _, err := pf.Write(data); err != nil {
-		return refuse(cmd, "settings-unwritable", err.Error())
+		return unwritable(err)
 	}
 	if err := pf.Sync(); err != nil {
-		return refuse(cmd, "settings-unwritable", err.Error())
+		return unwritable(err)
 	}
 	if err := os.Link(pf.Name(), settings); err != nil {
 		if errors.Is(err, fs.ErrExist) {
-			return refuse(cmd, "settings-exist", "the host settings appeared at "+termsafe.Escape(settings)+" meanwhile; init never overwrites them")
+			return SettingsExist.New("the host settings appeared at " + termsafe.Escape(settings) + " meanwhile; init never overwrites them")
 		}
-		return refuse(cmd, "settings-unwritable", err.Error())
+		return unwritable(err)
 	}
 	return nil
 }
 
 // absent refuses settings that exist: init never overwrites them.
-func absent(cmd *cobra.Command, settings string) error {
+func absent(settings string) error {
 	_, err := os.Lstat(settings)
 	switch {
 	case err == nil:
-		return refuse(cmd, "settings-exist", "the host settings already exist at "+termsafe.Escape(settings)+"; init never overwrites them")
+		return SettingsExist.New("the host settings already exist at " + termsafe.Escape(settings) + "; init never overwrites them")
 	case !errors.Is(err, fs.ErrNotExist):
 		return fmt.Errorf("init: the settings: %w", err)
 	}
@@ -277,7 +285,7 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 	}
 	o.root = filepath.Clean(o.root) // a trailing slash is no fault
 	if !filepath.IsAbs(o.root) {
-		return zero, refuse(cmd, "root-unsafe", "the root is not an absolute, clean path")
+		return zero, RootUnsafe.New("the root is not an absolute, clean path")
 	}
 	root, err := realPath(o.root)
 	if err != nil {
@@ -389,7 +397,7 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // between is caught. A directory init made is 0700; one that was there
 // is chmod'ed through the handle only when the checks passed, and never
 // followed out of the root.
-func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made, error) {
+func openTree(root, envName string) (*os.Root, string, made, error) {
 	var m made
 	// The levels above the root are made as they are needed and stay;
 	// the root's last element is this run's when its Mkdir succeeds.
@@ -402,7 +410,7 @@ func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made,
 		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
 	if why := dirProblem(os.Lstat, root); why != "" {
-		return nil, "", m, refuse(cmd, "root-unsafe", "the root "+why)
+		return nil, "", m, RootUnsafe.New("the root " + why)
 	}
 	rt, err := os.OpenRoot(root)
 	if err != nil {
@@ -416,7 +424,7 @@ func openTree(cmd *cobra.Command, root, envName string) (*os.Root, string, made,
 	}
 	if why := dirProblem(rt.Lstat, envName); why != "" {
 		_ = rt.Close()
-		return nil, "", m, refuse(cmd, "root-unsafe", envName+" "+why)
+		return nil, "", m, RootUnsafe.New(envName + " " + why)
 	}
 	if !m.env {
 		if err := rt.Chmod(envName, dirMode); err != nil {
@@ -474,7 +482,7 @@ func configDir(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h spe
 		return "", err
 	}
 	if def == "" {
-		return "", refuse(cmd, "config-ref-not-default", "the config repo has no default branch: its HEAD names no branch")
+		return "", refuse(cmd, "config-no-default-branch", "the config repo has no default branch: its HEAD names no branch")
 	}
 	if def != h.Config.Ref {
 		return "", refuse(cmd, "config-ref-not-default", "--config-ref "+termsafe.Escape(h.Config.Ref)+" is not the default branch of the config repo ("+termsafe.Escape(def)+"); init takes the default branch only")
@@ -535,7 +543,7 @@ func cloneError(cmd *cobra.Command, err error, configURL string, remote bool) er
 	case errors.Is(err, gitsafe.ErrRemoteContent) || (remote && refused) || (!remote && exited):
 		return ConfigCloneFailed.New("git could not clone the config repo",
 			cli.Detail{Key: "config.url", Value: termsafe.Escape(configURL)},
-			cli.Detail{Key: "git", Value: termsafe.Escape(err.Error())})
+			cli.Detail{Key: "git", Value: err.Error()})
 	case refused:
 		return usage(cmd, termsafe.Escape(err.Error()))
 	}
