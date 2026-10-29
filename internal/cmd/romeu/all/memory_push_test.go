@@ -349,8 +349,9 @@ func TestStepPushRefused(t *testing.T) {
 	assert.Empty(t, h.remoteMain(t))
 }
 
-// TestStepTakesTheLock is the error locked when another romeu holds the
-// lock once the command released it, and pushes nothing.
+// TestStepTakesTheLock warns memory-push-failed, exit 0, when another
+// romeu holds the lock once the command released it, and pushes
+// nothing; the next command pushes.
 func TestStepTakesTheLock(t *testing.T) {
 	h := newHost(t, "url", false)
 	dir, err := state.DefaultDir(getenv)
@@ -361,9 +362,11 @@ func TestStepTakesTheLock(t *testing.T) {
 	lk, err := st.Lock()
 	require.NoError(t, err)
 	code, _, stderr := h.step(t, "run", nil, "shop")
-	assert.Equal(t, 1, code)
-	assert.Contains(t, stderr, "RJ-101 locked")
+	assert.Equal(t, 0, code, "the command's work stands")
+	assert.Contains(t, stderr, "warning memory-push-failed: memory was not committed or pushed; the next command pushes: another romeu holds the lock")
+	assert.Contains(t, stderr, "warning memory-unsigned: ", "the notices of run are printed all the same")
 	assert.Empty(t, h.remoteMain(t))
+	assert.NoDirExists(t, filepath.Join(h.envDir, "memory.git"), "nothing committed")
 	lk.Unlock()
 	code, _, _ = h.step(t, "run", nil, "shop")
 	assert.Equal(t, 0, code)
@@ -390,8 +393,9 @@ func TestStepTargets(t *testing.T) {
 	assert.Equal(t, 0, code, stderr)
 	assert.Contains(t, git(t, h.remoteDir, "ls-tree", "-r", "--name-only", "main"), "shop-api/entries/03rel.md", "a relative -C")
 	t.Chdir(h.root)
-	code, _, _ = h.step(t, "pull", nil, "-C", t.TempDir())
-	assert.Equal(t, 1, code, "a directory outside the root")
+	code, _, stderr = h.step(t, "pull", nil, "-C", t.TempDir())
+	assert.Equal(t, 0, code, "a directory outside the root")
+	assert.Contains(t, stderr, "warning memory-push-failed: ")
 
 	attic := filepath.Join(h.root, ".attic", "shop", "20261029T120000Z")
 	require.NoError(t, os.MkdirAll(filepath.Dir(attic), 0o700))
@@ -401,8 +405,9 @@ func TestStepTargets(t *testing.T) {
 	assert.Equal(t, 0, code, stderr)
 	assert.Contains(t, git(t, h.remoteDir, "ls-tree", "-r", "--name-only", "main"), "_shared/entries/04tomb.md")
 
-	code, _, _ = h.step(t, "run", nil, "../x")
-	assert.Equal(t, 1, code, "a name that is no path element")
+	code, _, stderr = h.step(t, "run", nil, "../x")
+	assert.Equal(t, 0, code, "a name that is no path element")
+	assert.Contains(t, stderr, "warning memory-push-failed: ")
 }
 
 // probe is a romeu command of this test binary alone, with the step of
@@ -464,14 +469,17 @@ func TestStepHostSettings(t *testing.T) {
 	assert.Equal(t, 0, code, stderr)
 	assert.NotEmpty(t, h.remoteMain(t))
 
-	// No projects/<name>.yaml at the commit: an error of the step.
+	// No projects/<name>.yaml at the commit: the step warns, and the
+	// command's work stands.
 	code, _, stderr = h.step(t, "run", nil, "cfg")
-	assert.Equal(t, 1, code, stderr)
+	assert.Equal(t, 0, code, stderr)
+	assert.Contains(t, stderr, "warning memory-push-failed: the memory of cfg was not committed or pushed")
 
 	for name, path := range map[string]string{"absent": filepath.Join(t.TempDir(), "none.yaml"), "a directory": t.TempDir()} {
 		var stdout, stderr bytes.Buffer
 		code := RunMemoryStep(t.Context(), path, &stdout, &stderr, "run", []string{"shop"}, func() error { return nil })
-		assert.Equal(t, 1, code, name)
+		assert.Equal(t, 0, code, name)
+		assert.Contains(t, stderr.String(), "warning memory-push-failed: ", name)
 	}
 }
 
@@ -496,11 +504,13 @@ func TestStepTargetsOfTheWorkingDirectory(t *testing.T) {
 	assert.NotEmpty(t, h.remoteMain(t))
 
 	require.NoError(t, os.MkdirAll(filepath.Join(h.root, ".attic", "shop"), 0o700))
-	code, _, _ = h.step(t, "retire", nil, "shop")
-	assert.Equal(t, 1, code, "an attic with no tree")
+	code, _, stderr = h.step(t, "retire", nil, "shop")
+	assert.Equal(t, 0, code, "an attic with no tree")
+	assert.Contains(t, stderr, "warning memory-push-failed: ")
 	t.Chdir(h.root)
-	code, _, _ = h.step(t, "pull", nil)
-	assert.Equal(t, 1, code, "the root is in no project's tree")
+	code, _, stderr = h.step(t, "pull", nil)
+	assert.Equal(t, 0, code, "the root is in no project's tree")
+	assert.Contains(t, stderr, "warning memory-push-failed: ")
 }
 
 // TestStepDoctorFailsNothing leaves to doctor's own checks host settings
@@ -514,4 +524,16 @@ func TestStepDoctorFailsNothing(t *testing.T) {
 	var stdout, errOut bytes.Buffer
 	code = RunMemoryStep(t.Context(), filepath.Join(t.TempDir(), "none.yaml"), &stdout, &errOut, "doctor", nil, func() error { return nil })
 	assert.Equal(t, 0, code, errOut.String())
+}
+
+// TestStepFailsOnTheMachine keeps as an error, after the command's
+// work, a failure of the machine's own memory repository: here a layout
+// violation in entries/, which needs the operator.
+func TestStepFailsOnTheMachine(t *testing.T) {
+	h := newHost(t, "url", false)
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(h.envDir, "memory", "shop-api", "entries", "x.md")))
+	code, _, stderr := h.step(t, "run", nil, "shop")
+	assert.Equal(t, 1, code)
+	assert.Contains(t, stderr, "x.md")
+	assert.Empty(t, h.remoteMain(t))
 }

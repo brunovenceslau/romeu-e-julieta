@@ -91,40 +91,59 @@ func memoryStep(role memoryRole) cli.Around {
 // afterWork is the step once the command's work is done: for each
 // project the command acted on, the refusal of sync, the notices and
 // the commit and push, each project's warnings printed before the next.
-// An error of one project does not stop the others; the first error
-// of the table among them is returned.
+//
+// The command's work stands, so what keeps the step from pushing is the
+// warning memory-push-failed with its cause, exit 0, as a refused push
+// is (decided on 2026-10-29): host settings or a project it cannot
+// resolve (render.json, the config clone, the spec at the commit), and
+// romeu.lock that another romeu took once the command released it. The
+// errors left are sync's refusal memory-remote-missing (exit 2) and a
+// failure of the machine's own memory repository that memgit.Sync
+// returns (the git dir, the excludes, a commit, a layout violation in
+// entries/ or stamps/): those need the operator, as the layout
+// allowlist's refusal in sync and run does (REQ-0651). An error of one
+// project does not stop the others; the first error of the table among
+// them is returned. A role that only warns (doctor) leaves what it
+// cannot read to the command's own checks.
 func afterWork(ctx context.Context, env *cli.Env, role memoryRole, cmd *cobra.Command, args []string) error {
-	// A role that only warns (doctor) leaves what it cannot read to the
-	// command's own checks, and fails nothing.
 	quiet := !role.push && !role.refuse
+	notPushed := func(what string, err error) {
+		if !quiet {
+			warnMemory(env.Stderr, memgit.Warning{Slug: memgit.SlugPushFailed,
+				Message: what + " was not committed or pushed; the next command pushes: " + err.Error()})
+		}
+	}
 	h, err := loadMemoryHost(env)
 	if err != nil {
-		if quiet {
-			return nil
-		}
-		return err
-	}
-	targets, err := role.targets(h, cmd, args)
-	if quiet && err != nil {
+		notPushed("memory", err)
 		return nil
 	}
-	if err != nil || len(targets) == 0 {
-		return err
+	targets, err := role.targets(h, cmd, args)
+	if err != nil {
+		notPushed("memory", err)
+		return nil
 	}
-	if role.push {
+	if len(targets) == 0 {
+		return nil
+	}
+	push := role.push
+	if push {
 		release, err := lockState()
-		if err != nil {
+		switch {
+		case isLocked(err):
+			notPushed("memory", errors.New("another romeu holds the lock"))
+			push = false
+		case err != nil:
 			return err
+		default:
+			defer release()
 		}
-		defer release()
 	}
 	var errs []error
 	for _, t := range targets {
 		p, sp, err := h.project(ctx, t)
 		if err != nil {
-			if !quiet {
-				errs = append(errs, err)
-			}
+			notPushed("the memory of "+t.name, err)
 			continue
 		}
 		if role.refuse {
@@ -140,7 +159,7 @@ func afterWork(ctx context.Context, env *cli.Env, role memoryRole, cmd *cobra.Co
 		if role.notices {
 			warnings = append(warnings, memgit.Notices(p)...)
 		}
-		if role.push {
+		if push {
 			w, err := memgit.Sync(ctx, h.git, p)
 			warnings = append(warnings, w...)
 			if err != nil {
@@ -159,6 +178,13 @@ func afterWork(ctx context.Context, env *cli.Env, role memoryRole, cmd *cobra.Co
 	return errors.Join(errs...)
 }
 
+// isLocked reports whether err is the error locked (RJ-101) of
+// romeu.lock.
+func isLocked(err error) bool {
+	e, ok := errors.AsType[*cli.Error](err)
+	return ok && e.ID == state.Locked.ID
+}
+
 // warnMemory prints w by its slug, each a literal of 04 4.1, Warnings.
 func warnMemory(w *cli.Writer, m memgit.Warning) {
 	switch m.Slug {
@@ -175,8 +201,8 @@ func warnMemory(w *cli.Writer, m memgit.Warning) {
 
 // lockState takes romeu.lock for the push and returns the function that
 // releases it. The command released the lock it took when its RunE
-// returned, so another romeu that took it in between makes this the
-// error locked (RJ-101), and nothing is pushed.
+// returned, so another romeu can take it in between: the error locked
+// (RJ-101), which afterWork turns into memory-push-failed.
 func lockState() (func(), error) {
 	dir, err := state.DefaultDir(getenv)
 	if err != nil {
