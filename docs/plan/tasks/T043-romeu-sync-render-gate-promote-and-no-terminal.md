@@ -11,6 +11,9 @@ owns:
   - e2e/scenarios/j11/**
   - e2e/sync_test.go
   - e2e/internal/romeu/sync_helpers.go
+  - e2e/internal/romeu/env.go
+  - tools/release/main.go
+  - tools/release/internal/build/host*.go
 needs:
   - T040
   - T041
@@ -21,9 +24,13 @@ needs:
   - T035
   - T103
   - T039
+  - T183
+  - T184
+  - T186
 after: []
 ask_first:
   - contracts
+  - release
 sitting: none
 ---
 
@@ -46,6 +53,19 @@ ordered step list and `sync/rules.go` the registered render-time rules
 encoder and the size function come from T135. The helper file it adds to
 the harness of T041 is `e2e/internal/romeu/sync_helpers.go`.
 
+
+Re-plan (2026-10-29): built in slices, one file per step under
+`internal/cmd/romeu/sync/` (`step1_lock.go`, `step2_fetch.go`,
+`step3_specs.go`, `step4_tree.go`, `step5_memory.go`,
+`step6_render.go`, `step7_drift.go`, `step8_gate.go`,
+`step10_report.go`), and the part that links `sync` into the binary
+(`import_sync.go`) waits on T183 and T184. Step 1 reads julieta from
+the package of T186. The `sync` e2e builds its romeu through a
+host-native `tools/release` build, since only that build embeds
+julieta (REQ-0131, the e2e row of 10 10.2): this task adds that build
+to `tools/release` (`host*.go`, a flag in `main.go`) and has the e2e
+harness of T041 (`env.go`) build romeu through it, so it asks first for
+`release` too.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700, writes it into the manifest as
@@ -92,7 +112,13 @@ warns `handoff-legacy` and is not refused.
   - `--from <sha>` refuses a commit not reachable from
     `refs/romeu/origin/*`.
   - A spec secret without its `name@project` binding is exit 2 naming
-    the key, and `github@other` does not satisfy project `shop` (I8).
+    the key, and `github@other` does not satisfy project `shop` (I8);
+    the check runs at the end of step 3, on the targets only (an
+    unbound secret of a project not synced does not fail), before step
+    4 writes (no `<name>-env/` is made).
+  - Every product kit of `kits.FS` renders through step 6
+    (`TestRenderCandidatesRendersEveryProductKit`), once T184's
+    `egress.Split` takes their hosts with a port.
   - An uncommitted lock change, a commit on another branch and a local
     `refs/remotes/origin` rewrite leave egress unchanged; changing `ref`
     changes egress and meets gate 2 (I9).
@@ -119,8 +145,8 @@ warns `handoff-legacy` and is not refused.
   - A memory directory with a symlink, a FIFO or a `..` name, or any
     other layout violation of 08 8.1, makes `sync` exit 2 naming the
     offending path and is not followed (I12, I24); a leftover
-    `.tmp-<ULID>` makes it warn and not refuse; a `stamps/` over its
-    cap makes the command warn and not refuse.
+    `.tmp-<ULID>` makes it warn and not refuse (the cap of `stamps/`
+    is T174's).
   - A personal kit with each hostile entry of I27 fails `sync` before a
     file is written outside `.romeu/candidates/`, on the macOS runners
     too, selected by the runner table of 10 10.2; a hostile tree
@@ -143,6 +169,9 @@ warns `handoff-legacy` and is not refused.
   - A romeu built with plain `go build` exits 2 with
     `julieta-not-embedded` on `sync` and `run`, and `status`, `doctor`
     and `version` work.
+  - The e2e harness builds romeu through the host-native embedded
+    build of `tools/release`, and a J2 `sync` passes step 1 with the
+    julieta it embeds.
   - The idempotency meta-test of 10 10.1 lands here as a table with
     `sync`'s row: a second run on unchanged inputs leaves every file's
     content and mode and every ref as they were, except `lastRunAt`.

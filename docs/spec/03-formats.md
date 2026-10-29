@@ -130,7 +130,7 @@ naming the host-only rules it did not check.
 | kit id | `REQ-0182` `^[a-z0-9][a-z0-9-]{0,62}$` | both |
 | kit `args` | `REQ-0183` key `^[a-z][a-zA-Z0-9_]{0,31}$`; value printable UTF-8, no newline, <= 1 KiB | both |
 | secret name | `REQ-0184` `^[a-z0-9][a-z0-9_-]{0,62}$` | both |
-| secret binding | `REQ-0185` a `name@project` entry in host settings for every spec secret name (3.4) | romeu only |
+| secret binding | `REQ-0185` a `name@project` entry in host settings for every secret name of a project `sync` renders (3.4; checked at [04 4.2](04-cli.md#how-romeu-sync-renders-gates-and-promotes), sync step 3) | romeu only |
 | run layout pane id / tab label | `REQ-0186` `^[a-z0-9][a-z0-9_-]{0,31}$` | both |
 | relative `cwd` in the run layout | `REQ-0187` cleaned path, no leading `/`, no `..` element | both |
 | egress domain (every source of [07 7.5](07-mise-egress.md#75-egress-derivation-internalegress): `egress.extra`, catalog, lock-derived, kit-declared) | `REQ-0188` lowercase hostname, IDNA A-labels, no wildcard, no port, no IP literal, no label of `0x` and hex digits; not under a special-use name a resolver may map to the host or its local network: the last labels `localhost`, `test` and `invalid` (RFC 6761), `local` (RFC 6762), `onion` (RFC 7686), `internal` (ICANN's private-use reservation), `localdomain`, `lan`, `home`, `corp`, `intranet` and `private` (names networks use with no registration), and the suffix `home.arpa` (RFC 8375); `example` is not refused (decided on 2026-10-22) | both |
@@ -366,8 +366,9 @@ argv element that holds, at its start or after whitespace or `=` (so
 `ghr_` or `github_pat_`, or 40 hex digits of either case that end the
 element or a word, is refused with the error
 `secret-in-argv` (`RJ-314`; a best-effort guard against the common token
-shapes, not a detector); a spec secret name without a matching `name@project`
-entry is exit 2 naming the key; `REQ-0207` a `name@other-project` entry never
+shapes, not a detector); a spec secret name of a target without a
+matching `name@project` entry is exit 2 naming the key; `REQ-0207` a
+`name@other-project` entry never
 satisfies a different project; entries for unknown projects are
 reported by `doctor`. `REQ-0208` A secret argv and the credential helper run with
 exactly `HOME` and `PATH=/usr/bin:/bin`, so a manager must work from
