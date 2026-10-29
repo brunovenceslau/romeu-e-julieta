@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -204,6 +205,45 @@ func (s *Store) GetDescriptor(digest string) (*Descriptor, error) {
 			fmt.Errorf("%w: the entry holds the digest %s", ErrInvalid, clip(d.Digest)))
 	}
 	return d, nil
+}
+
+// FindDescriptor returns the cached entry reached from the workload (an
+// index digest) for the platform: the entry is keyed by the platform
+// manifest's digest, which the spec does not name for a multi-arch
+// image. It reads descriptors/ in name order and stops at the first
+// match. An entry that does not decode, or that holds another digest
+// than its name says, is skipped here (GetDescriptor of it is still
+// record-unreadable, RJ-334), so one bad entry does not fail every
+// sync. A pair with no entry is an error that wraps fs.ErrNotExist, as
+// GetDescriptor gives an absent digest. A local kit's entry has no
+// workload and never matches, and neither does an empty workload.
+func (s *Store) FindDescriptor(workload, platform string) (*Descriptor, error) {
+	absent := fmt.Errorf("state: no descriptor for %s on %s: %w", clip(workload), clip(platform), fs.ErrNotExist)
+	if workload == "" || platform == "" {
+		return nil, absent
+	}
+	entries, err := fs.ReadDir(s.descriptors.FS(), ".")
+	if err != nil {
+		return nil, fmt.Errorf("state: %w", err)
+	}
+	for _, e := range entries {
+		hex, ok := strings.CutSuffix(e.Name(), ".json")
+		if !ok || !e.Type().IsRegular() {
+			continue
+		}
+		data, err := readRecord(s.descriptors, e.Name())
+		if err != nil {
+			continue
+		}
+		d, err := DecodeDescriptor(data)
+		if err != nil || d.Digest != "sha256:"+hex {
+			continue
+		}
+		if d.Workload == workload && d.Platform == platform {
+			return d, nil
+		}
+	}
+	return nil, absent
 }
 
 // PutDescriptor caches a descriptor under its digest. Entries are
