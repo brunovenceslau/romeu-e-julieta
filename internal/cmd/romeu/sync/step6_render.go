@@ -80,7 +80,8 @@ type candidate struct {
 // renderCandidates is step 6 of 04 4.2 (REQ-0341), for each target:
 // the project record; the workload descriptor, from the descriptor
 // cache of host state first and from its registry by digest only on a
-// miss, which is cached; the candidate dir, made by the event "sync
+// miss, which is then written to the cache; .romeu/ of the env dir,
+// made when missing; the candidate dir, made by the event "sync
 // renders" of the candidate machine, which deletes every candidate dir
 // a killed command left (after step 1's recovery no record names
 // one); the kits, product kits from romeu's embedded copy and personal
@@ -89,14 +90,29 @@ type candidate struct {
 // egress, derived from the pinned locks, the spec and the network
 // domains the descriptors declare. Then the render-time rules run, on
 // every target, and only then is sbxenv.yaml rendered and the widening
-// set built, so a rule refuses before any sbxenv.yaml is written, and
-// nothing is written outside .romeu/candidates/. Last, render.json is
-// written with the gate's digests. It fills candidates.
+// set built, so a rule refuses before any sbxenv.yaml is rendered;
+// what is written before it is .romeu/, the descriptor cache and the
+// candidate dir with its kits. Last, render.json is written with the
+// gate's digests. It fills candidates.
+//
+// On any error once a candidate dir is made, each candidate of the run
+// is declined (the event "operator declines" of 01 1.6), which deletes
+// its dir, so a command that returns leaves no candidate dir; only a
+// killed one does, and the next sync deletes it.
 //
 // The egress is derived after the kits are materialized, where 04 4.2
 // lists it before: the kits' network domains are read from their
 // descriptors as the materializer parses them.
 func renderCandidates(ctx context.Context, r *run) error {
+	if err := renderAll(ctx, r); err != nil {
+		return errors.Join(err, decline(r.candidates))
+	}
+	return nil
+}
+
+// renderAll is step 6 without the decline of its candidates on an
+// error.
+func renderAll(ctx context.Context, r *run) error {
 	cat, err := catalog.Embedded()
 	if err != nil {
 		return fmt.Errorf("the embedded catalog: %w", err)
@@ -123,9 +139,22 @@ func renderCandidates(ctx context.Context, r *run) error {
 	return nil
 }
 
+// decline declines each candidate of cs, which deletes its dir
+// (REQ-1209).
+func decline(cs []candidate) error {
+	var errs []error
+	for _, c := range cs {
+		if _, err := c.dir.Apply(state.CandidateDecline, nil, state.Approval{}); err != nil {
+			errs = append(errs, fmt.Errorf("decline the candidate %s: %w", c.dir.ID(), err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // resolve is the part of step 6 for the target p, whose tree step 4
-// made, that comes before the rules.
-func resolve(ctx context.Context, r *run, p spec.Project, t tree, cat catalog.Catalog) (candidate, error) {
+// made, that comes before the rules. On an error once its candidate
+// dir is made, it declines that candidate.
+func resolve(ctx context.Context, r *run, p spec.Project, t tree, cat catalog.Catalog) (_ candidate, err error) {
 	project, err := r.store.LoadProject(p.Name)
 	if errors.Is(err, fs.ErrNotExist) {
 		project, err = state.NewProject(), nil
@@ -141,6 +170,11 @@ func resolve(ctx context.Context, r *run, p spec.Project, t tree, cat catalog.Ca
 	if err != nil {
 		return candidate{}, err
 	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, decline([]candidate{{dir: dir}}))
+		}
+	}()
 	m := render.KitMaterializer{
 		FS: productKits, EnvDir: t.env, GOARCH: runtime.GOARCH,
 		Git: r.git, ConfigDir: r.configClone, ConfigCommit: r.specCommit,
@@ -298,9 +332,16 @@ func kitFiles(rt *os.Root, name string) ([]gate.File, error) {
 }
 
 // declared returns the domains the network capability of the workload
-// and of each kit allows, at install and at runtime: the kits' input of
-// the egress derivation (07 7.5, step 6), which gates each one the
-// catalog does not allow (I10).
+// and of each kit allows: the kits' input of the egress derivation (07
+// 7.5, step 6), which gates each one the catalog does not allow (I10).
+// The hosts of the install phase and of the runtime phase are merged
+// into the one list egress.Input.Kit takes, so a host a kit allows at
+// install alone is allowed to the sandbox at runtime too. Whether
+// egress keeps the phases apart is open: kits/julieta/julieta.yaml
+// names the install phase so the runtime does not open github.com
+// (REQ-0592), and 07 7.5 does not say. Each host is passed as the
+// descriptor writes it; a host:port entry fails the derivation until
+// egress.Split (REQ-0069, 06 6.1) splits it.
 func declared(workload oci.Capabilities, kits []render.MaterializedKit) []string {
 	var out []string
 	add := func(c oci.Capabilities) {

@@ -12,7 +12,11 @@ import (
 	"strings"
 )
 
-// rule is a render-time rule: a check step 6 runs before it renders, in the order of the rules' names.
+// rule is a render-time rule: a check step 6 runs, in the order of the
+// rules' names, once the kits of every target are materialized into
+// its candidate dir and the egress is derived, and before sbxenv.yaml
+// is rendered; .romeu/, the descriptor cache and the candidate dir are
+// written before it.
 // An error it returns stops the command (rule 14 of docs/plan.md: an
 // unordered set, one rule per file, each joined by a package-level
 // var _ = register(rule{...})).

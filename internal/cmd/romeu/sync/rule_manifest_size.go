@@ -30,7 +30,8 @@ var _ = register(rule{name: "manifest-size", check: checkManifestSize})
 // each as long as the value run passes, or longer, so a manifest that
 // fits here fits at run.
 const (
-	// standInGeneration is a ULID, the form of every generation id.
+	// standInGeneration is a ULID, the form of every generation id
+	// and salvage id.
 	standInGeneration = "01j9zc2q8x7w4t6y3r5e1v9k0p"
 	// sandboxHome is the home of the workload user, where a secondary
 	// repo is cloned (REQ-0221): probe A4 measures it and kits/pins.yaml
@@ -62,17 +63,20 @@ func checkManifestSize(_ context.Context, r *run) error {
 }
 
 // sizedManifest returns the manifest of the target p with the tree t
-// and the egress eg, as large as the one romeu run passes: every gated
-// domain counts as approved, each repo has one base, and the generation
-// and the salvage cap are stand-ins of the longest form.
+// and the egress eg, as large as the one romeu passes on any exec, a
+// salvage call's included: every gated domain counts as approved, each
+// repo has one base, and the generation, the salvage id of salvageRun
+// (REQ-0223) and the salvage cap are stand-ins of the longest form.
 //
-// It holds no sharedMemory: internal/manifest has no such member yet
-// (03 3.6, the re-plan of 2026-10-28).
+// It holds no sharedMemory, which 03 3.6 lists, since
+// internal/manifest has no such member yet (the re-plan of
+// 2026-10-28): until it has, the size measured lacks that member.
 func sizedManifest(p spec.Project, t tree, eg egress.Result, commit string) (manifest.Manifest, error) {
 	m := manifest.Manifest{
 		Agent: p.Agent, Egress: eg.Effective(), Generation: standInGeneration, Project: p.Name,
 		Protocol: manifest.Protocol, Schema: manifest.Field, SpecCommit: commit,
-		Salvage: manifest.Salvage{CapBytes: math.MaxInt64},
+		Salvage:    manifest.Salvage{CapBytes: math.MaxInt64},
+		SalvageRun: &manifest.SalvageRun{ID: standInGeneration},
 	}
 	if p.Salvage != nil {
 		m.Salvage.ExcludeIgnored = p.Salvage.ExcludeIgnored

@@ -39,6 +39,7 @@ const (
 	plainKit     = "schemaVersion: \"3\"\nkind: mixin\ndisplayName: plain\ndescription: a fixture\n"
 	lifecycleKit = plainKit + "capabilities:\n  - type: com.docker.sandbox/privileged@1\n"
 	binKit       = plainKit + "args:\n  julietaBin:\n    default: \"\"\n    description: the path of julieta\n"
+	networkKit   = plainKit + "capabilities:\n  - type: com.docker.sandbox/network-policy@2\n    config:\n      install: {allow: [kit.example.com]}\n"
 )
 
 // The two workload references of the fixture: the pinned one of
@@ -100,6 +101,7 @@ func renderRun(t *testing.T) *renderFixture {
 		"plain/files/run.sh":     {Data: []byte("#!/bin/sh\n"), Mode: 0o555},
 		"withbin/withbin.yaml":   {Data: []byte(binKit), Mode: 0o444},
 		"withcaps/withcaps.yaml": {Data: []byte(lifecycleKit), Mode: 0o444},
+		"withnet/withnet.yaml":   {Data: []byte(networkKit), Mode: 0o444},
 	}
 	t.Cleanup(func() { fetchWorkload, productKits = oldFetch, oldKits })
 	return f
@@ -293,7 +295,7 @@ func TestRenderCandidatesRefusesAnOversizedManifest(t *testing.T) {
 	assert.Equal(t, ManifestSize.ID, e.ID)
 	assert.Equal(t, 2, cli.ExitCode(err))
 	assert.Contains(t, e.Hint(), "romeu sync shop")
-	assert.NoFileExists(t, filepath.Join(f.r.candidates[0].dir.Path(), render.CandidateEnvFile))
+	assert.Empty(t, f.candidates(t), "the candidate is declined, and its dir deleted, with no sbxenv.yaml rendered")
 }
 
 // TestRenderCandidatesPassesAManifestUnderTheCap: the same spec with a
@@ -320,7 +322,7 @@ func TestRenderCandidatesRefusesASpecThatSetsJulietaBin(t *testing.T) {
 			assert.Equal(t, 2, cli.ExitCode(err), "%v", err)
 			assert.Contains(t, err.Error(), "julieta-bin-reserved")
 			assert.Contains(t, err.Error(), render.JulietaBinArg)
-			assert.NoFileExists(t, filepath.Join(f.r.candidates[0].dir.Path(), render.CandidateEnvFile))
+			assert.Empty(t, f.candidates(t), "the candidate is declined before any sbxenv.yaml is rendered")
 		})
 	}
 }
@@ -398,6 +400,7 @@ func TestRenderCandidatesRefusesAHostilePersonalKit(t *testing.T) {
 			delete(after, f.in(romeuDir))
 			delete(after, f.in(render.CandidatesDir))
 			assert.Equal(t, before, after, "nothing is written outside .romeu/candidates/")
+			assert.Empty(t, f.candidates(t), "the candidate is declined")
 		})
 	}
 }
@@ -421,4 +424,110 @@ func TestRenderCandidatesGatesAKitDeclaredDomain(t *testing.T) {
 	c := f.r.candidates[0]
 	assert.Contains(t, c.set.EgressGated, gate.GatedDomain{Domain: "kit.example.com", Reason: gate.ReasonKitDeclared})
 	assert.Contains(t, c.record.Egress.Gated, render.GatedDomain{Domain: "kit.example.com", Reason: "kit"})
+}
+
+// TestRenderCandidatesGatesADomainAProductKitDeclares: a domain a
+// product kit's descriptor declares, which the catalog does not allow,
+// is gated as kit-declared in the widening set (I10).
+func TestRenderCandidatesGatesADomainAProductKitDeclares(t *testing.T) {
+	f := renderRun(t)
+	f.r.targets[0].Kits = []spec.Kit{{Product: "withnet"}}
+
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+
+	assert.Contains(t, f.r.candidates[0].set.EgressGated, gate.GatedDomain{Domain: "kit.example.com", Reason: gate.ReasonKitDeclared})
+}
+
+// TestReadKitsRefusesAKitChangedAfterItsDigest: a kit file that changes
+// between the materialization and the read-back is not the kit the
+// digest names, and the gate never sees it: the read fails closed.
+func TestReadKitsRefusesAKitChangedAfterItsDigest(t *testing.T) {
+	f := renderRun(t)
+	dir := t.TempDir()
+	m := render.KitMaterializer{FS: productKits, EnvDir: f.env, GOARCH: runtime.GOARCH}
+	kits, err := m.Materialize(t.Context(), render.Candidate{Dir: dir}, spec.Project{Kits: []spec.Kit{{Product: "plain"}}})
+	require.NoError(t, err)
+	_, err = readKits(dir, kits)
+	require.NoError(t, err, "the kit as written reads back")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, render.CandidateKitsDir, kits[0].Dir(), "plain.yaml"), []byte(lifecycleKit), 0o600))
+
+	_, err = readKits(dir, kits)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is not the kit materialized")
+}
+
+// TestRenderCandidatesExitsOneOnAnUnknownKitAndDeclinesIt: a spec kit
+// that is in neither the product kits nor the config commit (ghost)
+// stops the sync and leaves no candidate dir: the candidate is
+// declined. It exits 1, an error of no row: render exports no sentinel
+// that tells an unknown kit apart from a failure on romeu's own paths,
+// so it is not kit-refused (exit 2) until it does.
+func TestRenderCandidatesExitsOneOnAnUnknownKitAndDeclinesIt(t *testing.T) {
+	for _, kit := range []spec.Kit{{Personal: "ghost"}, {Product: "ghost"}} {
+		t.Run(kit.Product+kit.Personal+" "+map[bool]string{true: "personal", false: "product"}[kit.Personal != ""], func(t *testing.T) {
+			f := renderRun(t)
+			f.r.targets[0].Kits = []spec.Kit{kit}
+
+			err := renderCandidates(t.Context(), f.r)
+
+			require.Error(t, err)
+			assert.Equal(t, 1, cli.ExitCode(err), "%v", err)
+			assert.Contains(t, err.Error(), "ghost")
+			assert.Empty(t, f.candidates(t), "the candidate is declined")
+		})
+	}
+}
+
+// TestRenderCandidatesDeclinesEveryCandidateOnAnError: with two
+// targets, an unknown kit of the second declines the candidate of the
+// first too, so no candidate dir remains under either env dir.
+func TestRenderCandidatesDeclinesEveryCandidateOnAnError(t *testing.T) {
+	f := renderRun(t)
+	f.addTarget(t, "cart", "cart-api")
+	cart := &f.r.targets[1]
+	cart.Workload, cart.Agent, cart.Kits = workloadRef, "sbx-kit-claude", []spec.Kit{{Personal: "ghost"}}
+	f.r.trees = nil
+	require.NoError(t, makeTree(t.Context(), f.r))
+
+	err := renderCandidates(t.Context(), f.r)
+
+	require.Error(t, err)
+	require.Len(t, f.r.candidates, 1, "the first target was resolved")
+	assert.NoDirExists(t, f.r.candidates[0].dir.Path())
+	assert.Empty(t, f.candidates(t))
+	entries, err := os.ReadDir(filepath.Join(f.root, "cart-env", filepath.FromSlash(render.CandidatesDir)))
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+}
+
+// TestRenderCandidatesReadsAnIndexWorkloadEachSyncUntilStateLooksUpByPlatform
+// pins the gap of the descriptor cache for a multi-arch workload: the
+// entry is written under the digest of the platform manifest
+// (REQ-0240), the lookup is by the reference's index digest, so the
+// second sync reads the registry again. It changes when internal/state
+// looks an entry up by (workload, platform).
+func TestRenderCandidatesReadsAnIndexWorkloadEachSyncUntilStateLooksUpByPlatform(t *testing.T) {
+	f := renderRun(t)
+	const platformManifest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	f.registry = func(ref string) (oci.Fetched, error) {
+		w, err := spec.ParseWorkload(ref)
+		if err != nil {
+			return oci.Fetched{}, err
+		}
+		return oci.Fetched{Workload: w, ManifestDigest: platformManifest, Kit: oci.Kit{Capabilities: oci.Capabilities{Kind: "workload"}}}, nil
+	}
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+	f.again()
+
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+
+	assert.Equal(t, []string{workloadRef, workloadRef}, f.reads, "the second sync reads the registry again")
+	d, err := f.r.store.GetDescriptor(platformManifest)
+	require.NoError(t, err, "the entry is under the platform manifest's digest")
+	w, err := spec.ParseWorkload(workloadRef)
+	require.NoError(t, err)
+	assert.Equal(t, w.Digest, d.Workload)
+	_, err = f.r.store.GetDescriptor(w.Digest)
+	require.ErrorIs(t, err, fs.ErrNotExist, "nothing is under the index digest")
 }

@@ -6,6 +6,8 @@
 package sync
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,4 +46,32 @@ func TestSizedManifestIsTheManifestOfRun(t *testing.T) {
 	require.NoError(t, err)
 	_, err = manifest.DecodeEnv(value)
 	require.NoError(t, err)
+}
+
+// TestSizedManifestFillsEveryOptionalMember: the manifest the size rule
+// measures is at least as large as one with every optional member of
+// manifest.Manifest filled, salvageRun among them (REQ-0223), so a
+// salvage call's manifest fits whenever the rule passes. A member that
+// internal/manifest adds as optional fails this test until the size
+// rule fills it.
+func TestSizedManifestFillsEveryOptionalMember(t *testing.T) {
+	h := treeRun(t)
+	require.NoError(t, makeTree(t.Context(), h.r))
+	m, err := sizedManifest(h.r.targets[0], h.r.trees[0], egress.Result{}, "ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12")
+	require.NoError(t, err)
+
+	v := reflect.ValueOf(m)
+	for i := range v.NumField() {
+		f := v.Type().Field(i)
+		if strings.Contains(f.Tag.Get("json"), "omit") {
+			assert.False(t, v.Field(i).IsZero(), "the optional member %s is filled", f.Name)
+		}
+	}
+	full := m
+	full.SalvageRun = &manifest.SalvageRun{ID: "01j9zd0a1b2c3d4e5f6g7h8j9k"}
+	got, err := manifest.EncodedSize(m)
+	require.NoError(t, err)
+	want, err := manifest.EncodedSize(full)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, got, want)
 }
