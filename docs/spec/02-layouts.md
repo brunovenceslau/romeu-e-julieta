@@ -29,6 +29,7 @@ romeu-e-julieta/
 │  ├─ state/                   host state records, the candidate and generation state machines, descriptor cache, flock
 │  ├─ gate/                    widening set, diff, prompt
 │  ├─ preflight/              the ordered checks of 01 1.5 before a mutating sbx call
+│  ├─ memgit/                 the commit and push of the durable copy of memory (08 8.1)
 │  ├─ signing/                 ssh-agent identity listing for the git-ssh-sign rule
 │  ├─ sbxdrv/                  sbx argv builders and output parsing
 │  ├─ memstore/                memory readers on os.Root, layout allowlist, caps
