@@ -549,16 +549,20 @@ U+2033, U+301D to U+301F and U+FF02. Single quotation marks are allowed,
 because U+2019 is also the apostrophe, and other look-alikes, such as
 U+275D and U+275E, are left to review. `REQ-1148` No code that a pull request
 changes judges that pull request: `pr` runs from a workflow defined in
-the default branch, builds the default branch's commit, and reads the
-head only as data (decided on 2026-10-09; the invariant and what the
+the pull request's base branch, a branch of this repository, builds that
+branch's commit, and reads the head only as data (decided on 2026-10-09;
+the base branch in place of the default branch on 2026-10-29, so a pull
+request into a stack branch is judged too; the invariant and what the
 task that builds `pr` must show for it are in
 [05 5.3](05-security.md#53-ask-first-surfaces)). `REQ-1149` The shape of the `pr`
-job is decided: it runs on `pull_request_target` for pull requests into
-`main` (`branches: [main]`), under which GitHub runs the workflow file
-of the default branch, with `permissions: contents: read` and no secret.
-It checks out the default branch's commit (`github.sha`), with its
-`go.mod`, `go.sum`, `mise.toml` and `mise.lock`, and builds `pr` there;
-it never checks out `pull_request.base.sha`. `REQ-1150` The code of `pr` is
+job is decided: it runs on `pull_request_target` for every pull request,
+with no `branches` filter, under which GitHub runs the workflow file of
+the base branch, with `permissions: contents: read` and no secret. It
+checks out the base branch's commit (`github.sha`), with its `go.mod`,
+`go.sum`, `mise.toml` and `mise.lock`, and builds `pr` there; it never
+checks out `pull_request.base.sha`. The ruleset of `main` requires the
+check on every pull request of a stack, as if each targeted `main`, so
+the stack's branches need a base that holds this workflow. `REQ-1150` The code of `pr` is
 the approval package of `tools/ci` (`tools/ci/internal/askfirst/approval`),
 which imports the standard library, `tools/ci/git`, `internal/procgroup`
 and the YAML library, and not the framework of `tools/ci`. The step of
