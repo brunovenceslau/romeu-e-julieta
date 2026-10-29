@@ -78,7 +78,8 @@ func initRepo(t *testing.T) string {
 // fixtureModule is a module with the two commands of the repository, one
 // dependency with a license by a replace directive, and the files a
 // build reads. The fixture romeu embeds internal/embedded/julieta, which
-// no file of the tree holds: only the overlay of a build does.
+// the tree holds as an empty placeholder, as the repository does: only
+// the overlay of a build maps the julieta binary there.
 func fixtureModule(t *testing.T) string {
 	t.Helper()
 	return fixtureModuleWith(t, true)
@@ -86,7 +87,7 @@ func fixtureModule(t *testing.T) string {
 
 // fixtureModuleWith is fixtureModule with or without the package that
 // consumes the embedded julieta: without it, nothing reads
-// internal/embedded/julieta, as in the repository today.
+// internal/embedded/julieta, as before T186.
 func fixtureModuleWith(t *testing.T, consumer bool) string {
 	t.Helper()
 	dep := t.TempDir()
@@ -104,10 +105,12 @@ func fixtureModuleWith(t *testing.T, consumer bool) string {
 		"cmd/romeu/main.go": "package main\n\nimport (\n\t\"example.com/dep\"\n\t\"example.com/fixture/internal/embedded\"\n)\n\n" +
 			"var version, commit, date = \"devel\", \"unknown\", \"unknown\"\n\n" +
 			"func main() { println(dep.Name, version, commit, date, len(embedded.Julieta)) }\n",
+		"internal/embedded/julieta":     "",
 		"internal/embedded/embedded.go": "// Package embedded holds the julieta binary.\npackage embedded\n\nimport _ \"embed\"\n\n// Julieta is the embedded binary.\n//\n//go:embed julieta\nvar Julieta []byte\n",
 	}
 	if !consumer {
 		delete(files, "internal/embedded/embedded.go")
+		delete(files, "internal/embedded/julieta")
 		files["cmd/romeu/main.go"] = "package main\n\nimport \"example.com/dep\"\n\nvar version, commit, date = \"devel\", \"unknown\", \"unknown\"\n\nfunc main() { println(dep.Name, version, commit, date) }\n"
 	}
 	write(t, root, files)

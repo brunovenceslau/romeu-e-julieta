@@ -36,14 +36,15 @@ var allowedDirectives = []string{"go:build", "romeu:invariant"}
 // named from the root of the repository: a directory, with its slash,
 // covers the files below it, and a path with no trailing slash names
 // that one file. The embed directive is internal/catalog's, for its
-// entries (03 3.5, ADR 0007, Consequences), that of kits/embed.go,
-// the one embed.FS of the product kits (02 2.1, REQ-0129), the file and
-// not the rest of kits/, and internal/embedded's, for the julieta
-// binary tools/release build maps in (02 2.1, REQ-0129, REQ-0130). A go:embed pattern may not take the all:
+// entries (03 3.5, ADR 0007, Consequences), that of kits/embed.go, the
+// one embed.FS of the product kits (02 2.1, REQ-0129), the file and not
+// the rest of kits/, and that of internal/embedded/embedded.go, for the
+// julieta binary tools/release build maps in (02 2.1, REQ-0129,
+// REQ-0130), the file and not the rest of its directory. A go:embed pattern may not take the all:
 // prefix, which would embed dotfiles and files whose names begin with an
 // underscore (TestOnlyAllowedDirectives).
 var scopedDirectives = map[string][]string{
-	"go:embed": {"internal/catalog/", "kits/embed.go", "internal/embedded/"},
+	"go:embed": {"internal/catalog/", "kits/embed.go", "internal/embedded/embedded.go"},
 }
 
 // inScope reports whether file, a path from the root of the repository,
@@ -239,16 +240,16 @@ func TestDisallowed(t *testing.T) {
 	}
 }
 
-// TestAllowedIn: go:embed is allowed below internal/catalog/ and
-// internal/embedded/ and in kits/embed.go and nowhere else, go:generate at its one site, and the
-// rest everywhere.
+// TestAllowedIn: go:embed is allowed below internal/catalog/, in
+// kits/embed.go and in internal/embedded/embedded.go and nowhere else;
+// the generate directive at its one site, and the rest everywhere.
 func TestAllowedIn(t *testing.T) {
 	assert.Equal(t, allowedDirectives, allowedIn("internal/spec/spec.go"))
 	assert.Contains(t, allowedIn("internal/catalog/catalog.go"), "go:embed")
 	assert.NotContains(t, allowedIn("internal/catalogue/x.go"), "go:embed", "the prefix is a directory")
 	assert.Contains(t, allowedIn("kits/embed.go"), "go:embed")
 	assert.Contains(t, allowedIn("internal/embedded/embedded.go"), "go:embed")
-	assert.NotContains(t, allowedIn("internal/embeddedx/x.go"), "go:embed", "the prefix is a directory")
+	assert.NotContains(t, allowedIn("internal/embedded/other.go"), "go:embed", "internal/embedded/embedded.go is a file, not its directory")
 	assert.NotContains(t, allowedIn("kits/other.go"), "go:embed", "kits/embed.go is a file, not kits/")
 	assert.NotContains(t, allowedIn("kits/embed.go.bak/x.go"), "go:embed", "a file entry is not a prefix")
 	assert.NotContains(t, allowedIn("internal/kits/embed.go"), "go:embed", "the path is from the root")

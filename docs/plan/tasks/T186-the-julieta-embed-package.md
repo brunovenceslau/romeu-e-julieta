@@ -12,6 +12,11 @@ owns:
   - tools/ci/internal/imports/rows.go
   - tools/release/main.go
   - tools/release/main_test.go
+  - tools/release/internal/build/build.go
+  - tools/release/internal/build/build_test.go
+  - tools/release/internal/build/fixture_test.go
+  - tools/ci/internal/imports/imports_test.go
+  - internal/cmd/romeu/sync/step1_lock.go
   - REUSE.toml
   - docs/spec/02-layouts.md
   - docs/spec/10-testing-style.md
@@ -47,15 +52,18 @@ with T183 and T184, and which `sync` (T043) and `run`
    place of its placeholder seam, and `TestPlaceholderJulietaUntilEmbedded`
    is rewritten for an embedder that exists: today it asserts that no
    file embeds the path.
-3. The `go:embed` scope of the lint step admits `internal/embedded/`
-   (ADR 0007), and the import rows of 10 10.7 put `embedded` on the
+3. The `go:embed` scope of the lint step admits
+   `internal/embedded/embedded.go` (ADR 0007), and the import rows of 10 10.7 put `embedded` on the
    romeu-only row (REQ-0968), so julieta never links it.
 4. 02 2.1 lists `internal/embedded/` in the tree and states that the
    build maps the file with an overlay and writes nothing into the
    tree; 12's module table lists the directory under `romeu-cli`.
 5. The note `tools/release build` prints when no package consumes the
-   path names this task in place of T043, T066 and T077; `REUSE.toml`
-   covers the placeholder.
+   path no longer names T043, T066 and T077; `REUSE.toml` covers the
+   placeholder. Since `go list` names the committed placeholder with or
+   without the overlay, the build also checks that each romeu binary
+   holds the bytes of its julieta, and a release refuses one that does
+   not.
 
 - Implements: none: the consumer of REQ-0129 and REQ-0130, which T103
   and T043 implement.

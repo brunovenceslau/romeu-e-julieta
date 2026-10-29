@@ -13,8 +13,8 @@
 // and api.github.com unless --api-host names another host:port. The tree
 // must be clean; a dry run builds a dirty one only with --allow-dirty and
 // stamps it dirty. A release build also needs the tag to name HEAD and
-// at least one package of romeu to consume the embedded julieta, and a
-// dry run says plainly when none does. --out must be absent or empty and
+// each romeu binary to carry the bytes of its julieta, which a package
+// of romeu consumes, and a dry run says plainly when one does not. --out must be absent or empty and
 // is written in one rename; it defaults to a new temporary directory. The commands are in
 // tools/release/internal/build, whose doc comment says what the build
 // does; this package parses the command line and calls it, under
@@ -99,13 +99,19 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		say(stdout, "%s\n", path)
 	}
 	say(stdout, "%s\n", res.Checksums)
+	notes(stdout, res)
+	return exitOK
+}
+
+// notes says what a build that wrote its archives left out: a dirty
+// commit stamp, and a romeu that carries no julieta.
+func notes(w io.Writer, res build.Result) {
 	if res.Dirty {
-		say(stdout, "note: the tree has changes; the commit stamp is <commit>-dirty, not a clean commit\n")
+		say(w, "note: the tree has changes; the commit stamp is <commit>-dirty, not a clean commit\n")
 	}
 	if !res.Embedded {
-		say(stdout, "note: the archives carry no julieta: no package of romeu consumes %s yet (the embed package of T186 adds it), so a romeu from this build cannot pass julieta-not-embedded\n", build.EmbedPath)
+		say(w, "note: the archives carry no julieta: no package of romeu consumes %s, or the overlay did not replace its placeholder, so a romeu from this build cannot pass julieta-not-embedded\n", build.EmbedPath)
 	}
-	return exitOK
 }
 
 func say(w io.Writer, format string, args ...any) {

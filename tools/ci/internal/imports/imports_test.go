@@ -207,6 +207,14 @@ func TestImportsTable(t *testing.T) {
 			},
 		},
 		{
+			name:   "second column, julieta links the embedded julieta of romeu",
+			change: map[string]pkg{"internal/embedded": {}, "internal/cmd/julieta/all": {imports: []string{"internal/cmd/julieta/version", "internal/embedded"}}},
+			want: []string{
+				"cmd/julieta: imports binary: links internal/embedded, which the row of REQ-0968 does not let julieta link (10 10.7, second column)",
+				"internal/cmd/julieta/all: imports link: imports internal/embedded, which julieta may not link, and julieta may link this package (10 10.7, second column)",
+			},
+		},
+		{
 			name:   "second column, a binary links the package no binary may link",
 			change: map[string]pkg{"cmd/romeu": {imports: []string{"internal/cmd/romeu/all", "internal/cli/clidoc"}}},
 			want: []string{

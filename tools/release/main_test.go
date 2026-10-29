@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/tools/release/internal/build"
 )
 
 // chdirRoot runs the rest of the test in the root of the repository.
@@ -80,4 +82,19 @@ func TestRunUsage(t *testing.T) {
 			assert.Contains(t, stderr.String(), "usage:")
 		})
 	}
+}
+
+// TestNotes: a build that carries no julieta says so, and a dirty one
+// says its stamp is dirty; a clean build that embeds julieta says
+// nothing.
+func TestNotes(t *testing.T) {
+	t.Parallel()
+	var none bytes.Buffer
+	notes(&none, build.Result{Embedded: true})
+	assert.Empty(t, none.String())
+
+	var both bytes.Buffer
+	notes(&both, build.Result{Dirty: true})
+	assert.Contains(t, both.String(), "note: the tree has changes")
+	assert.Contains(t, both.String(), "note: the archives carry no julieta: no package of romeu consumes internal/embedded/julieta")
 }

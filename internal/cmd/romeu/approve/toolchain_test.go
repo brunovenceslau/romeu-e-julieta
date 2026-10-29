@@ -419,6 +419,7 @@ func embedsPath(dir, pattern, target string) bool {
 //
 //romeu:invariant I7 test
 func TestGate1ReadsTheEmbeddedJulieta(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile(filepath.Join(moduleRoot, "tools", "release", "internal", "build", "build.go"))
 	require.NoError(t, err)
 	require.Contains(t, string(src), `const EmbedPath = "`+releaseEmbedPath+`"`, "build.EmbedPath moved: update releaseEmbedPath")
@@ -453,7 +454,14 @@ func TestGate1ReadsTheEmbeddedJulieta(t *testing.T) {
 	assert.Equal(t, julietaOf(nil, v), julietaOf([]byte{}, v), "an empty embed is the placeholder too")
 	assert.Equal(t, state.JulietaBinary{Version: "v1.2.3", Protocol: 1, SHA256: sha256.Sum256([]byte("a julieta"))}, julietaOf([]byte("a julieta"), v),
 		"a release's julieta carries romeu's version and its own sha256")
+}
 
+// TestMeasureRecordsTheEmbeddedJulieta: Measure records the julieta of
+// the bytes the binary embeds. Not parallel: it replaces the seam.
+//
+//romeu:invariant I7 test
+func TestMeasureRecordsTheEmbeddedJulieta(t *testing.T) {
+	v := cli.Version{Version: "v1.2.3", Protocol: 1}
 	old := embeddedJulieta
 	embeddedJulieta = func() []byte { return []byte("a julieta") }
 	t.Cleanup(func() { embeddedJulieta = old })
