@@ -2,8 +2,11 @@
 
 Pointers only; each linked file holds the rule.
 
-- Current state and next steps: `docs/handoff/now.md`. What the handoff
-  tree is: `docs/handoff/about.md`.
+- Current state and next steps: the open handoff entry of `julieta
+  memory` (the SessionStart hook prints it; `julieta memory list`).
+  Anything worth keeping goes into `julieta memory`, never into
+  `docs/handoff/`, which is read-only since 2026-10-29 until T176 moves
+  what it holds (`docs/handoff/about.md`).
 - Specification: `docs/spec.md` and `docs/spec/`. Build plan:
   `docs/plan.md` and `docs/plan/tasks/`.
 - Ask-first surfaces: the list is `.github/ask-first.yaml`; how a change
