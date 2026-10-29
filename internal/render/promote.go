@@ -560,13 +560,13 @@ func readSnapshot(root *os.Root, cand string) (snapshot, error) {
 	}
 	snap := snapshot{digest: digest, kits: map[string][]gate.File{}}
 	for _, f := range files {
-		switch {
-		case f.Path == CandidateRecord:
+		switch f.Path {
+		case CandidateRecord:
 			snap.record, err = DecodeRecord(f.Data)
 			if err != nil {
 				return snapshot{}, err
 			}
-		case f.Path == CandidateEnvFile:
+		case CandidateEnvFile:
 			snap.env = f.Data
 		default:
 			if rest, ok := strings.CutPrefix(f.Path, CandidateKitsDir+"/"); ok {
