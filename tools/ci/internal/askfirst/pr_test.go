@@ -422,34 +422,35 @@ func TestPRTemplateHasNoApprovalLine(t *testing.T) {
 // either caller turns it red.
 func TestPROneReader(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi os.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	entries, err := os.ReadDir(".")
 	require.NoError(t, err)
 	calls := map[string]map[string]bool{}
-	for _, pkg := range pkgs {
-		for _, f := range pkg.Files {
-			for _, d := range f.Decls {
-				fn, ok := d.(*ast.FuncDecl)
-				if !ok || fn.Body == nil {
-					continue
-				}
-				called := map[string]bool{}
-				ast.Inspect(fn.Body, func(n ast.Node) bool {
-					if c, ok := n.(*ast.CallExpr); ok {
-						switch fun := c.Fun.(type) {
-						case *ast.Ident:
-							called[fun.Name] = true
-						case *ast.SelectorExpr:
-							if x, ok := fun.X.(*ast.Ident); ok {
-								called[x.Name+"."+fun.Sel.Name] = true
-							}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, e.Name(), nil, 0)
+		require.NoError(t, err)
+		for _, d := range f.Decls {
+			fn, ok := d.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			called := map[string]bool{}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				if c, ok := n.(*ast.CallExpr); ok {
+					switch fun := c.Fun.(type) {
+					case *ast.Ident:
+						called[fun.Name] = true
+					case *ast.SelectorExpr:
+						if x, ok := fun.X.(*ast.Ident); ok {
+							called[x.Name+"."+fun.Sel.Name] = true
 						}
 					}
-					return true
-				})
-				calls[fn.Name.Name] = called
-			}
+				}
+				return true
+			})
+			calls[fn.Name.Name] = called
 		}
 	}
 	assert.True(t, calls["CodeownersOutput"]["Parse"], "the generator reads the list with Parse")
