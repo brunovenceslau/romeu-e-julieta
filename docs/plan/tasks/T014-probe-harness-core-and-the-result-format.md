@@ -12,6 +12,7 @@ after: []
 ask_first:
   - checks
   - dependencies
+  - formats
 sitting: none
 ---
 

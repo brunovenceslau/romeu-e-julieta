@@ -24,6 +24,7 @@ after:
   - T178
 ask_first:
   - kits
+  - formats
 sitting: none
 ---
 
