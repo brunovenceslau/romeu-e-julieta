@@ -53,14 +53,18 @@ the gitHosts allowlist did not see.
 - `REQ-1312` `http.followRedirects=false` keeps a clone or a fetch on the
   host CheckURL saw: git does not follow a server that answers with an
   HTTP redirect (a moved or renamed repository), so no part of the
-  transfer reaches a host the operator never named (decided on
-  2026-10-23). `REQ-1313` Such a clone or fetch fails with `ErrMoved`, a
-  plain error of gitsafe that names the URL asked for and its status
-  and says to set the repository's new URL in the spec or the
-  settings; git does not print where the redirect points, and a
-  redirect for another reason (a login page, a URL without `.git`)
-  fails the same way. The error has no id of 04 4.4; deferred: an id,
-  until a command needs a stable exit code or slug for it. Sandbox
+  transfer reaches a host the operator never named, a local rewrite of
+  REQ-0463 aside (decided on 2026-10-23). `REQ-1313` Such a clone or
+  fetch fails with `ErrMoved`, a plain error of gitsafe that names the
+  URL asked for and its status and says to set the repository's new
+  URL in the spec or the settings; git does not print where the
+  redirect points, and a redirect for another reason (a login page, a
+  URL without `.git`) fails the same way. A redirect of a later
+  request of smart HTTP is refused too, and fails with git's own
+  error. gitsafe reads the error from git's standard error, which a
+  server can write to, so `ErrMoved` is advice to the operator and no
+  decision branches on it. The error has no id of 04 4.4; deferred: an
+  id, until a command needs a stable exit code or slug for it. Sandbox
   mode does not set the key, since `http.*` stays the sandbox's own
   (below) and its egress goes through the proxy. A host clone's local
   `http.<url>.followRedirects` outranks the flag, as git ranks a key
@@ -69,7 +73,7 @@ the gitHosts allowlist did not see.
   take the key: a plain `git` the operator runs there follows git's
   default and prints where it is redirected. Deferred: the key in
   REQ-0468; trigger: romeu runs a fetch in a review checkout, or
-  REQ-0468 is reopened. These three choices are provisional (decided on
+  REQ-0468 is reopened. These choices are provisional (decided on
   2026-10-29).
 - `REQ-0461` Fetch always uses an explicit URL and refspecs, `--no-tags --no-prune
   --no-recurse-submodules --no-write-fetch-head`, never a remote name

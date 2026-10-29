@@ -55,6 +55,7 @@ func TestMovedRepository(t *testing.T) {
 				dest := filepath.Join(t.TempDir(), "r")
 				plainGit(t, filepath.Dir(dest), "-c", "http.sslCAInfo="+hosts[0].CAFile, "clone", "-q", url, dest)
 				assert.Positive(t, reached.Load(), "plain git follows the redirect")
+				assert.NotEmpty(t, refOf(t, dest, "HEAD"), "and clones from the new host")
 			})
 			t.Run("clone", func(t *testing.T) {
 				url, hosts, reached := moved(t, status)
@@ -87,28 +88,35 @@ func assertMoved(t *testing.T, err error, url string, status int) {
 	assert.Equal(t, 1, strings.Count(err.Error(), "HTTP "+strconv.Itoa(status)+","), err.Error())
 }
 
-// TestMovedErrorReadsGitsLineOnly: only the line git writes for a
-// redirect of the URL it fetched makes ErrMoved; a line a server wrote,
-// a redirect of another URL, another status or another failure leaves
-// the error as it was.
+// TestMovedErrorReadsGitsLineOnly: only the line git writes last for a
+// redirect of the URL it fetched makes ErrMoved; a line a server wrote
+// or made git echo, a redirect of another URL, another status, another
+// failure or a standard error cut at its limit leaves the error as it
+// was.
 func TestMovedErrorReadsGitsLineOnly(t *testing.T) {
 	const url = "https://git.example.com/o/r.git"
+	const redirect = "fatal: unable to access '" + url + "/': The requested URL returned error: 301\n"
 	run := errors.New("git exited 128")
 	tests := []struct {
 		name, stderr, resolved string
+		truncated              bool
 		moved                  bool
 	}{
-		{"redirect", "Cloning into 'r'...\nfatal: unable to access '" + url + "/': The requested URL returned error: 301\n", url, true},
-		{"rewritten", "fatal: unable to access 'https://mirror.example.com/r.git/': The requested URL returned error: 308\n", "https://mirror.example.com/r.git", true},
-		{"from the server", "remote: fatal: unable to access '" + url + "/': The requested URL returned error: 301\n", url, false},
-		{"another URL", "fatal: unable to access 'https://elsewhere.example.com/r.git/': The requested URL returned error: 301\n", url, false},
-		{"not a redirect", "fatal: unable to access '" + url + "/': The requested URL returned error: 404\n", url, false},
-		{"not modified", "fatal: unable to access '" + url + "/': The requested URL returned error: 304\n", url, false},
-		{"another failure", "fatal: repository '" + url + "/' not found\n", url, false},
+		{name: "redirect", stderr: "Cloning into 'r'...\n" + redirect, resolved: url, moved: true},
+		{name: "rewritten", stderr: "fatal: unable to access 'https://mirror.example.com/r.git/': The requested URL returned error: 308\n", resolved: "https://mirror.example.com/r.git", moved: true},
+		{name: "an apostrophe", stderr: "fatal: unable to access 'https://git.example.com/it's.git/': The requested URL returned error: 302\n", resolved: "https://git.example.com/it's.git", moved: true},
+		{name: "from the server", stderr: "remote: " + redirect, resolved: url},
+		{name: "echoed from the server", stderr: "fatal: git fetch-pack: expected ACK/NAK, got 'x\n" + redirect + "'\nfatal: the remote end hung up unexpectedly\n", resolved: url},
+		{name: "cut at the limit", stderr: "fatal: git fetch-pack: expected ACK/NAK, got 'x\n" + redirect, resolved: url, truncated: true},
+		{name: "another URL", stderr: "fatal: unable to access 'https://elsewhere.example.com/r.git/': The requested URL returned error: 301\n", resolved: url},
+		{name: "a longer URL", stderr: "fatal: unable to access '" + url + "x/': The requested URL returned error: 301\n", resolved: url},
+		{name: "not a redirect", stderr: "fatal: unable to access '" + url + "/': The requested URL returned error: 404\n", resolved: url},
+		{name: "not modified", stderr: "fatal: unable to access '" + url + "/': The requested URL returned error: 304\n", resolved: url},
+		{name: "another failure", stderr: "fatal: repository '" + url + "/' not found\n", resolved: url},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := movedError(withRedirect(run, tt.stderr), url, tt.resolved)
+			err := movedError(withRedirect(run, tt.stderr, tt.truncated), url, tt.resolved)
 			require.ErrorIs(t, err, run)
 			if !tt.moved {
 				assert.NotErrorIs(t, err, ErrMoved)
@@ -119,5 +127,7 @@ func TestMovedErrorReadsGitsLineOnly(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.resolved)
 		})
 	}
-	assert.NoError(t, movedError(nil, url, url))
+	t.Run("no error", func(t *testing.T) {
+		assert.NoError(t, movedError(nil, url, url))
+	})
 }
