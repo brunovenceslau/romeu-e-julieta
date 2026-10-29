@@ -27,12 +27,15 @@ var (
 	// check while render.json holds promoting: recovery runs first
 	// (REQ-0087), and an interrupted promotion is never drift.
 	ErrPromotionInterrupted = errors.New("render: a promotion was interrupted; recovery runs first")
-	// ErrPromotionAbandoned is recovery's report of a promotion whose
-	// candidate no longer verifies before the commit point: the caller
-	// maps it to interrupted-promotion-abandoned, exit 4 (REQ-0429).
-	ErrPromotionAbandoned = errors.New("render: the interrupted promotion was abandoned; its candidate no longer verifies")
-	// ErrKitDirDiffers is step 2's refusal of a live kit dir whose
-	// content is not its digest: a kit dir is verified, never rewritten.
+	// ErrPromotionAbandoned is recovery's report of a promotion it could
+	// not finish: the caller maps it to interrupted-promotion-abandoned,
+	// exit 4 (REQ-0429).
+	ErrPromotionAbandoned = errors.New("render: the interrupted promotion was abandoned")
+	// ErrNotApproved is Promote's refusal of a candidate whose widening
+	// digest is not the one approved.
+	ErrNotApproved = errors.New("render: the candidate is not the one approved")
+	// ErrKitDirDiffers is the refusal of a live kit dir whose content is
+	// not its digest: a kit dir is verified, never rewritten.
 	ErrKitDirDiffers = errors.New("render: a live kit dir differs from its digest")
 )
 
@@ -43,19 +46,20 @@ const (
 	// RecoveryNone means render.json held no promoting, so there was
 	// nothing to recover.
 	RecoveryNone Recovery = iota
-	// RecoveryFinished means the promotion was finished by repeating steps 2
-	// to 4.
+	// RecoveryFinished means the promotion was finished by repeating
+	// steps 2 to 4.
 	RecoveryFinished
-	// RecoveryAbandoned means the promotion was abandoned (ErrPromotionAbandoned).
+	// RecoveryAbandoned means the promotion was abandoned
+	// (ErrPromotionAbandoned).
 	RecoveryAbandoned
 )
 
 // WorkspaceFile is one workspace file step 2 writes whole (REQ-0048):
-// derived from host state, under $ROMEU_ROOT rather than <name>-env/,
-// so render.json holds no digest of it.
+// derived from host state, in $ROMEU_ROOT rather than <name>-env/, so
+// render.json holds no digest of it.
 type WorkspaceFile struct {
-	// Path is the absolute path of the file.
-	Path string
+	// Name is DevWorkspaceFile or ReviewWorkspaceFile.
+	Name string
 	// Data is its bytes.
 	Data []byte
 }
@@ -64,6 +68,9 @@ type WorkspaceFile struct {
 // writes that does not come from the candidate: the julieta binary and
 // the workspace files.
 type Live struct {
+	// Root is the absolute path of $ROMEU_ROOT, which holds the
+	// workspace files.
+	Root string
 	// EnvDir is the absolute path of <name>-env/.
 	EnvDir string
 	// Bin is the julieta binary and SHA256SUMS of .romeu/bin.
@@ -76,13 +83,24 @@ type Live struct {
 	afterStep func(step int) error
 }
 
+// snapshot is a candidate dir read once into memory: what the
+// promotion verifies is what it writes, whatever the dir holds later.
+type snapshot struct {
+	digest canon.Sum[canon.CandidateFilesKind]
+	record Record
+	env    []byte
+	// kits are the files of each kit dir, by the dir's name.
+	kits map[string][]gate.File
+}
+
 // Promote runs the promotion commit of 01 1.6 for the candidate c,
-// which holds the render.json the gate approved: (1) render.json with
+// whose widening digest must be approved: (1) render.json with
 // promoting, (2) the kit dirs, .romeu/bin and the workspace files,
 // (3) sbxenv.yaml renamed into place, the commit point, (4) render.json
 // without promoting, the candidate dir and the unreferenced kit dirs
-// deleted. The caller holds the lock and has run Recover.
-func (l Live) Promote(c Candidate) error {
+// deleted. What can fail on the candidate's content is checked before
+// step 1. The caller holds the lock and has run Recover.
+func (l Live) Promote(c Candidate, approved canon.Sum[canon.WideningKind]) error {
 	root, err := os.OpenRoot(l.EnvDir)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
@@ -102,44 +120,47 @@ func (l Live) Promote(c Candidate) error {
 	if found && live.Promoting != nil {
 		return ErrPromotionInterrupted
 	}
-	next, err := readCandidateRecord(root, candidateDir(id))
+	snap, err := readSnapshot(root, candidateDir(id))
 	if err != nil {
 		return err
 	}
-	digest, err := CandidateFilesDigest(c.Dir)
-	if err != nil {
+	if snap.record.WideningDigest != approved {
+		return ErrNotApproved
+	}
+	if err := l.preflight(root, snap); err != nil {
 		return err
 	}
 	// Step 1 keeps the live record whole and adds the marker, so an
 	// abandoned promotion leaves nothing of the candidate live. Before
 	// the first promotion there is no live record: the candidate's
-	// stands in with no files, since nothing is live to describe.
+	// stands in with no files, and an abandon removes it again.
 	marker := live
 	if !found {
-		marker = next
+		marker = snap.record
 		marker.Files = map[string]string{}
 	}
-	marker.Promoting = &Promoting{CandidateID: id, FilesDigest: digest, PreviousFiles: maps.Clone(marker.Files)}
+	marker.Promoting = &Promoting{CandidateID: id, FilesDigest: snap.digest, PreviousFiles: maps.Clone(marker.Files)}
 	if err := writeLiveRecord(root, marker); err != nil {
 		return err
 	}
 	if err := l.step(1); err != nil {
 		return err
 	}
-	return l.finish(root, next, candidateDir(id))
+	return l.finish(root, snap, candidateDir(id))
 }
 
 // Recover finishes or abandons a promotion that render.json says was
 // interrupted (REQ-0087). It runs after the lock in every mutating
 // command. A candidate that still verifies against its filesDigest is
 // finished by repeating steps 2 to 4, each idempotent, with the record
-// the candidate holds, which the digest covers. Otherwise the live
-// record, which step 1 kept whole, is written back without promoting
-// and with the digests of what step 2 had written, and the result is
-// ErrPromotionAbandoned. Before the commit point the old live
-// sbxenv.yaml and its kit dirs are intact; after it, the live
-// sbxenv.yaml is the approved candidate's, and the next drift check
-// names it, since no trusted digest of it is left.
+// the candidate holds, which the digest covers. Otherwise, or when the
+// finish fails, the live record, which step 1
+// kept whole, is written back without promoting and with the digests of
+// what step 2 had written, and the result is ErrPromotionAbandoned.
+// Before the commit point the old live sbxenv.yaml and its kit dirs are
+// intact; after it, the live sbxenv.yaml is the approved candidate's,
+// and the next drift check names it, since no trusted digest of it is
+// left.
 func (l Live) Recover() (Recovery, error) {
 	root, err := os.OpenRoot(l.EnvDir)
 	if err != nil {
@@ -151,24 +172,28 @@ func (l Live) Recover() (Recovery, error) {
 		return RecoveryNone, err
 	}
 	cand := candidateDir(rec.Promoting.CandidateID)
-	verifies, err := candidateVerifies(root, *rec.Promoting)
-	if err != nil {
-		return RecoveryNone, err
-	}
-	if verifies {
-		next, err := readCandidateRecord(root, cand)
-		if err != nil {
+	// A candidate that cannot be read, or holds what is not a regular
+	// file, does not verify.
+	snap, err := readSnapshot(root, cand)
+	if err == nil && snap.digest == rec.Promoting.FilesDigest {
+		ferr := l.preflight(root, snap)
+		if ferr == nil {
+			ferr = l.finish(root, snap, cand)
+		}
+		if ferr == nil {
+			return RecoveryFinished, nil
+		}
+		// A finish that fails would fail again on every command: abandon
+		// it, so the next sync renders afresh.
+		if err := l.abandon(root, rec); err != nil {
 			return RecoveryNone, err
 		}
-		if err := l.finish(root, next, cand); err != nil {
-			return RecoveryNone, err
-		}
-		return RecoveryFinished, nil
+		return RecoveryAbandoned, fmt.Errorf("%w: %w", ErrPromotionAbandoned, ferr)
 	}
 	if err := l.abandon(root, rec); err != nil {
 		return RecoveryNone, err
 	}
-	return RecoveryAbandoned, ErrPromotionAbandoned
+	return RecoveryAbandoned, fmt.Errorf("%w: its candidate no longer verifies", ErrPromotionAbandoned)
 }
 
 // Interrupted reports whether render.json holds promoting. It takes no
@@ -183,16 +208,82 @@ func Interrupted(envDir string) (bool, error) {
 	return found && rec.Promoting != nil, err
 }
 
-// finish runs steps 2 to 4 for next, the candidate's record, whose dir
-// is cand.
-func (l Live) finish(root *os.Root, next Record, cand string) error {
-	if err := l.writeDerived(root, next, cand); err != nil {
+// preflight checks, before any write, what makes step 2 or 3 fail on
+// the candidate's content: each kit path of its record in the form
+// <kit>-<digest12> of its digest, each kit dir present in the
+// candidate with that digest, a live kit dir of that name with it too,
+// the bin digests of the julieta this romeu embeds, and the candidate's
+// sbxenv.yaml with its recorded digest.
+func (l Live) preflight(root *os.Root, snap snapshot) error {
+	files := snap.record.Files
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		if !isKitPath(p) {
+			continue
+		}
+		name := path.Base(p)
+		if path.Dir(p) != LiveKitsDir || strings.HasPrefix(name, ".tmp-") || !kitDirName.MatchString(name) ||
+			!strings.HasPrefix(files[p], name[len(name)-12:]) {
+			return fmt.Errorf("render: render.json names the kit dir %s, which is not <kit>-<digest12> of its digest", p)
+		}
+		kit, ok := snap.kits[name]
+		if !ok {
+			return fmt.Errorf("render: the candidate has no kit dir %s", name)
+		}
+		got, err := gate.KitTreeDigest(kit)
+		if err != nil {
+			return err
+		}
+		if got.String() != files[p] {
+			return fmt.Errorf("render: the candidate's kit dir %s is not the one render.json names", name)
+		}
+		if ok, err := liveExists(root, p); err != nil {
+			return err
+		} else if ok {
+			live, err := kitDirDigest(root, p)
+			if err != nil {
+				return err
+			}
+			if live != files[p] {
+				return fmt.Errorf("%w: %s", ErrKitDirDiffers, p)
+			}
+		}
+	}
+	for p, d := range l.Bin.Files() {
+		if files[p] != d {
+			return fmt.Errorf("render: render.json holds another digest for %s than the julieta this romeu embeds", p)
+		}
+	}
+	if snap.env == nil || plainSum(snap.env) != files[LiveEnvFile] {
+		return fmt.Errorf("render: the candidate's sbxenv.yaml is not the one render.json names")
+	}
+	for _, w := range l.Workspace {
+		if w.Name != DevWorkspaceFile && w.Name != ReviewWorkspaceFile {
+			return fmt.Errorf("render: %q is not a workspace file", w.Name)
+		}
+	}
+	return nil
+}
+
+// finish runs steps 2 to 4 for the candidate snap, whose dir is cand.
+func (l Live) finish(root *os.Root, snap snapshot, cand string) error {
+	next := snap.record
+	for _, p := range slices.Sorted(maps.Keys(next.Files)) {
+		if isKitPath(p) {
+			if err := ensureKitDir(root, p, snap.kits[path.Base(p)]); err != nil {
+				return err
+			}
+		}
+	}
+	if err := l.Bin.WriteTo(root); err != nil {
+		return err
+	}
+	if err := l.writeWorkspace(); err != nil {
 		return err
 	}
 	if err := l.step(2); err != nil {
 		return err
 	}
-	if err := commitEnv(root, next, cand); err != nil {
+	if err := commitEnv(root, next.Files[LiveEnvFile], snap.env); err != nil {
 		return err
 	}
 	if err := l.step(3); err != nil {
@@ -208,67 +299,39 @@ func (l Live) finish(root *os.Root, next Record, cand string) error {
 	return pruneKitDirs(root, next.Files)
 }
 
-// writeDerived is step 2: each kit dir rec names, copied from the
-// candidate when it is not live yet, the bin and the workspace files.
-func (l Live) writeDerived(root *os.Root, rec Record, cand string) error {
-	for _, p := range slices.Sorted(maps.Keys(rec.Files)) {
-		if !isKitPath(p) {
-			continue
-		}
-		if err := ensureKitDir(root, p, rec.Files[p], path.Join(cand, CandidateKitsDir, path.Base(p))); err != nil {
-			return err
-		}
-	}
-	for p, d := range l.Bin.Files() {
-		if rec.Files[p] != d {
-			return fmt.Errorf("render: render.json holds another digest for %s than the julieta this romeu embeds", p)
-		}
-	}
-	if err := l.Bin.WriteTo(root); err != nil {
-		return err
-	}
-	for _, w := range l.Workspace {
-		if err := writeWorkspace(w); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// commitEnv is step 3, the commit point: the candidate's sbxenv.yaml,
-// checked against its digest, replaces the live one by rename. The
-// candidate keeps its copy, so it still verifies until step 4. A live
-// file that is already the new one is left as it is.
-func commitEnv(root *os.Root, rec Record, cand string) error {
-	want := rec.Files[LiveEnvFile]
+// commitEnv is step 3, the commit point: env, whose digest is want,
+// replaces the live sbxenv.yaml by rename. A live file that is already
+// the new one is left as it is.
+func commitEnv(root *os.Root, want string, env []byte) error {
 	done, err := liveMatches(root, LiveEnvFile, want)
 	if err != nil || done {
 		return err
 	}
-	data, err := root.ReadFile(path.Join(cand, CandidateEnvFile))
-	if err != nil {
-		return fmt.Errorf("render: read the candidate's sbxenv.yaml: %w", err)
-	}
-	if plainSum(data) != want {
-		return fmt.Errorf("render: the candidate's sbxenv.yaml is not the one render.json names")
-	}
-	if err := replaceFile(root, LiveEnvFile, data, FileMode); err != nil {
+	if err := replaceFile(root, LiveEnvFile, env, FileMode); err != nil {
 		return err
 	}
 	return syncDir(root)
 }
 
 // abandon writes the live record back without promoting: the previous
-// digests, plus the digests of what step 2 had written, each read from
-// the live file and trusted without the candidate: the bin files whose
-// content is the julieta this romeu embeds, and each kit dir whose
-// kit-tree digest begins with the 12 hex digits of its own name. Then
-// it deletes the candidate dir.
+// digests, plus the digests of what step 2 had written that the
+// previous record does not name, each read from the live file and
+// trusted without the candidate: the bin files whose content is the
+// julieta this romeu embeds, and each kit dir whose kit-tree digest
+// begins with the 12 hex digits of its own name. A dir that cannot be
+// read is left out. An abandoned first promotion has no previous record
+// to write back, so its render.json is removed. Then the candidate dir
+// is deleted.
 func (l Live) abandon(root *os.Root, rec Record) error {
-	files := maps.Clone(rec.Promoting.PreviousFiles)
-	if files == nil {
-		files = map[string]string{}
+	cand := candidateDir(rec.Promoting.CandidateID)
+	previous := rec.Promoting.PreviousFiles
+	if len(previous) == 0 {
+		if err := removeFirstRecord(root); err != nil {
+			return err
+		}
+		return removeCandidateDir(root, cand)
 	}
+	files := maps.Clone(previous)
 	for p, d := range l.Bin.Files() {
 		ok, err := liveMatches(root, p, d)
 		if err != nil {
@@ -284,19 +347,15 @@ func (l Live) abandon(root *os.Root, rec Record) error {
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if !e.IsDir() || strings.HasPrefix(name, ".tmp-") || !kitDirName.MatchString(name) {
+		p := path.Join(LiveKitsDir, name)
+		if _, known := previous[p]; known || !e.IsDir() || strings.HasPrefix(name, ".tmp-") || !kitDirName.MatchString(name) {
 			continue
 		}
-		p := path.Join(LiveKitsDir, name)
 		d, err := kitDirDigest(root, p)
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(d, name[len(name)-12:]) {
+		if err == nil && strings.HasPrefix(d, name[len(name)-12:]) {
 			files[p] = d
 		}
 	}
-	cand := candidateDir(rec.Promoting.CandidateID)
 	rec.Files = files
 	rec.Promoting = nil
 	if err := writeLiveRecord(root, rec); err != nil {
@@ -305,38 +364,13 @@ func (l Live) abandon(root *os.Root, rec Record) error {
 	return removeCandidateDir(root, cand)
 }
 
-// ensureKitDir makes the live kit dir p hold the kit of digest want: a
-// dir that exists is verified, never rewritten; a missing one is copied
-// from the candidate's kit dir src into a temporary dir, checked, and
-// renamed to its new name.
-func ensureKitDir(root *os.Root, p, want, src string) error {
-	if _, err := root.Stat(p); err == nil {
-		got, err := kitDirDigest(root, p)
-		if err != nil {
-			return err
-		}
-		if got != want {
-			return fmt.Errorf("%w: %s", ErrKitDirDiffers, p)
-		}
-		return nil
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("render: %w", err)
-	}
-	sub, err := root.OpenRoot(src)
-	if err != nil {
-		return fmt.Errorf("render: the candidate has no kit dir for %s: %w", p, err)
-	}
-	files, err := kitFiles(sub.FS())
-	_ = sub.Close()
-	if err != nil {
-		return fmt.Errorf("render: read the candidate's kit dir %s: %w", src, err)
-	}
-	got, err := gate.KitTreeDigest(files)
-	if err != nil {
+// ensureKitDir makes the live kit dir p hold files: a dir that exists,
+// which preflight verified under the lock, is never rewritten; a
+// missing one is written into a temporary dir and renamed to its new
+// name.
+func ensureKitDir(root *os.Root, p string, files []gate.File) error {
+	if ok, err := liveExists(root, p); err != nil || ok {
 		return err
-	}
-	if got.String() != want {
-		return fmt.Errorf("render: the candidate's kit dir %s is not the one render.json names", src)
 	}
 	tmp := path.Join(LiveKitsDir, ".tmp-"+path.Base(p))
 	if err := removeKitTemp(root, tmp); err != nil {
@@ -408,6 +442,17 @@ func removeCandidateDir(root *os.Root, cand string) error {
 	return nil
 }
 
+// removeFirstRecord deletes the render.json an abandoned first
+// promotion wrote at its step 1, where none was before, so nothing of
+// the candidate is recorded as live. It is an admitted call site of the
+// I16 scan (05 5.2).
+func removeFirstRecord(root *os.Root) error {
+	if err := root.Remove(LiveRecord); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("render: %w", err)
+	}
+	return nil
+}
+
 // kitDirName is the form of a kit dir's name, <kit>-<digest12>, and of
 // the temporary dir step 2 copies it into, .tmp-<kit>-<digest12>.
 var kitDirName = regexp.MustCompile(`^(?:\.tmp-)?[a-z0-9][a-z0-9-]*-[0-9a-f]{12}$`)
@@ -438,18 +483,22 @@ func pruneKitDirs(root *os.Root, files map[string]string) error {
 	return nil
 }
 
-// writeWorkspace replaces one workspace file by the atomic write rule.
-func writeWorkspace(w WorkspaceFile) error {
-	if !filepath.IsAbs(w.Path) {
-		return fmt.Errorf("render: the workspace file %s is not an absolute path", w.Path)
+// writeWorkspace replaces each workspace file in l.Root by the atomic
+// write rule, through an os.Root on $ROMEU_ROOT.
+func (l Live) writeWorkspace() error {
+	if len(l.Workspace) == 0 {
+		return nil
 	}
-	dir, err := os.OpenRoot(filepath.Dir(w.Path))
+	dir, err := os.OpenRoot(l.Root)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
 	defer func() { _ = dir.Close() }()
-	if err := replaceFile(dir, filepath.Base(w.Path), w.Data, FileMode); err != nil {
-		return err
+	for _, w := range l.Workspace {
+		// preflight held each name to the two workspace files.
+		if err := replaceFile(dir, w.Name, w.Data, FileMode); err != nil {
+			return err
+		}
 	}
 	return syncDir(dir)
 }
@@ -492,30 +541,55 @@ func readLiveRecord(root *os.Root) (rec Record, found bool, err error) {
 	return rec, true, nil
 }
 
-// readCandidateRecord reads the render.json of the candidate dir cand.
-func readCandidateRecord(root *os.Root, cand string) (Record, error) {
-	data, err := root.ReadFile(path.Join(cand, CandidateRecord))
+// readSnapshot reads the candidate dir cand once: its candidate-files
+// digest, and the record, the sbxenv.yaml and the kit files taken from
+// the bytes the digest covers.
+func readSnapshot(root *os.Root, cand string) (snapshot, error) {
+	sub, err := root.OpenRoot(cand)
 	if err != nil {
-		return Record{}, fmt.Errorf("render: read the candidate's render.json: %w", err)
-	}
-	return DecodeRecord(data)
-}
-
-// candidateVerifies reports whether the candidate dir of p still holds
-// the files whose digest p recorded; a missing dir does not verify.
-func candidateVerifies(root *os.Root, p Promoting) (bool, error) {
-	sub, err := root.OpenRoot(candidateDir(p.CandidateID))
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("render: %w", err)
+		return snapshot{}, fmt.Errorf("render: %w", err)
 	}
 	defer func() { _ = sub.Close() }()
-	// A candidate that cannot be read, or holds what is not a regular
-	// file, does not verify.
-	got, err := candidateFilesDigest(sub.FS())
-	return err == nil && got == p.FilesDigest, nil
+	files, err := candidateTree(sub.FS())
+	if err != nil {
+		return snapshot{}, err
+	}
+	digest, err := candidateFilesDigest(files)
+	if err != nil {
+		return snapshot{}, err
+	}
+	snap := snapshot{digest: digest, kits: map[string][]gate.File{}}
+	for _, f := range files {
+		switch {
+		case f.Path == CandidateRecord:
+			snap.record, err = DecodeRecord(f.Data)
+			if err != nil {
+				return snapshot{}, err
+			}
+		case f.Path == CandidateEnvFile:
+			snap.env = f.Data
+		default:
+			if rest, ok := strings.CutPrefix(f.Path, CandidateKitsDir+"/"); ok {
+				if name, inner, ok := strings.Cut(rest, "/"); ok {
+					snap.kits[name] = append(snap.kits[name], gate.File{Path: inner, Mode: f.Mode, Data: f.Data})
+				}
+			}
+		}
+	}
+	if snap.record.Schema == "" {
+		return snapshot{}, fmt.Errorf("render: the candidate has no %s", CandidateRecord)
+	}
+	return snap, nil
+}
+
+// candidateTree reads every file below the root of fsys, refusing what
+// is not a regular file or a dir.
+func candidateTree(fsys fs.FS) ([]gate.File, error) {
+	files, err := kitFiles(fsys)
+	if err != nil {
+		return nil, fmt.Errorf("render: the candidate's files: %w", err)
+	}
+	return files, nil
 }
 
 // candidateDir returns the path of the candidate id in <name>-env/.
@@ -523,6 +597,18 @@ func candidateDir(id canon.ULID) string { return path.Join(CandidatesDir, id.Str
 
 // isKitPath reports whether the render.json path p is a kit dir.
 func isKitPath(p string) bool { return strings.HasPrefix(p, LiveKitsDir+"/") }
+
+// liveExists reports whether the live path p exists.
+func liveExists(root *os.Root, p string) (bool, error) {
+	_, err := root.Lstat(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("render: %w", err)
+	}
+	return true, nil
+}
 
 // candidateFile is one entry of the candidate-files digest's input.
 type candidateFile struct {
@@ -547,31 +633,21 @@ func CandidateFilesDigest(dir string) (canon.Sum[canon.CandidateFilesKind], erro
 		return canon.Sum[canon.CandidateFilesKind]{}, fmt.Errorf("render: %w", err)
 	}
 	defer func() { _ = root.Close() }()
-	return candidateFilesDigest(root.FS())
+	files, err := candidateTree(root.FS())
+	if err != nil {
+		return canon.Sum[canon.CandidateFilesKind]{}, err
+	}
+	return candidateFilesDigest(files)
 }
 
-func candidateFilesDigest(fsys fs.FS) (canon.Sum[canon.CandidateFilesKind], error) {
-	var files candidateFiles
-	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		if !d.Type().IsRegular() {
-			return fmt.Errorf("%q is not a regular file", p)
-		}
-		data, err := fs.ReadFile(fsys, p)
-		if err != nil {
-			return err
-		}
-		s := sha256.Sum256(data)
-		files = append(files, candidateFile{Path: p, SHA256: hex.EncodeToString(s[:])})
-		return nil
-	})
-	if err != nil {
-		return canon.Sum[canon.CandidateFilesKind]{}, fmt.Errorf("render: the candidate's files: %w", err)
+func candidateFilesDigest(files []gate.File) (canon.Sum[canon.CandidateFilesKind], error) {
+	in := make(candidateFiles, 0, len(files))
+	for _, f := range files {
+		s := sha256.Sum256(f.Data)
+		in = append(in, candidateFile{Path: f.Path, SHA256: hex.EncodeToString(s[:])})
 	}
-	slices.SortFunc(files, func(a, b candidateFile) int { return cmp.Compare(a.Path, b.Path) })
-	return canon.Digest(canon.CandidateFiles, files)
+	slices.SortFunc(in, func(a, b candidateFile) int { return cmp.Compare(a.Path, b.Path) })
+	return canon.Digest(canon.CandidateFiles, in)
 }
 
 // step runs the test hook after step n.

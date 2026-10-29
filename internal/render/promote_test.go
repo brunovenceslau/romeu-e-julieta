@@ -109,14 +109,15 @@ func newPromoEnv(t *testing.T) promoEnv {
 	require.NoError(t, os.MkdirAll(envDir, 0o700))
 	bin, err := render.NewBin("arm64", []byte("julieta binary"))
 	require.NoError(t, err)
-	return promoEnv{envDir: envDir, ws: filepath.Join(root, "dev.code-workspace"), bin: bin}
+	return promoEnv{envDir: envDir, ws: filepath.Join(root, render.DevWorkspaceFile), bin: bin}
 }
 
 func (e promoEnv) live() render.Live {
 	return render.Live{
+		Root:      filepath.Dir(e.envDir),
 		EnvDir:    e.envDir,
 		Bin:       e.bin,
-		Workspace: []render.WorkspaceFile{{Path: e.ws, Data: []byte("{\"folders\": []}\n")}},
+		Workspace: []render.WorkspaceFile{{Name: render.DevWorkspaceFile, Data: []byte("{\"folders\": []}\n")}},
 	}
 }
 
@@ -159,7 +160,7 @@ func TestPromoteWritesTheLiveFilesAndDeletesTheCandidate(t *testing.T) {
 	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
 	cand := tree(t, c.Dir)
 
-	require.NoError(t, e.live().Promote(c))
+	require.NoError(t, e.live().Promote(c, approvedOf(t, c)))
 
 	got := tree(t, e.envDir)
 	assert.Equal(t, "env: one\n", got[render.LiveEnvFile])
@@ -188,11 +189,11 @@ func TestPromoteWritesTheLiveFilesAndDeletesTheCandidate(t *testing.T) {
 func TestPromoteDeletesOnlyTheKitDirsNoLongerReferenced(t *testing.T) {
 	e := newPromoEnv(t)
 	c1, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA(), kitB("v: 1\n"))
-	require.NoError(t, e.live().Promote(c1))
+	require.NoError(t, e.live().Promote(c1, approvedOf(t, c1)))
 	first := readRecord(t, e.envDir)
 
 	c2, _ := candidateFixture(t, e.envDir, 2, "env: two\n", e.bin, kitA(), kitB("v: 2\n"))
-	require.NoError(t, e.live().Promote(c2))
+	require.NoError(t, e.live().Promote(c2, approvedOf(t, c2)))
 	second := readRecord(t, e.envDir)
 
 	for p := range first.Files {
@@ -216,7 +217,7 @@ func TestPromoteDeletesOnlyTheKitDirsNoLongerReferenced(t *testing.T) {
 func TestRecoverFinishesAPromotionKilledAfterEachStep(t *testing.T) {
 	clean := newPromoEnv(t)
 	c, _ := candidateFixture(t, clean.envDir, 1, "env: one\n", clean.bin, kitA())
-	require.NoError(t, clean.live().Promote(c))
+	require.NoError(t, clean.live().Promote(c, approvedOf(t, c)))
 	want := tree(t, clean.envDir)
 
 	for step := 1; step <= 3; step++ {
@@ -230,14 +231,14 @@ func TestRecoverFinishesAPromotionKilledAfterEachStep(t *testing.T) {
 				}
 				return nil
 			})
-			require.ErrorIs(t, l.Promote(c), errKilled)
+			require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
 
 			interrupted, err := render.Interrupted(e.envDir)
 			require.NoError(t, err)
 			assert.True(t, interrupted)
 			_, err = render.CheckDrift(e.envDir)
 			require.ErrorIs(t, err, render.ErrPromotionInterrupted, "an interrupted promotion is never drift")
-			require.ErrorIs(t, e.live().Promote(c), render.ErrPromotionInterrupted, "recovery runs first")
+			require.ErrorIs(t, e.live().Promote(c, approvedOf(t, c)), render.ErrPromotionInterrupted, "recovery runs first")
 
 			got, err := e.live().Recover()
 			require.NoError(t, err)
@@ -260,7 +261,7 @@ func TestRecoverAbandonsAPromotionWhoseCandidateNoLongerVerifies(t *testing.T) {
 		t.Run(stepName(step), func(t *testing.T) {
 			e := newPromoEnv(t)
 			c0, _ := candidateFixture(t, e.envDir, 1, "env: zero\n", e.bin, kitB("v: 0\n"))
-			require.NoError(t, e.live().Promote(c0))
+			require.NoError(t, e.live().Promote(c0, approvedOf(t, c0)))
 			before := readRecord(t, e.envDir)
 
 			c, _ := candidateFixture(t, e.envDir, 2, "env: one\n", e.bin, kitA())
@@ -271,9 +272,15 @@ func TestRecoverAbandonsAPromotionWhoseCandidateNoLongerVerifies(t *testing.T) {
 				}
 				return nil
 			})
-			require.ErrorIs(t, l.Promote(c), errKilled)
+			require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
 			require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
+			// A kit-shaped dir whose content does not hash to its name is
+			// never trusted.
+			planted := path.Join(render.LiveKitsDir, "evil-0123456789ab")
+			require.NoError(t, os.MkdirAll(filepath.Join(e.envDir, filepath.FromSlash(planted)), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(e.envDir, filepath.FromSlash(planted), "evil.yaml"), []byte("x\n"), 0o600))
 
+			candRec := readCandidate(t, c)
 			got, err := e.live().Recover()
 			require.ErrorIs(t, err, render.ErrPromotionAbandoned)
 			assert.Equal(t, render.RecoveryAbandoned, got)
@@ -292,6 +299,19 @@ func TestRecoverAbandonsAPromotionWhoseCandidateNoLongerVerifies(t *testing.T) {
 			assert.Equal(t, before.WideningDigest, rec.WideningDigest)
 			assert.Equal(t, before.RecreateDigest, rec.RecreateDigest)
 			assert.Equal(t, before.CatalogDigest, rec.CatalogDigest)
+			// What step 2 wrote is recorded, and only that.
+			var kitPath string
+			for p := range candRec.Files {
+				if strings.HasPrefix(p, render.LiveKitsDir+"/") {
+					kitPath = p
+				}
+			}
+			if step == 2 {
+				assert.Contains(t, rec.Files, kitPath)
+			} else {
+				assert.NotContains(t, rec.Files, kitPath)
+			}
+			assert.NotContains(t, rec.Files, planted)
 			drifted, err := render.CheckDrift(e.envDir)
 			require.NoError(t, err)
 			assert.Empty(t, drifted)
@@ -308,7 +328,7 @@ func TestRecoverAbandonsAPromotionWhoseCandidateNoLongerVerifies(t *testing.T) {
 func TestRecoverAbandonsAfterTheCommitPointWhenTheCandidateChanged(t *testing.T) {
 	e := newPromoEnv(t)
 	c0, _ := candidateFixture(t, e.envDir, 1, "env: zero\n", e.bin, kitB("v: 0\n"))
-	require.NoError(t, e.live().Promote(c0))
+	require.NoError(t, e.live().Promote(c0, approvedOf(t, c0)))
 	before := readRecord(t, e.envDir)
 
 	c, _ := candidateFixture(t, e.envDir, 2, "env: one\n", e.bin, kitA())
@@ -319,7 +339,7 @@ func TestRecoverAbandonsAfterTheCommitPointWhenTheCandidateChanged(t *testing.T)
 		}
 		return nil
 	})
-	require.ErrorIs(t, l.Promote(c), errKilled)
+	require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
 	require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
 
 	got, err := e.live().Recover()
@@ -334,8 +354,8 @@ func TestRecoverAbandonsAfterTheCommitPointWhenTheCandidateChanged(t *testing.T)
 }
 
 // The first promotion has no live record: step 1 writes the
-// candidate's with no files. Abandoned before the commit point, nothing
-// is live, and the record names only what step 2 wrote.
+// candidate's with no files. Abandoned before the commit point, its
+// render.json is removed, so the env dir is as it was before.
 func TestRecoverAbandonsTheFirstPromotion(t *testing.T) {
 	for step := 1; step <= 2; step++ {
 		t.Run(stepName(step), func(t *testing.T) {
@@ -348,16 +368,15 @@ func TestRecoverAbandonsTheFirstPromotion(t *testing.T) {
 				}
 				return nil
 			})
-			require.ErrorIs(t, l.Promote(c), errKilled)
+			require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
 			require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
 
 			got, err := e.live().Recover()
 			require.ErrorIs(t, err, render.ErrPromotionAbandoned)
 			assert.Equal(t, render.RecoveryAbandoned, got)
 			assert.NoFileExists(t, filepath.Join(e.envDir, render.LiveEnvFile))
-			rec := readRecord(t, e.envDir)
-			assert.Nil(t, rec.Promoting)
-			assert.NotContains(t, rec.Files, render.LiveEnvFile)
+			assert.NoFileExists(t, filepath.Join(e.envDir, filepath.FromSlash(render.LiveRecord)), "nothing of the candidate is recorded")
+			assert.NoDirExists(t, c.Dir)
 			drifted, err := render.CheckDrift(e.envDir)
 			require.NoError(t, err)
 			assert.Empty(t, drifted)
@@ -368,7 +387,7 @@ func TestRecoverAbandonsTheFirstPromotion(t *testing.T) {
 func TestPromoteVerifiesAnExistingKitDirAndNeverRewritesIt(t *testing.T) {
 	e := newPromoEnv(t)
 	c1, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
-	require.NoError(t, e.live().Promote(c1))
+	require.NoError(t, e.live().Promote(c1, approvedOf(t, c1)))
 	rec := readRecord(t, e.envDir)
 	var kitDir string
 	for p := range rec.Files {
@@ -380,14 +399,17 @@ func TestPromoteVerifiesAnExistingKitDirAndNeverRewritesIt(t *testing.T) {
 	require.NoError(t, err)
 
 	c2, _ := candidateFixture(t, e.envDir, 2, "env: two\n", e.bin, kitA())
-	require.NoError(t, e.live().Promote(c2))
+	require.NoError(t, e.live().Promote(c2, approvedOf(t, c2)))
 	again, err := os.Stat(filepath.Join(kitDir, "julieta.yaml"))
 	require.NoError(t, err)
 	assert.True(t, os.SameFile(info, again), "the kit dir is left as it was")
 
 	require.NoError(t, os.WriteFile(filepath.Join(kitDir, "julieta.yaml"), []byte("changed\n"), 0o600))
 	c3, _ := candidateFixture(t, e.envDir, 3, "env: three\n", e.bin, kitA())
-	require.ErrorIs(t, e.live().Promote(c3), render.ErrKitDirDiffers)
+	require.ErrorIs(t, e.live().Promote(c3, approvedOf(t, c3)), render.ErrKitDirDiffers)
+	interrupted, err := render.Interrupted(e.envDir)
+	require.NoError(t, err)
+	assert.False(t, interrupted, "the refusal comes before step 1")
 }
 
 // I15 (REQ-0498): a hand edit of sbxenv.yaml, of a kit file or of
@@ -426,7 +448,7 @@ func TestCheckDriftNamesEachHandEditedFile(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := newPromoEnv(t)
 			c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
-			require.NoError(t, e.live().Promote(c))
+			require.NoError(t, e.live().Promote(c, approvedOf(t, c)))
 			want := edit(t, e.envDir, readRecord(t, e.envDir))
 
 			drifted, err := render.CheckDrift(e.envDir)
@@ -480,7 +502,7 @@ func TestPromoteReplacesAStaleTempKitDirAndKeepsWhatIsNotAKitDir(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(kits, "notes.txt"), []byte("mine\n"), 0o600))
 	require.NoError(t, os.MkdirAll(filepath.Join(kits, "not-a-kit"), 0o700))
 
-	require.NoError(t, e.live().Promote(c))
+	require.NoError(t, e.live().Promote(c, approvedOf(t, c)))
 
 	assert.NoDirExists(t, stale)
 	assert.NoFileExists(t, filepath.Join(kits, kit, "half"))
@@ -489,4 +511,312 @@ func TestPromoteReplacesAStaleTempKitDirAndKeepsWhatIsNotAKitDir(t *testing.T) {
 	drifted, err := render.CheckDrift(e.envDir)
 	require.NoError(t, err)
 	assert.Empty(t, drifted)
+}
+
+// approvedOf returns the widening digest the candidate c's record
+// holds, which a test approves.
+func approvedOf(t *testing.T, c render.Candidate) canon.Sum[canon.WideningKind] {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(c.Dir, render.CandidateRecord))
+	require.NoError(t, err)
+	r, err := render.DecodeRecord(b)
+	require.NoError(t, err)
+	return r.WideningDigest
+}
+
+// readCandidate returns the record of the candidate c.
+func readCandidate(t *testing.T, c render.Candidate) render.Record {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(c.Dir, render.CandidateRecord))
+	require.NoError(t, err)
+	r, err := render.DecodeRecord(b)
+	require.NoError(t, err)
+	return r
+}
+
+// The refusals that come before step 1, so they leave no marker.
+func TestPromoteRefusesBeforeStep1(t *testing.T) {
+	cases := map[string]func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error){
+		"a candidate not approved": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			return e.live(), c, hexSum[canon.WideningKind](t, 'e'), render.ErrNotApproved
+		},
+		"a candidate dir not named by an id": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			return e.live(), render.Candidate{Dir: filepath.Join(filepath.Dir(c.Dir), "x")}, approvedOf(t, c), nil
+		},
+		"a candidate dir outside the candidates dir": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			return e.live(), render.Candidate{Dir: filepath.Join(t.TempDir(), filepath.Base(c.Dir))}, approvedOf(t, c), nil
+		},
+		"another julieta than the record names": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			l := e.live()
+			var err error
+			l.Bin, err = render.NewBin("arm64", []byte("another julieta"))
+			require.NoError(t, err)
+			return l, c, approvedOf(t, c), nil
+		},
+		"a workspace file of another name": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			l := e.live()
+			l.Workspace = []render.WorkspaceFile{{Name: "../escape", Data: []byte("x")}}
+			return l, c, approvedOf(t, c), nil
+		},
+		"a candidate without its sbxenv.yaml": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			require.NoError(t, os.Remove(filepath.Join(c.Dir, render.CandidateEnvFile)))
+			return e.live(), c, approvedOf(t, c), nil
+		},
+		"a candidate without a kit dir its record names": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			require.NoError(t, os.RemoveAll(filepath.Join(c.Dir, render.CandidateKitsDir)))
+			return e.live(), c, approvedOf(t, c), nil
+		},
+		"a kit path not in the form of its digest": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			r := readCandidate(t, c)
+			r.Files[path.Join(render.LiveKitsDir, "a")] = strings.Repeat("1", 64)
+			require.NoError(t, render.WriteRecord(c, r))
+			return e.live(), c, approvedOf(t, c), nil
+		},
+		"a candidate kit dir that is not its digest": func(t *testing.T, e promoEnv, c render.Candidate) (render.Live, render.Candidate, canon.Sum[canon.WideningKind], error) {
+			t.Helper()
+			entries, err := os.ReadDir(filepath.Join(c.Dir, render.CandidateKitsDir))
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateKitsDir, entries[0].Name(), "julieta.yaml"), []byte("changed\n"), 0o600))
+			return e.live(), c, approvedOf(t, c), nil
+		},
+	}
+	for name, setup := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := newPromoEnv(t)
+			c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+			approved := approvedOf(t, c)
+			l, target, approved2, want := setup(t, e, c)
+			if approved2 != (canon.Sum[canon.WideningKind]{}) {
+				approved = approved2
+			}
+			err := l.Promote(target, approved)
+			require.Error(t, err)
+			if want != nil {
+				require.ErrorIs(t, err, want)
+			}
+			assert.NoFileExists(t, filepath.Join(e.envDir, filepath.FromSlash(render.LiveRecord)), "no step ran")
+			assert.NoFileExists(t, filepath.Join(e.envDir, render.LiveEnvFile))
+		})
+	}
+}
+
+// A finish that would fail on every command, here because romeu now
+// embeds another julieta than the candidate names, is abandoned rather
+// than refused for ever.
+func TestRecoverAbandonsAFinishThatFails(t *testing.T) {
+	for step := 1; step <= 3; step++ {
+		t.Run(stepName(step), func(t *testing.T) {
+			e := newPromoEnv(t)
+			c0, _ := candidateFixture(t, e.envDir, 1, "env: zero\n", e.bin, kitB("v: 0\n"))
+			require.NoError(t, e.live().Promote(c0, approvedOf(t, c0)))
+			before := readRecord(t, e.envDir)
+			c, _ := candidateFixture(t, e.envDir, 2, "env: one\n", e.bin, kitA())
+			l := e.live()
+			render.SetAfterStep(&l, func(n int) error {
+				if n == step {
+					return errKilled
+				}
+				return nil
+			})
+			require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
+
+			upgraded := e.live()
+			var err error
+			upgraded.Bin, err = render.NewBin("arm64", []byte("another julieta"))
+			require.NoError(t, err)
+			got, err := upgraded.Recover()
+			require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+			assert.Equal(t, render.RecoveryAbandoned, got)
+			rec := readRecord(t, e.envDir)
+			assert.Nil(t, rec.Promoting)
+			assert.Equal(t, before.WideningDigest, rec.WideningDigest)
+			drifted, err := render.CheckDrift(e.envDir)
+			require.NoError(t, err)
+			if step < 3 {
+				assert.Empty(t, drifted)
+			} else {
+				assert.Equal(t, []string{render.LiveEnvFile}, drifted, "past the commit point")
+			}
+		})
+	}
+}
+
+func TestCheckDriftNamesALiveSbxenvThatNoRecordHolds(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, render.LiveEnvFile), []byte("env: hand made\n"), 0o600))
+	drifted, err := render.CheckDrift(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{render.LiveEnvFile}, drifted)
+}
+
+// An abandoned first promotion killed after the commit point leaves
+// the approved sbxenv.yaml with no record, which drift names.
+func TestRecoverAbandonsTheFirstPromotionPastTheCommitPoint(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	l := e.live()
+	render.SetAfterStep(&l, func(n int) error {
+		if n == 3 {
+			return errKilled
+		}
+		return nil
+	})
+	require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
+	require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
+	_, err := e.live().Recover()
+	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+	drifted, err := render.CheckDrift(e.envDir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{render.LiveEnvFile}, drifted)
+}
+
+// A step 2 that the file system refuses, here a kits dir romeu cannot
+// write, fails after step 1; recovery abandons it, so the next command
+// is not refused for ever.
+func TestRecoverAbandonsAStep2TheFileSystemRefuses(t *testing.T) {
+	e := newPromoEnv(t)
+	c0, _ := candidateFixture(t, e.envDir, 1, "env: zero\n", e.bin, kitB("v: 0\n"))
+	require.NoError(t, e.live().Promote(c0, approvedOf(t, c0)))
+	kits := filepath.Join(e.envDir, filepath.FromSlash(render.LiveKitsDir))
+	require.NoError(t, os.Chmod(kits, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(kits, 0o700) })
+
+	c, _ := candidateFixture(t, e.envDir, 2, "env: one\n", e.bin, kitA())
+	require.Error(t, e.live().Promote(c, approvedOf(t, c)))
+	interrupted, err := render.Interrupted(e.envDir)
+	require.NoError(t, err)
+	assert.True(t, interrupted)
+
+	got, err := e.live().Recover()
+	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+	assert.Equal(t, render.RecoveryAbandoned, got)
+	drifted, err := render.CheckDrift(e.envDir)
+	require.NoError(t, err)
+	assert.Empty(t, drifted)
+}
+
+// A render.json romeu cannot write fails the promotion at step 1.
+func TestPromoteFailsWhenRenderJSONCannotBeWritten(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	dir := filepath.Join(e.envDir, ".romeu")
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	require.Error(t, e.live().Promote(c, approvedOf(t, c)))
+	assert.NoFileExists(t, filepath.Join(e.envDir, render.LiveEnvFile))
+}
+
+// A render.json that does not decode is an error of each reader, never
+// a clean state.
+func TestAnUnreadableRenderJSONIsAnError(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	require.NoError(t, os.WriteFile(filepath.Join(e.envDir, filepath.FromSlash(render.LiveRecord)), []byte("{"), 0o600))
+	require.ErrorIs(t, e.live().Promote(c, approvedOf(t, c)), render.ErrRecordInvalid)
+	_, err := e.live().Recover()
+	require.ErrorIs(t, err, render.ErrRecordInvalid)
+	_, err = render.CheckDrift(e.envDir)
+	require.ErrorIs(t, err, render.ErrRecordInvalid)
+	_, err = render.Interrupted(e.envDir)
+	require.ErrorIs(t, err, render.ErrRecordInvalid)
+}
+
+// A candidate that holds a symlink does not verify: Promote refuses it,
+// and recovery abandons a promotion whose candidate gained one.
+func TestACandidateWithASymlinkDoesNotVerify(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	l := e.live()
+	render.SetAfterStep(&l, func(n int) error {
+		if n == 1 {
+			return errKilled
+		}
+		return nil
+	})
+	require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(c.Dir, "link")))
+	_, err := render.CandidateFilesDigest(c.Dir)
+	require.Error(t, err)
+	_, err = e.live().Recover()
+	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+	assert.NoFileExists(t, filepath.Join(e.envDir, render.LiveEnvFile))
+}
+
+func TestTheReadersFailOnAMissingEnvDir(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "absent")
+	_, err := render.CheckDrift(missing)
+	require.Error(t, err)
+	_, err = render.Interrupted(missing)
+	require.Error(t, err)
+	_, err = render.CandidateFilesDigest(missing)
+	require.Error(t, err)
+	_, err = render.Live{EnvDir: missing}.Recover()
+	require.Error(t, err)
+	require.Error(t, render.Live{EnvDir: missing}.Promote(render.Candidate{Dir: missing}, canon.Sum[canon.WideningKind]{}))
+}
+
+// A live kit path that is a file, not a dir, is an error of the drift
+// check, not a clean result.
+func TestCheckDriftFailsOnAKitPathThatIsAFile(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	require.NoError(t, e.live().Promote(c, approvedOf(t, c)))
+	for p := range readRecord(t, e.envDir).Files {
+		if strings.HasPrefix(p, render.LiveKitsDir+"/") {
+			full := filepath.Join(e.envDir, filepath.FromSlash(p))
+			require.NoError(t, os.RemoveAll(full))
+			require.NoError(t, os.WriteFile(full, []byte("x"), 0o600))
+		}
+	}
+	_, err := render.CheckDrift(e.envDir)
+	require.Error(t, err)
+}
+
+// A step 2 that cannot write the workspace files, here a $ROMEU_ROOT
+// that is gone, fails after step 1; once it is back, recovery finishes
+// the promotion.
+func TestRecoverFinishesOnceTheWorkspaceRootIsBack(t *testing.T) {
+	e := newPromoEnv(t)
+	c, _ := candidateFixture(t, e.envDir, 1, "env: one\n", e.bin, kitA())
+	l := e.live()
+	l.Root = filepath.Join(t.TempDir(), "gone")
+	require.Error(t, l.Promote(c, approvedOf(t, c)))
+
+	got, err := e.live().Recover()
+	require.NoError(t, err)
+	assert.Equal(t, render.RecoveryFinished, got)
+	assert.FileExists(t, e.ws)
+}
+
+// An abandon leaves out a kit-shaped dir it cannot read, rather than
+// failing on it.
+func TestRecoverAbandonLeavesOutAKitDirItCannotRead(t *testing.T) {
+	e := newPromoEnv(t)
+	c0, _ := candidateFixture(t, e.envDir, 1, "env: zero\n", e.bin, kitB("v: 0\n"))
+	require.NoError(t, e.live().Promote(c0, approvedOf(t, c0)))
+	c, _ := candidateFixture(t, e.envDir, 2, "env: one\n", e.bin, kitA())
+	l := e.live()
+	render.SetAfterStep(&l, func(n int) error {
+		if n == 1 {
+			return errKilled
+		}
+		return nil
+	})
+	require.ErrorIs(t, l.Promote(c, approvedOf(t, c)), errKilled)
+	odd := path.Join(render.LiveKitsDir, "odd-0123456789ab")
+	require.NoError(t, os.MkdirAll(filepath.Join(e.envDir, filepath.FromSlash(odd)), 0o700))
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(e.envDir, filepath.FromSlash(odd), "link")))
+	require.NoError(t, os.WriteFile(filepath.Join(c.Dir, render.CandidateEnvFile), []byte("env: tampered\n"), 0o600))
+
+	_, err := e.live().Recover()
+	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
+	assert.NotContains(t, readRecord(t, e.envDir).Files, odd)
 }

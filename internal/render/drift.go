@@ -19,7 +19,7 @@ import (
 // (REQ-0256), the kit-tree digest of a kit dir. It returns the paths
 // that differ or are missing, sorted; the caller reports the first as
 // drift-detected, exit 4. Before the first promotion there is no
-// render.json and nothing drifts. A render.json with promoting is
+// render.json, and only a live sbxenv.yaml drifts. A render.json with promoting is
 // ErrPromotionInterrupted, never drift: recovery runs first.
 func CheckDrift(envDir string) ([]string, error) {
 	root, err := os.OpenRoot(envDir)
@@ -28,8 +28,17 @@ func CheckDrift(envDir string) ([]string, error) {
 	}
 	defer func() { _ = root.Close() }()
 	rec, found, err := readLiveRecord(root)
-	if err != nil || !found {
+	if err != nil {
 		return nil, err
+	}
+	if !found {
+		// A live sbxenv.yaml that no render.json records is drift: no
+		// digest says what it should hold.
+		ok, err := liveExists(root, LiveEnvFile)
+		if err != nil || !ok {
+			return nil, err
+		}
+		return []string{LiveEnvFile}, nil
 	}
 	if rec.Promoting != nil {
 		return nil, ErrPromotionInterrupted
