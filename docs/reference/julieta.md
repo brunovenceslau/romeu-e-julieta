@@ -35,6 +35,7 @@ julieta <command> [flags]
 * [julieta install](julieta/install.md) - install the locked tools of every repo with mise
 * [julieta lock](julieta/lock.md) - lock the tools of a repo's mise.toml, or check that its mise.lock is fresh
 * [julieta memory](julieta/memory.md) - the memory commands
+* [julieta salvage](julieta/salvage.md) - capture every repo's unpushed work into its memory dir before the sandbox goes
 * [julieta setup](julieta/setup.md) - prepare the sandbox: the PATH link, the repos and their default branches
 * [julieta snapshot](julieta/snapshot.md) - bundle the unpushed work of a repo into its memory dir's snapshot/
 * [julieta status](julieta/status.md) - print the state of the repos, the manifest, the recorded hook failures and julieta's warnings
