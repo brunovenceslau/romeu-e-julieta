@@ -19,7 +19,8 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 )
 
-var _ = cli.Register(func() cli.Command {
+// definition is the command's registered definition.
+var definition = cli.Register(func() cli.Command {
 	c := cli.Define(cli.PreflightRuns, cli.LockTaken, cli.AppendsNothing(), cli.SnapshotNone, cli.Converges)
 	c.Binary, c.Name = "romeu", "sync"
 	c.New = func(env *cli.Env) *cobra.Command {

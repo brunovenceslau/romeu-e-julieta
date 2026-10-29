@@ -197,3 +197,27 @@ func TestUsageNamesTheRuleAndExitsTwo(t *testing.T) {
 		t.Errorf("got %q, want the slug and the message", err)
 	}
 }
+
+func TestTheCommandParsesItsFlagsAndRunsTheSteps(t *testing.T) {
+	var got flags
+	saved := steps
+	t.Cleanup(func() { steps = saved })
+	steps = []step{{n: 1, name: "step", do: func(_ context.Context, r *run) error { got = r.flags; return nil }}}
+	cmd := definition.New(&cli.Env{})
+	cmd.SetArgs([]string{"--all", "--from", "abc123", "--overwrite-drift", "shop", "blog"})
+	cmd.SetContext(context.Background())
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	want := flags{all: true, from: "abc123", overwriteDrift: true, names: []string{"shop", "blog"}}
+	if got.all != want.all || got.from != want.from || got.overwriteDrift != want.overwriteDrift || strings.Join(got.names, ",") != "shop,blog" {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestFromDefaultsToOrigin(t *testing.T) {
+	f := definition.New(&cli.Env{}).Flags().Lookup("from")
+	if f == nil || f.DefValue != "origin" {
+		t.Fatalf("--from defaults to %v, want origin", f)
+	}
+}
