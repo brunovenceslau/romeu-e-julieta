@@ -14,6 +14,10 @@ owns:
   - e2e/internal/romeu/env.go
   - tools/release/main.go
   - tools/release/internal/build/host*.go
+  - internal/gate/prompt.go
+  - internal/gate/prompt_test.go
+  - docs/spec/01-system-model.md
+  - docs/spec/04-cli.md
 needs:
   - T040
   - T041
@@ -32,6 +36,7 @@ after: []
 ask_first:
   - contracts
   - release
+  - spec
 sitting: none
 ---
 
@@ -75,7 +80,18 @@ workload descriptor up by index digest and platform through
 `FindDescriptor` of T187 before the digest, so a second `sync` of a
 multi-arch workload reads no registry (2026-10-29); the test of slice C
 that pins the miss is rewritten. The exit 2 of a kit error the spec
-causes is T188's, after this task.
+causes is T188's, after this task. From the review of slice D
+(2026-10-29): `N` to gate 2 on a terminal exits 1, as gate 1's decline
+does (REQ-1276), with the row `candidate-declined` in 04 4.4 and the
+exit named in 04 4.2 step 8, both landing with the code that links
+`sync` (`contracts`, `spec`); the workspace files `dev.code-workspace`
+and `review.code-workspace` are written once, after the last promotion
+of a run, from every project's record, since they list every clone
+under the root, and REQ-0086 says so in place of the write of each
+promotion (`spec`); `gate.Ask`, which no command calls since step 8
+confirms through `gate.Confirm` and `Diff.WriteTo`, is deleted with
+its test. The promotion failing closed on the candidate digest, and an
+edited kit dir under `--overwrite-drift`, are T189's, after this task.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700 (REQ-0646, REQ-0140, 03 3.3; ADR
@@ -115,7 +131,14 @@ member and the mount this note gave this task).
     promotes after `y`, and leaves the live files byte-identical after
     `N` (I7): the pty cases "sync approves on y and promotes" and "sync
     declines on N and deletes the candidate"; the gate prompt is written
-    to stderr and the TTY condition is stdin.
+    to stderr and the TTY condition is stdin. `N` exits 1 with
+    `candidate-declined` naming the project, and the targets after it
+    go on.
+  - After the last promotion of a run, `$ROMEU_ROOT/dev.code-workspace`
+    and `review.code-workspace` list every clone of every project's
+    record, written by atomic rename; a run that promotes nothing
+    leaves them as they were.
+  - `gate.Ask` is gone from `internal/gate`.
   - A candidate dir planted as if left by a killed command is deleted
     before the next render; after `N` no candidate dir remains; a `sync`
     whose widening digest equals the approval promotes with no TTY; at
