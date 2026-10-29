@@ -258,13 +258,15 @@ const fetchRemote = "origin"
 // noCredentials are the settings the fetch of the head runs with, so it
 // sends no credential whatever the configuration holds (REQ-1152): no
 // credential helper and no askpass program (an empty value resets each
-// setting, and fetchHead empties GIT_ASKPASS and SSH_ASKPASS too), no extra header, which is where actions/checkout keeps the token
-// when it persists it, and no redirect, so the fetch reads only the URL of
-// the remote.
+// setting, and fetchHead empties GIT_ASKPASS and SSH_ASKPASS too), no
+// extra header, unscoped or scoped to github.com, which is where
+// actions/checkout keeps the token when it persists it, and no redirect,
+// so the fetch reads only the URL of the remote.
 var noCredentials = []string{
 	"-c", "credential.helper=",
 	"-c", "core.askPass=",
 	"-c", "http.extraHeader=",
+	"-c", "http.https://github.com/.extraheader=",
 	"-c", "http.followRedirects=false",
 }
 

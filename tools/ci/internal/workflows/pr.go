@@ -19,12 +19,13 @@ import (
 //
 //   - on is the one event pull_request_target, filtered to pull requests
 //     into main (branches: [main]), whose types list edited, so a change
-//     to the title or the body runs pr again (REQ-0813), and no other
-//     filter;
+//     to the title or the body runs pr again (REQ-0813), with opened,
+//     synchronize and reopened and no other, and no other filter;
 //   - permissions, at the top and in the job, is contents: read and
 //     nothing else; no step names a secret or github.token (the
 //     expression rules of every file);
-//   - one job, approval.JobName, named so, whose steps are one checkout
+//   - one job, approval.JobName, named so, with no strategy, no needs
+//     and timeout-minutes: 10, whose steps are one checkout
 //     of the default branch's commit, which names no ref and no
 //     repository (actions/checkout then checks out github.sha, the
 //     default branch's commit under this event: src/input-helper.ts at
@@ -48,6 +49,12 @@ const (
 	prDepth     = "fetch-depth"
 	prDepthNone = "0"
 )
+
+// prTypes are the types of the event, sorted, and prTimeout the
+// timeout-minutes of the job.
+var prTypes = []string{"edited", "opened", "reopened", "synchronize"}
+
+const prTimeout = "10"
 
 // prRow is what pr.yml grants its job. A nil prRow grants nothing,
 // which is every other file.
@@ -121,6 +128,12 @@ func (c *grammar) prWorkflow(doc *yaml.Node) {
 	if s := field(job, "strategy"); s != nil {
 		c.add(s, "the pr job has no strategy (the pr job row)")
 	}
+	if n := field(job, "needs"); n != nil {
+		c.add(n, "the pr job needs no other job (the pr job row)")
+	}
+	if v := field(job, "timeout-minutes"); v == nil || v.Kind != yaml.ScalarNode || v.Value != prTimeout {
+		c.add(job, "the pr job has timeout-minutes: "+prTimeout+", so a stuck run does not hold the check (the pr job row)")
+	}
 	c.prRead(field(job, "permissions"), job, "the permissions of the job")
 	c.prSteps(job)
 }
@@ -147,8 +160,14 @@ func (c *grammar) prTrigger(doc *yaml.Node) {
 	if b := seqContent(branches); len(b) != 1 || b[0].Kind != yaml.ScalarNode || b[0].Value != "main" {
 		c.add(on, prEvent+" of "+prFile+" holds branches: [main], so it runs for pull requests into main (the pr job row)")
 	}
-	if !slices.ContainsFunc(seqContent(field(event, "types")), func(t *yaml.Node) bool { return t.Value == "edited" }) {
+	var types []string
+	for _, t := range seqContent(field(event, "types")) {
+		types = append(types, t.Value)
+	}
+	if !slices.Contains(types, "edited") {
 		c.add(on, prFile+" lists edited among its "+prEvent+" types, so a change to the title or body runs pr again (REQ-0813)")
+	} else if slices.Sort(types); !slices.Equal(types, prTypes) {
+		c.add(on, "the "+prEvent+" types of "+prFile+" are opened, synchronize, reopened and edited, so every push to the head is judged (the pr job row)")
 	}
 }
 

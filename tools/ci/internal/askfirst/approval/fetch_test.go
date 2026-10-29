@@ -113,7 +113,7 @@ func gitCalls(t *testing.T) func() [][]string {
 // --ignore-submodules=all.
 var requiredFlags = map[string][]string{
 	"fetch": {"--no-recurse-submodules", "--no-tags", "--no-write-fetch-head", "--no-auto-maintenance",
-		"-c credential.helper=", "-c core.askPass=", "-c http.extraHeader=", "-c http.followRedirects=false"},
+		"-c credential.helper=", "-c core.askPass=", "-c http.extraHeader=", "-c http.https://github.com/.extraheader=", "-c http.followRedirects=false"},
 	"diff":      {"--no-ext-diff", "--no-textconv"},
 	"log":       {"--no-ext-diff", "--no-textconv", "--ignore-submodules=all"},
 	"show":      {"--no-ext-diff", "--no-textconv", "--ignore-submodules=all"},

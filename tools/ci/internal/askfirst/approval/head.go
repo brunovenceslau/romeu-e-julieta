@@ -214,7 +214,7 @@ func parseWorkflow(src []byte) (*yaml.Node, error) {
 
 // indirect reports whether a node, or one below it, is an alias, holds
 // an anchor or is a merge key, or is a mapping with a key written twice,
-// which loaders read in different ways.
+// in any case, which loaders read in different ways.
 func indirect(n *yaml.Node) bool {
 	if n.Kind == yaml.AliasNode || n.Anchor != "" || n.Tag == "!!merge" {
 		return true
@@ -222,7 +222,7 @@ func indirect(n *yaml.Node) bool {
 	if n.Kind == yaml.MappingNode {
 		seen := map[string]bool{}
 		for i := 0; i+1 < len(n.Content); i += 2 {
-			k := n.Content[i].Value
+			k := strings.ToLower(n.Content[i].Value)
 			if seen[k] {
 				return true
 			}
@@ -232,14 +232,15 @@ func indirect(n *yaml.Node) bool {
 	return slices.ContainsFunc(n.Content, indirect)
 }
 
-// mappingValue returns the value of key in a mapping node, or nil;
-// parseWorkflow refuses a key written twice.
+// mappingValue returns the value of key in a mapping node, or nil. The
+// key is matched without case, so a key GitHub might read without case
+// is not missed; parseWorkflow refuses a key written twice in any case.
 func mappingValue(n *yaml.Node, key string) *yaml.Node {
 	if n == nil || n.Kind != yaml.MappingNode {
 		return nil
 	}
 	for i := 0; i+1 < len(n.Content); i += 2 {
-		if n.Content[i].Value == key {
+		if strings.EqualFold(n.Content[i].Value, key) {
 			return n.Content[i+1]
 		}
 	}
