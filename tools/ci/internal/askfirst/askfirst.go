@@ -4,8 +4,8 @@
 // Package askfirst is the face of .github/ask-first.yaml in tools/ci:
 // the CODEOWNERS generator of 12 12.3 and the pr subcommand of 12 12.4.
 // The rules themselves live in the approval package below it, which does
-// not import the framework of tools/ci, so the pr job builds them alone
-// (cmd/pr); this package wraps them for that framework and registers no
+// not import the framework of tools/ci, so the ask-first job builds them alone
+// (cmd/ask-first); this package wraps them for that framework and registers no
 // check.
 package askfirst
 
@@ -70,7 +70,7 @@ func CodeownersOutput(root *os.Root) ([]check.Output, error) {
 // pull request exists, from --title and --body over the local range from
 // --base to HEAD (approval.ReadArgs). It reads only local objects: a
 // commit the clone lacks is an error, not a fetch (REQ-0816); the fetch
-// is the pr job's alone (cmd/pr).
+// is the ask-first job's alone (cmd/ask-first).
 func RunPR(ctx context.Context, e check.Env, args []string) (bool, error) {
 	pr, err := approval.ReadArgs(ctx, e.Repo(), args, check.Usage())
 	if err != nil {

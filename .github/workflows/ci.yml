@@ -10,7 +10,7 @@ name: ci
 
 on:
   # A change to the title or the body runs none of these checks again:
-  # pr.yml judges the text of a pull request, and its types list edited.
+  # ask-first.yml judges the text of a pull request, and its types list edited.
   pull_request:
     types: [opened, synchronize, reopened]
   push:

@@ -26,10 +26,10 @@ func headWorkflow(id, name string) string {
 }
 
 // TestPRHeadJobs holds REQ-1154 and REQ-1155 on single workflow files of
-// the head: a job outside pr.yml whose check name equals the pr job's
+// the head: a job outside ask-first.yml whose check name equals the ask-first job's
 // fails, one whose name holds "${{" fails, with a literal expression and
 // with a matrix value, unless a literal prefix keeps it from the pr
-// job's name, and a pr.yml of the head that names an event other than
+// job's name, and an ask-first.yml of the head that names an event other than
 // pull_request_target fails.
 func TestPRHeadJobs(t *testing.T) {
 	const other = ".github/workflows/x.yml"
@@ -37,38 +37,38 @@ func TestPRHeadJobs(t *testing.T) {
 		name, path, src, want string
 	}{
 		{"another job name", other, headWorkflow("build", "build"), ""},
-		{"the pr job's name", other, headWorkflow("build", "pr"), "could post the check pr"},
-		{"the pr job's name in another case and with spaces", other, headWorkflow("build", `" PR "`), "could post the check pr"},
-		{"the pr job's id and no name", other, headWorkflow("pr", ""), "could post the check pr"},
-		{"the pr job's id with another name", other, headWorkflow("pr", "build"), ""},
-		{"the pr job's id and a null name", other, headWorkflow("pr", "~"), "could post the check pr"},
-		{"the pr job's id and an empty name", other, headWorkflow("pr", `""`), "could post the check pr"},
-		{"the pr job's id and a name with no value", other, "name: x\non: push\njobs:\n  pr:\n    name:\n    runs-on: ubuntu-26.04\n", "could post the check pr"},
-		{"a literal expression", other, headWorkflow("build", `"${{ 'pr' }}"`), "could post the check pr"},
-		{"a matrix value", other, "name: x\non: push\njobs:\n  build:\n    name: ${{ matrix.n }}\n    strategy:\n      matrix:\n        n: [pr]\n    runs-on: ubuntu-26.04\n    steps:\n      - run: echo\n", "could post the check pr"},
-		{"an expression after a prefix of the name", other, headWorkflow("build", `"p${{ matrix.r }}"`), "could post the check pr"},
-		{"an expression after a prefix in another case", other, headWorkflow("build", `"P${{ matrix.r }}"`), "could post the check pr"},
-		{"an expression after spaces", other, headWorkflow("build", `" ${{ matrix.r }}"`), "could post the check pr"},
+		{"the ask-first job's name", other, headWorkflow("build", "ask-first"), "could post the check ask-first"},
+		{"the ask-first job's name in another case and with spaces", other, headWorkflow("build", `" ASK-FIRST "`), "could post the check ask-first"},
+		{"the ask-first job's id and no name", other, headWorkflow("ask-first", ""), "could post the check ask-first"},
+		{"the ask-first job's id with another name", other, headWorkflow("ask-first", "build"), ""},
+		{"the ask-first job's id and a null name", other, headWorkflow("ask-first", "~"), "could post the check ask-first"},
+		{"the ask-first job's id and an empty name", other, headWorkflow("ask-first", `""`), "could post the check ask-first"},
+		{"the ask-first job's id and a name with no value", other, "name: x\non: push\njobs:\n  ask-first:\n    name:\n    runs-on: ubuntu-26.04\n", "could post the check ask-first"},
+		{"a literal expression", other, headWorkflow("build", `"${{ 'ask-first' }}"`), "could post the check ask-first"},
+		{"a matrix value", other, "name: x\non: push\njobs:\n  build:\n    name: ${{ matrix.n }}\n    strategy:\n      matrix:\n        n: [ask-first]\n    runs-on: ubuntu-26.04\n    steps:\n      - run: echo\n", "could post the check ask-first"},
+		{"an expression after a prefix of the name", other, headWorkflow("build", `"ask-firs${{ matrix.r }}"`), "could post the check ask-first"},
+		{"an expression after a prefix in another case", other, headWorkflow("build", `"ASK-FIRS${{ matrix.r }}"`), "could post the check ask-first"},
+		{"an expression after spaces", other, headWorkflow("build", `" ${{ matrix.r }}"`), "could post the check ask-first"},
 		{"an expression after a prefix that is not the name's", other, headWorkflow("build", `"static on ${{ matrix.os }}"`), ""},
-		{"an expression after the whole name and more", other, headWorkflow("build", `"pr2 ${{ matrix.os }}"`), ""},
-		{"a name that is not a scalar", other, headWorkflow("build", "[pr]"), "a name pr cannot read"},
+		{"an expression after the whole name and more", other, headWorkflow("build", `"ask-first2 ${{ matrix.os }}"`), ""},
+		{"a name that is not a scalar", other, headWorkflow("build", "[ask-first]"), "a name ask-first cannot read"},
 		{"a file that is not YAML", other, "jobs: [\n", "cannot read"},
 		{"two documents", other, headWorkflow("build", "build") + "---\nname: y\n", "cannot read"},
 		{"an alias that names the job", other, "name: x\non: push\nx: &n pr\njobs:\n  build:\n    name: *n\n    runs-on: ubuntu-26.04\n", "cannot read"},
-		{"a name written twice", other, "name: x\non: push\njobs:\n  build:\n    name: pr\n    name: build\n    runs-on: ubuntu-26.04\n", "cannot read"},
-		{"a job written twice", other, "name: x\non: push\njobs:\n  build:\n    name: build\n  build:\n    name: pr\n", "cannot read"},
-		{"jobs in another case", other, "name: x\non: push\nJobs:\n  pr:\n    runs-on: ubuntu-26.04\n", "could post the check pr"},
-		{"a name in another case", other, "name: x\non: push\njobs:\n  build:\n    Name: pr\n", "could post the check pr"},
+		{"a name written twice", other, "name: x\non: push\njobs:\n  build:\n    name: ask-first\n    name: build\n    runs-on: ubuntu-26.04\n", "cannot read"},
+		{"a job written twice", other, "name: x\non: push\njobs:\n  build:\n    name: build\n  build:\n    name: ask-first\n", "cannot read"},
+		{"jobs in another case", other, "name: x\non: push\nJobs:\n  ask-first:\n    runs-on: ubuntu-26.04\n", "could post the check ask-first"},
+		{"a name in another case", other, "name: x\non: push\njobs:\n  build:\n    Name: ask-first\n", "could post the check ask-first"},
 		{"a name written twice in two cases", other, "name: x\non: push\njobs:\n  build:\n    name: build\n    NAME: pr\n", "cannot read"},
-		{"jobs that are not a mapping", other, "name: x\non: push\njobs: [pr]\n", "not a mapping"},
-		{"the pr job's name in a file ending .yaml", ".github/workflows/x.yaml", headWorkflow("build", "pr"), "could post the check pr"},
-		{"pr.yml on pull_request_target", PRWorkflow, "on:\n  pull_request_target:\n    branches: [main]\njobs:\n  pr:\n    name: pr\n", ""},
-		{"pr.yml on pull_request_target as one name", PRWorkflow, "on: pull_request_target\njobs: {}\n", ""},
-		{"pr.yml on pull_request", PRWorkflow, "on:\n  pull_request:\njobs:\n  pr:\n    name: pr\n", "names an event other than pull_request_target"},
-		{"pr.yml on pull_request_target and push", PRWorkflow, "on: [pull_request_target, push]\njobs: {}\n", "names an event other than pull_request_target"},
-		{"pr.yml on pull_request_target and push, as a mapping", PRWorkflow, "on:\n  pull_request_target:\n  push:\njobs: {}\n", "names an event other than pull_request_target"},
-		{"pr.yml on push and pull_request_target, as a mapping", PRWorkflow, "on:\n  push:\n  pull_request_target:\njobs: {}\n", "names an event other than pull_request_target"},
-		{"pr.yml with no event", PRWorkflow, "jobs: {}\n", "names an event other than pull_request_target"},
+		{"jobs that are not a mapping", other, "name: x\non: push\njobs: [ask-first]\n", "not a mapping"},
+		{"the ask-first job's name in a file ending .yaml", ".github/workflows/x.yaml", headWorkflow("build", "ask-first"), "could post the check ask-first"},
+		{"ask-first.yml on pull_request_target", PRWorkflow, "on:\n  pull_request_target:\n    branches: [main]\njobs:\n  ask-first:\n    name: ask-first\n", ""},
+		{"ask-first.yml on pull_request_target as one name", PRWorkflow, "on: pull_request_target\njobs: {}\n", ""},
+		{"ask-first.yml on pull_request", PRWorkflow, "on:\n  pull_request:\njobs:\n  ask-first:\n    name: ask-first\n", "names an event other than pull_request_target"},
+		{"ask-first.yml on pull_request_target and push", PRWorkflow, "on: [pull_request_target, push]\njobs: {}\n", "names an event other than pull_request_target"},
+		{"ask-first.yml on pull_request_target and push, as a mapping", PRWorkflow, "on:\n  pull_request_target:\n  push:\njobs: {}\n", "names an event other than pull_request_target"},
+		{"ask-first.yml on push and pull_request_target, as a mapping", PRWorkflow, "on:\n  push:\n  pull_request_target:\njobs: {}\n", "names an event other than pull_request_target"},
+		{"ask-first.yml with no event", PRWorkflow, "jobs: {}\n", "names an event other than pull_request_target"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestPRHeadJobs(t *testing.T) {
 }
 
 // TestPRHeadJobsOfThisRepository reads the committed workflows as a head
-// would hold them: none of them could post the check of the pr job.
+// would hold them: none of them could post the check of the ask-first job.
 func TestPRHeadJobsOfThisRepository(t *testing.T) {
 	dir := filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(workflowsDir))
 	entries, err := os.ReadDir(dir)
@@ -109,11 +109,11 @@ func TestPRHeadFromGit(t *testing.T) {
 		head  map[string]string
 		wants []string
 	}{
-		{"a workflow that posts the pr check", nil, map[string]string{".github/workflows/x.yml": headWorkflow("pr", "")}, []string{"could post the check pr"}},
-		{"a workflow in a subdirectory", nil, map[string]string{".github/workflows/old/x.yml": headWorkflow("pr", "")}, nil},
+		{"a workflow that posts the ask-first check", nil, map[string]string{".github/workflows/x.yml": headWorkflow("ask-first", "")}, []string{"could post the check ask-first"}},
+		{"a workflow in a subdirectory", nil, map[string]string{".github/workflows/old/x.yml": headWorkflow("ask-first", "")}, nil},
 		{"a directory named as a workflow", nil, map[string]string{".github/workflows/x.yml/a.txt": "x\n"}, []string{"is not a file"}},
 		{"a workflow that is a symbolic link", nil, map[string]string{"link:.github/workflows/x.yml": "../../README.md"}, []string{"cannot read"}},
-		{"a workflow with another ending", nil, map[string]string{".github/workflows/x.txt": headWorkflow("pr", "")}, nil},
+		{"a workflow with another ending", nil, map[string]string{".github/workflows/x.txt": headWorkflow("ask-first", "")}, nil},
 		{"a go.work", nil, map[string]string{"go.work": "go 1.24\n"}, []string{"the head holds go.work"}},
 		{"a go.work.sum", nil, map[string]string{"go.work.sum": "\n"}, []string{"the head holds go.work.sum"}},
 		{"a vendor directory", nil, map[string]string{"vendor/modules.txt": "\n"}, []string{"the head holds vendor"}},

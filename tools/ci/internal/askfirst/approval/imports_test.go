@@ -25,13 +25,13 @@ import (
 )
 
 // Invariant (b) of T005's acceptance (05 5.3, REQ-0540): the code the pr
-// job builds, cmd/pr, imports only the standard library and packages
+// job builds, cmd/ask-first, imports only the standard library and packages
 // under the globs of the approvals surface, so no change a grant covers
 // changes the code that judges a pull request. TestPRImports holds it
 // over the committed tree; the fixtures below hold the rule itself.
 
-// prCommand is the package the pr job builds (REQ-1150).
-const prCommand = "./tools/ci/internal/askfirst/cmd/pr"
+// prCommand is the package the ask-first job builds (REQ-1150).
+const prCommand = "./tools/ci/internal/askfirst/cmd/ask-first"
 
 // listedPackage is what the rule reads of one package that
 // "go list -deps -test -json" prints.
@@ -205,7 +205,7 @@ func approvalsGlobs(t *testing.T, root string) []string {
 }
 
 // TestPRImports holds invariant (b) over the committed tree: every
-// package cmd/pr builds, on every lint target, is of the standard
+// package cmd/ask-first builds, on every lint target, is of the standard
 // library, on an approvals glob, or of a module go.sum pins.
 func TestPRImports(t *testing.T) {
 	root := citest.ModuleRoot(t)
@@ -221,10 +221,10 @@ func TestPRImports(t *testing.T) {
 func TestPRImportsRule(t *testing.T) {
 	globs := []string{"cmd/**", "ok/**", "go.sum"}
 	base := map[string]string{
-		"go.mod":         "module example.org/fix\n\ngo 1.24\n",
-		"cmd/pr/main.go": "package main\n\nimport (\n\t\"fmt\"\n\n\t\"example.org/fix/ok\"\n)\n\nfunc main() { fmt.Println(ok.X) }\n",
-		"ok/ok.go":       "package ok\n\nconst X = 1\n",
-		"outside/o.go":   "package outside\n\nconst Y = 2\n",
+		"go.mod":                "module example.org/fix\n\ngo 1.24\n",
+		"cmd/ask-first/main.go": "package main\n\nimport (\n\t\"fmt\"\n\n\t\"example.org/fix/ok\"\n)\n\nfunc main() { fmt.Println(ok.X) }\n",
+		"ok/ok.go":              "package ok\n\nconst X = 1\n",
+		"outside/o.go":          "package outside\n\nconst Y = 2\n",
 	}
 	cases := []struct {
 		name   string
@@ -236,7 +236,7 @@ func TestPRImportsRule(t *testing.T) {
 			"ok/ok.go": "package ok\n\nimport \"example.org/fix/outside\"\n\nconst X = outside.Y\n",
 		}, []string{"outside/o.go is on no approvals glob"}},
 		{"a test file of the command that imports outside the globs", map[string]string{
-			"cmd/pr/main_test.go": "package main\n\nimport (\n\t\"testing\"\n\n\t\"example.org/fix/outside\"\n)\n\nfunc TestX(t *testing.T) { _ = outside.Y }\n",
+			"cmd/ask-first/main_test.go": "package main\n\nimport (\n\t\"testing\"\n\n\t\"example.org/fix/outside\"\n)\n\nfunc TestX(t *testing.T) { _ = outside.Y }\n",
 		}, []string{"outside/o.go is on no approvals glob"}},
 		{"a dotless module under a local replace inside the tree", map[string]string{
 			"go.mod":         "module example.org/fix\n\ngo 1.24\n\nrequire example v0.0.0\n\nreplace example => ./example\n",
@@ -269,7 +269,7 @@ func TestPRImportsRule(t *testing.T) {
 			}
 			writeFile(t, filepath.Join(top, "example", "go.mod"), "module example\n\ngo 1.24\n")
 			writeFile(t, filepath.Join(top, "example", "e.go"), "package example\n\nconst Z = 3\n")
-			got := judgeImports(t, root, "./cmd/pr", globs)
+			got := judgeImports(t, root, "./cmd/ask-first", globs)
 			if c.want == nil {
 				assert.Empty(t, got)
 				return

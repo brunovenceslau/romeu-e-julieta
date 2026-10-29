@@ -22,17 +22,17 @@ import (
 // the default branch, and fails closed on what it cannot read.
 
 // workflowsDir is the directory GitHub reads workflow files from, and
-// PRWorkflow the file of the pr job (10 10.2, the pr job row).
+// PRWorkflow the file of the ask-first job (10 10.2, the ask-first job row).
 const (
 	workflowsDir = ".github/workflows"
-	// PRWorkflow is the file of the pr job, and PREvent its one event;
+	// PRWorkflow is the file of the ask-first job, and PREvent its one event;
 	// the grammar of tools/ci workflows reads the same names.
-	PRWorkflow = workflowsDir + "/pr.yml"
+	PRWorkflow = workflowsDir + "/ask-first.yml"
 	PREvent    = "pull_request_target"
 )
 
 // goModeFiles are the paths at the top of the tree that change what the
-// go command builds in the pr job's checkout of the base branch: a
+// go command builds in the ask-first job's checkout of the base branch: a
 // workspace file and its sums, which take other modules in, and a vendor
 // directory, which replaces the module cache. The hygiene rule of 10
 // 10.2 refuses them, but it runs from the head's own tools/ci, which the
@@ -73,7 +73,7 @@ func headGoFiles(ctx context.Context, r git.Repo, head string) ([]Finding, error
 
 // headJobs applies REQ-1154 and REQ-1155 to the workflow files of the
 // head. A required check is matched by its name, and a workflow of the
-// head other than pr.yml can run from the head (on pull_request, or on
+// head other than ask-first.yml can run from the head (on pull_request, or on
 // push to the head's branch) and post a check on the head commit, so:
 //
 //   - a job of such a file whose check name (its name, else its id)
@@ -87,10 +87,10 @@ func headGoFiles(ctx context.Context, r git.Repo, head string) ([]Finding, error
 //     "static on ${{ matrix.os }}" stays; reopened when a measured check
 //     name of GitHub differs from that reading, or when the maintainer
 //     prefers the literal rule of REQ-1154 with jobs renamed);
-//   - the head's pr.yml names no event but pull_request_target, under
+//   - the head's ask-first.yml names no event but pull_request_target, under
 //     which GitHub runs the base branch's file and never the head's;
 //   - a workflow file that does not parse as one YAML mapping fails, as
-//     what pr cannot read it cannot clear.
+//     what ask-first cannot read it cannot clear.
 //
 // Every file directly in .github/workflows that ends in .yml or .yaml, in
 // any case, is read: the two endings GitHub runs.
@@ -123,7 +123,7 @@ func headJobs(ctx context.Context, r git.Repo, head string) ([]Finding, error) {
 func workflowFindings(name string, src []byte) []Finding {
 	doc, err := parseWorkflow(src)
 	if err != nil {
-		return []Finding{{Where: name, Msg: "a workflow file of the head that pr cannot read: " + err.Error()}}
+		return []Finding{{Where: name, Msg: "a workflow file of the head that ask-first cannot read: " + err.Error()}}
 	}
 	if name == PRWorkflow {
 		if !onlyEvent(mappingValue(doc, "on"), PREvent) {
@@ -137,7 +137,7 @@ func workflowFindings(name string, src []byte) []Finding {
 		return nil
 	}
 	if jobs.Kind != yaml.MappingNode {
-		return []Finding{{Where: name, Msg: "the jobs of a workflow file of the head are not a mapping pr can read"}}
+		return []Finding{{Where: name, Msg: "the jobs of a workflow file of the head are not a mapping ask-first can read"}}
 	}
 	for i := 0; i+1 < len(jobs.Content); i += 2 {
 		id, job := jobs.Content[i], jobs.Content[i+1]
@@ -147,13 +147,13 @@ func workflowFindings(name string, src []byte) []Finding {
 		switch n := mappingValue(job, "name"); {
 		case n == nil:
 		case n.Kind != yaml.ScalarNode:
-			findings = append(findings, Finding{Where: name, Msg: "a job of a workflow file of the head has a name pr cannot read"})
+			findings = append(findings, Finding{Where: name, Msg: "a job of a workflow file of the head has a name ask-first cannot read"})
 			continue
 		case n.Tag != "!!null" && n.Value != "":
 			check, label = n.Value, "name"
 		}
 		if spoofs(check) {
-			findings = append(findings, Finding{Where: name, Msg: "a job's " + label + ", quoted below, could post the check " + JobName + " of the pr job from the head (REQ-1154)", Quote: check})
+			findings = append(findings, Finding{Where: name, Msg: "a job's " + label + ", quoted below, could post the check " + JobName + " of the ask-first job from the head (REQ-1154)", Quote: check})
 		}
 	}
 	return findings

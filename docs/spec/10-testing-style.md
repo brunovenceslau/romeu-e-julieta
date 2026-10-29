@@ -61,7 +61,7 @@ covered item:
 20. `REQ-0771` `invariants` and `mutate`;
 21. `REQ-0772` `acceptance` against a recorded GitHub API fixture;
 22. `REQ-0773` `pins` against one fixture per source;
-23. `REQ-0774` `pr` against recorded event payloads.
+23. `REQ-0774` `ask-first` against recorded event payloads.
 
 Additional required tests:
 
@@ -150,8 +150,8 @@ Rules:
   workload's base image and its herdr download, each pinned and
   checksum-verified the same way; by the host suite, `tools/ci
   acceptance`, `tools/ci links` and `tools/ci pins`, which are outside
-  `all`; by the pr job's unauthenticated fetch of a pull request's
-  `head.sha`, made by `pr` only when the object is missing (10.2); and,
+  `all`; by the ask-first job's unauthenticated fetch of a pull request's
+  `head.sha`, made by `ask-first` only when the object is missing (10.2); and,
   inside `all`, by the `vulnerabilities` step and by the `license`
   step's pull of its pinned image (10.2). Nothing else in a test or a
   step reads it. The steps' `GOPROXY=off` is the one check; the rest is
@@ -207,11 +207,11 @@ does a file in that directory with another name ending:
 
 | Level | Allowed |
 |---|---|
-| file | `REQ-0802` the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters, and `pull_request_target` only as the pr job row below allows; `env` is required and holds exactly the mise environment of `tools/ci` (`MiseEnv` of the mise package of `tools/ci`), in its order, each value a YAML string |
+| file | `REQ-0802` the keys `name`, `on`, `permissions`, `concurrency`, `env`, `jobs`; `on` names the events `pull_request`, `push`, `schedule`, `workflow_dispatch`, with their filters, and `pull_request_target` only as the ask-first job row below allows; `env` is required and holds exactly the mise environment of `tools/ci` (`MiseEnv` of the mise package of `tools/ci`), in its order, each value a YAML string |
 | job | `REQ-0803` the keys `name`, `runs-on`, `needs`, `if`, `strategy`, `permissions`, `timeout-minutes`, `steps`; `if` is admitted only in an aggregator job, a job that holds an `if` or the step `exit 1`, which has a literal `name` (no `${{`), a `runs-on` that is one literal label, no `strategy`, a `needs` that lists every other job of the same file that is not an aggregator, no more and no fewer, a `timeout-minutes` of `5`, an `if` that is, byte for byte, `${{ always() && (contains(needs.*.result, 'failure') \|\| contains(needs.*.result, 'cancelled') \|\| contains(needs.*.result, 'skipped')) }}`, and one step, `run: exit 1`; `runs-on` is `${{ matrix.os }}` or one of the four labels of Runners below, and so is each `os` of the matrix (`runs-on` as a list or a mapping fails); `permissions`, at the top and in a job, is a mapping whose values are `read` or `none`, and the file sets it at the top or in every job, so no scope is left to the default; `strategy` holds `matrix`, `fail-fast` and `max-parallel` only; the matrix is a written mapping with the keys `os` and `include` only, each `include` entry holds `os` and `mise_sha256` only (names matched exactly), and a `${{` in the value of an `include` entry fails (the `os` value is held to the four labels); with `runs-on: ${{ matrix.os }}` every runner of the matrix names an `os` |
 | `uses` step | `REQ-0804` the keys `name`, `uses`, `with`; `uses` is `<owner>/<repo>[/<path>]@<40 hex digits>`, a commit SHA, the owner and the repository start with a letter or a digit, and so does each path segment or it starts with `_`, so no `.` or `..` segment, no `./` path of the repository (a local action) and no `docker://` image fits; `REQ-0805` `with` is a mapping that holds only the inputs listed for that action in `tools/ci` (the action is matched without case), and every `jdx/mise-action` step writes `persist_github_token: false`, an allowed input of that action, each value a literal or one `${{ matrix.<key> }}` alone whose values are all literals; an `actions/checkout` step sets `persist-credentials: false`, written exactly so (the case of the action name is ignored, the case of the value is not) |
 | `run` step | `REQ-0806` the keys `name`, `run`; `run` is one line, `go run ./tools/ci <subcommand> [<argument>...]`, `go run ./tools/release <subcommand> [<argument>...]`, the build line `go build -o "$RUNNER_TEMP/ci" ./tools/ci`, or `"$RUNNER_TEMP/ci" <subcommand> [<argument>...]`, the built `tools/ci` that `ci.yml` and `x64.yml` run `static`, `race` and `e2e` with (REQ-0800), or `exit 1`, only as the one step of an aggregator job (the job row); each word is made of ASCII letters, digits and `._/=:-`, or is `"$NAME"` |
-| pr job | `REQ-0807` one workflow file whose `on` names `pull_request_target`, with no `branches` filter (so a pull request into a stack branch is judged too, as the ruleset of `main` requires; decided on 2026-10-29), and no other event holds the one job that runs `go run ./tools/ci pr` (the task that builds `pr` may change that command line, and this row with it, 12 12.4); the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token` (the mise action reads the job's token through the default of its `github_token` input, which `permissions: contents: read` bounds, and its `persist_github_token: false`, required by the `uses` step row, keeps it from every later step), its one checkout is of the base branch's commit (`github.sha`), never `pull_request.base.sha`, with `persist-credentials: false`, and the head is read only as git objects fetched by `head.sha` by `pr` itself, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, the event with a `branches` filter, and a checkout of any other ref, with a fixture per refusal. The head fetch is unauthenticated, so it relies on the repository being public; a private repository reopens it (the [Deferred decisions](../spec.md#in-how-this-repository-is-run)). Under that event GitHub runs the workflow file of the pull request's base branch, a branch of this repository, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
+| ask-first job | `REQ-0807` one workflow file whose `on` names `pull_request_target`, with no `branches` filter (so a pull request into a stack branch is judged too, as the ruleset of `main` requires; decided on 2026-10-29), and no other event holds the one job that runs `go run ./tools/ci ask-first` (the task that builds `ask-first` may change that command line, and this row with it, 12 12.4); the file and the job set `permissions` to `contents: read` and nothing else, no step names a secret or `github.token` (the mise action reads the job's token through the default of its `github_token` input, which `permissions: contents: read` bounds, and its `persist_github_token: false`, required by the `uses` step row, keeps it from every later step), its one checkout is of the base branch's commit (`github.sha`), never `pull_request.base.sha`, with `persist-credentials: false`, and the head is read only as git objects fetched by `head.sha` by `ask-first` itself, never checked out to be built or run; `tools/ci workflows` refuses `pull_request_target` in any other file, the event with a `branches` filter, and a checkout of any other ref, with a fixture per refusal. The head fetch is unauthenticated, so it relies on the repository being public; a private repository reopens it (the [Deferred decisions](../spec.md#in-how-this-repository-is-run)). Under that event GitHub runs the workflow file of the pull request's base branch, a branch of this repository, with a token that may write and with secrets, and warns against building or running pull request code ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [secure use](https://docs.github.com/en/actions/reference/security/secure-use), read on 2026-10-09), which is why every one of these limits is in the grammar |
 | release publish job | `REQ-0808` in `.github/workflows/release.yml` only, one job, the publish job of [Release and bootstrap](#release-and-bootstrap), may set `contents: write`, `id-token: write` and `attestations: write` in its job `permissions`, and only its `run` steps of `tools/release build`, `tools/release notes`, `tools/release verify` and `tools/release publish` may hold `env` with the one key `GH_TOKEN: ${{ github.token }}`, and those four steps quote no variable but `"$GITHUB_REF_NAME"`; the file's `on` is `push` with `tags` only, and the publish job's `uses` steps are only checkout, mise and `actions/attest-build-provenance`, the whole path compared without case; `tools/ci workflows` refuses each of these in any other file, job or step (the `tools/ci setup` step of that job included), with a fixture per admitted step and per refused step |
 
 `REQ-0809` So a workflow has no `if` but the aggregator's, no `continue-on-error`, no `shell`, no
@@ -256,8 +256,8 @@ Three consequences of the grammar:
   `go test -json` output reports zero tests fails, so a selection that
   runs nothing is red. On a runner class that runs no container e2e the
 `e2e` subcommand prints the line of the step not run on that class.
-- `REQ-0813` The pr job's workflow lists `edited` among its `pull_request_target`
-  types, so a change to a PR's title or body runs `pr` again;
+- `REQ-0813` The ask-first job's workflow lists `edited` among its `pull_request_target`
+  types, so a change to a PR's title or body runs `ask-first` again;
   `tools/ci workflows` fails that file without it.
 - The grammar bounds keys, `run` lines, runner labels, the inputs of
   each action and expressions, not each value: the owner of a `uses`
@@ -268,18 +268,18 @@ Three consequences of the grammar:
   `actions/cache` (the container e2e's mise cache, 10.1) and
   `actions/attest-build-provenance`.
 
-`REQ-0815` The `pr` step runs in its own job, the pr job of the grammar, from the
+`REQ-0815` The `ask-first` step runs in its own job, the ask-first job of the grammar, from the
 base branch's code, on the file that `GITHUB_EVENT_PATH` names; `tools/ci
 all` does not run it. A local run
-is `go run ./tools/ci pr <file>`, on a payload saved beforehand (with
+is `go run ./tools/ci ask-first <file>`, on a payload saved beforehand (with
 `gh api`, for example), or, before the pull request exists,
-`go run ./tools/ci pr --title <title> --body <file>`, which reads the
-local base..HEAD range in place of a payload. `REQ-0816` `pr` reads the network
-only for the fetch of `head.sha` in the pr job, when the object is
+`go run ./tools/ci ask-first --title <title> --body <file>`, which reads the
+local base..HEAD range in place of a payload. `REQ-0816` `ask-first` reads the network
+only for the fetch of `head.sha` in the ask-first job, when the object is
 missing (12 12.4); a local run on a saved payload, or with `--title`
 and `--body`, reads none. `REQ-0817` The file is
 the pull request object, or the event whose `pull_request` member is
-that object, and `pr` reads seven fields of the object: `title`, `body`,
+that object, and `ask-first` reads seven fields of the object: `title`, `body`,
 `head.ref`, `head.sha`, `base.sha`, `base.ref` and
 `base.repo.default_branch`. A file with neither shape, or without one
 of the seven, fails. The rest comes from git: the commits
@@ -324,7 +324,7 @@ local-gate run is recorded is a
 | cross-build | `REQ-0838` darwin amd64/arm64 (`romeu`), linux amd64/arm64 (`julieta`) | |
 | imports | `REQ-0839` `tools/ci imports` (I1, I2, I11, I24, 10.7) | |
 | callsites | `REQ-1311` `tools/ci callsites`: the static scan of I16 and of the subprocess rule, over the admitted-call-site table of [05 5.2](05-security.md#52-invariants-and-their-tests) (REQ-0481, REQ-0500; [04 4.1](04-cli.md#41-conventions-both-binaries), Subprocesses, item 4) | |
-| invariants | `REQ-0840` `tools/ci invariants` reads the ids from the table of 05 5.2: the guard and test tags found in the code pair up, and each tagged id is a row of that table. That each row has both is checked by `acceptance` (10.5); that a pull request removes no last guard or test tag of a row it keeps is checked by `pr` | |
+| invariants | `REQ-0840` `tools/ci invariants` reads the ids from the table of 05 5.2: the guard and test tags found in the code pair up, and each tagged id is a row of that table. That each row has both is checked by `acceptance` (10.5); that a pull request removes no last guard or test tag of a row it keeps is checked by `ask-first` | |
 | mutation | `REQ-0841` `tools/ci mutate` on PRs touching a `.go` file on a path in `.github/ask-first.yaml`, or a file that holds a guard tag of an invariant; the scheduled `fuzz.yml` runs it too | |
 | catalog | `REQ-0842` `tools/ci catalog` (explicit upload flags, key syntax) | |
 | kits | `REQ-0843` `tools/ci kits` (one frontend pin; install steps <= 5 lines; every download has a sha256: a download is a step line whose first word is `curl` or `wget`, and the same step has a `sha256sum -c` or `shasum -a 256 -c` line after it; a download line holds no `\|`, `;`, `&&` or `$(`, and the file `-c` reads is a kit file, not one the step downloaded. A download written with another tool is not seen by the check; the review of the `kits` surface covers it). `REQ-0844` On a change to the pin file, it verifies the committed signature of mise's `SHASUMS256.txt` offline and checks the pinned hashes against that file ([07 7.4](07-mise-egress.md#74-mise-bootstrap-and-its-own-egress)) | |
@@ -333,7 +333,7 @@ local-gate run is recorded is a
 | license | `REQ-0847` `reuse lint` (REUSE 3.3), from the `fsfe/reuse` image pinned by digest in `tools/ci` ([12 12.1](12-engineering.md#121-tech-stack)), with the working tree and the git directory (`git rev-parse --git-common-dir`) mounted read-only, each at its own path, and no network for the container, so that a linked worktree, whose git directory lies outside the tree, ignores the same files as a clone; it runs before `race` (below); on Linux only, since the check reads file content alone and the image is built for Linux. On macOS the output of `all` shows `--    license: not run on darwin`, neither `ok` nor `FAIL`. `REQ-0848` The same step reads the licenses of the module graph and fails a module whose license is not on an allowlist compatible with GPL-3.0-only ([00 0.4](00-scope.md#04-license)); the modules it judges are those whose packages some build of this module compiles (`go list -deps -test ./...` for each target and tag set), so a module `go.sum` pins for the tests of a dependency alone, such as `github.com/dlclark/regexp2`, is not judged; `REQ-0849` `tools/release build` writes the third-party notices file of each archive from that graph | |
 | docs | `REQ-0850` `tools/ci docs` (S10; the checks ADR 0001 assigns to it: rules 1, 5 without external URLs, 9 for the title at a first mention, 12, 13, 17, 20). `REQ-0851` It also fails `ARCHITECTURE.md` when an invariant id of 05 5.2 or a module id of 12 12.2 does not appear in it; and an error id whose "recovered in" cell is empty or names an anchor that does not resolve (12 12.8). The Markdown lint and the spell check of rule 5 check nothing until their tools are picked, a [deferred decision](../spec.md#deferred-decisions). The reference pages are compared with their source by `generated`, not here. `REQ-0852` The command lines of fix hints and `--help` examples are checked by the unit test over the generated command definitions that [04 4.1](04-cli.md#41-conventions-both-binaries) names (Error ids), not by rule 13, which reads `README.md` and `docs/guide/`. The julieta command lines of a `SKILL.md`, flags included, and the headings the handoff skill names are checked by the test of [12 12.3](12-engineering.md#123-generators) against the command definitions and the headings `julieta handoff write` requires | |
 | lessons | `REQ-0853` `tools/ci lessons`: every lesson under `docs/lessons/` ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read after its front matter, names an existing `tools/ci` subcommand or test name, or says "no check possible: <reason>" | |
-| pr | `REQ-0854` `tools/ci pr` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker, 12 12.10; the tags of 05 5.2, above; the forbidden-name check, below) | |
+| ask-first | `REQ-0854` `tools/ci ask-first` (pull requests only; inputs as described above; 12 12.4; ADR 0001 rules 4, 8, 11; the base branch, 12 12.9; the fix marker, 12 12.10; the tags of 05 5.2, above; the forbidden-name check, below) | |
 
 `REQ-0855` The registered checks are inventoried in `docs/reference/checks.md`,
 generated from the registry (12 12.3), one line per check with the
@@ -499,7 +499,7 @@ fixed one by one. Gating each merge on the merged result (a merge
 queue) is a repository setting on the ruleset, and v1 does not use it.
 
 `REQ-0865` The steps of `fast`, with `workflows`, `generated`, `sequences` and
-`pr`, land with `ci-bootstrap`
+`ask-first`, land with `ci-bootstrap`
 ([12 12.2](12-engineering.md#122-development-commands-and-capability-map));
 every other step lands in the first pull request of the module that
 owns its first input, as a `tools/new` kind does.
@@ -719,7 +719,7 @@ The list holds names of other projects this repository must not
 mention. A false positive is reported in an issue, and the maintainer
 adjusts the entry.
 `REQ-0884` There is one definition of a match and one function that applies it;
-`hygiene`, `fast` and `pr` all call that function.
+`hygiene`, `fast` and `ask-first` all call that function.
 
 - `REQ-0885` An entry is an ordered list of one or more segments. A segment is a
   length and the sha256 of a piece of the name, with ASCII letters
@@ -754,7 +754,7 @@ adjusts the entry.
 |---|---|---|
 | the path and the content of each tracked file at HEAD | `tools/ci hygiene` | in `fast` and in `all` |
 | the name each pushed ref gets on the remote; of each pushed annotated tag: the name it was created with, its tagger and its message; of each pushed commit: the message, the author and committer names and emails, the paths it adds or renames to, the lines it adds, and the name, tagger and message of each tag it embeds in a `mergetag` header | `REQ-0889` `tools/ci fast`, called by the pre-push hook | before the push leaves the machine |
-| the PR title, body and head ref name; the same four readings of each commit in base..head | `REQ-0890` `tools/ci pr` | on the pull request |
+| the PR title, body and head ref name; the same four readings of each commit in base..head | `REQ-0890` `tools/ci ask-first` | on the pull request |
 
 `REQ-0891` The hook's last line is `run go run ./tools/ci fast "$@"`, where `run`
 execs `env -i` with the allowlist and the fixed settings that the hook
@@ -777,7 +777,7 @@ pushed ref that leads to no commit, such as a tag on a blob or a tree:
 both end with exit status 2. The objects are read as the push sends
 them: replace refs are ignored, and grafts (`info/grafts`) are honoured
 by the reader and by `git push` alike, so the two agree. Called without
-arguments, `fast` runs the `In fast` steps and no range. `pr` uses the
+arguments, `fast` runs the `In fast` steps and no range. `ask-first` uses the
 same walk over base..head.
 
 `REQ-0893` The steps run on the working tree, and the review sees only commits,
@@ -844,7 +844,7 @@ from another clone applies once it is fetched here.
 The limits, stated plainly:
 
 - Outside a sandbox the hook is opt-in (12 12.4), and
-  `git push --no-verify` skips it. `pr` is the backstop, and it runs
+  `git push --no-verify` skips it. `ask-first` is the backstop, and it runs
   after the push: a name pushed without the hook is on the remote
   before any check reads it. A branch pushed that way and not opened as
   a PR is read by no check.
@@ -855,9 +855,9 @@ The limits, stated plainly:
 - Git notes, issues and review comments are not read: no check sees
   their text. Of a pushed annotated tag the hook reads the name it was
   created with, its tagger and its message, signature lines included;
-  `pr` reads no tag ref. A tag that a merge commit embeds in a
+  `ask-first` reads no tag ref. A tag that a merge commit embeds in a
   `mergetag` header, as `git merge` of a signed tag does, is read the
-  same way, by the hook and by `pr`. The other headers of a commit are
+  same way, by the hook and by `ask-first`. The other headers of a commit are
   not read: its signature, `encoding`, and any extra header. Nor are
   the headers of a tag other than `tag` and `tagger`. Git writes the
   `author`, `committer`, `object`, `tag` and `tagger` headers once
@@ -1033,7 +1033,7 @@ a stray tag and not the token, which merges through the API.
    [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change):
    `tools/new adr`, the `go generate` wiring with `tools/ci generated`
    (the ADR index and CODEOWNERS are its first two generators) and
-   `.github/ask-first.yaml`, in the first task; `sequences`, `pr`
+   `.github/ask-first.yaml`, in the first task; `sequences`, `ask-first`
    (whole, the form check of a `Fixes-release:` trailer included, so a
    trailer written before the first release is well formed) and the
    `ARCHITECTURE.md` and `CONTRIBUTING.md` skeletons land by their
@@ -1095,9 +1095,9 @@ Evidence, or, for items g and h, in the note's dated entry:
   checks (the note on the maintainer block); on 2026-10-17 the two x64
   checks left it, with the x64 runners (Runners). Saving the API's answer
   under Evidence is what is left to do (measured on 2026-10-12: no
-  merged pull request body holds it). `REQ-0919` When the task that builds `pr`
+  merged pull request body holds it). `REQ-0919` When the task that builds `ask-first`
   lands, its job is added to the required checks, and the step records
-  under that task's Evidence the `head_sha` the pr job's check run
+  under that task's Evidence the `head_sha` the ask-first job's check run
   carries and whether a ruleset that requires it blocks a merge and then
   allows it. If the check cannot be required, that task's Evidence says
   so.
@@ -1165,9 +1165,9 @@ run, marked interim; S2 still requires a real green run for release.
 - `REQ-0940` Injected clock, ULID entropy source and version stamp in every package
   that writes time, ids or versions; tests fix all three.
 - `REQ-0941` Golden files change only with `-update` locally; `REQ-0942` CI never runs it and
-  lists changed goldens, and `tools/ci pr` requires them listed under
+  lists changed goldens, and `tools/ci ask-first` requires them listed under
   the PR's Evidence. A golden, for that check, is a file under a
-  directory the Golden row of 10.1 names, and `pr` requires the
+  directory the Golden row of 10.1 names, and `ask-first` requires the
   repository path of each changed one, verbatim, in the Evidence
   section. `REQ-0943` The `sbxenv.yaml` goldens carry the sha256 recorded
   by probe A5; `tools/ci probes` flags a golden whose hash moved since

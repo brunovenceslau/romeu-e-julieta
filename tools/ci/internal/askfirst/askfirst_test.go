@@ -124,7 +124,7 @@ func TestPRRun(t *testing.T) {
 	t.Run("a local run that passes", func(t *testing.T) {
 		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
 		assert.True(t, ok, out)
-		assert.Equal(t, "pr: ok\n", out)
+		assert.Equal(t, "ask-first: ok\n", out)
 	})
 	t.Run("the default base is origin/main", func(t *testing.T) {
 		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile)
@@ -134,8 +134,8 @@ func TestPRRun(t *testing.T) {
 	t.Run("a local run that fails", func(t *testing.T) {
 		ok, out := run(t, alert("> - [ ] Approval: decisions - "+"amend rule 8"), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
 		assert.False(t, ok)
-		assert.Contains(t, out, "pull request body: pr: the diff touches \"decisions\" and its approval line is not ticked")
-		assert.Contains(t, out, "pr: 1 finding(s)")
+		assert.Contains(t, out, "pull request body: ask-first: the diff touches \"decisions\" and its approval line is not ticked")
+		assert.Contains(t, out, "ask-first: 1 finding(s)")
 	})
 	t.Run("a saved payload", func(t *testing.T) {
 		payload := filepath.Join(dir, "event.json")

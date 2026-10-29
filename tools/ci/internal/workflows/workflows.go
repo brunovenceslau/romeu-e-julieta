@@ -114,7 +114,7 @@ var actionInputs = map[string][]string{
 // miseAction is the action whose step must not hand the token on: its
 // github_token input reads the job's token by default, and
 // persist_github_token: false keeps it from every later step (10 10.2,
-// the pr job row).
+// the ask-first job row).
 const miseAction = "jdx/mise-action"
 
 // concurrencyKeys are the keys a concurrency mapping may hold: the group
@@ -266,8 +266,8 @@ type grammar struct {
 	// rel is what a release.yml grants its publish job (release.go), and
 	// nil in every other file.
 	rel *release
-	// pr is what pr.yml grants its job (pr.go), and nil in every other
-	// file; inPR says the file is pr.yml, with a pr job or without.
+	// pr is what ask-first.yml grants its job (pr.go), and nil in every other
+	// file; inPR says the file is ask-first.yml, with an ask-first job or without.
 	pr   *prRow
 	inPR bool
 }
@@ -802,7 +802,7 @@ func actionName(uses *yaml.Node) string {
 }
 
 // inputs checks the with keys of a uses step against actionInputs (and,
-// for the checkout of the pr job, prDepth), and
+// for the checkout of the ask-first job, prDepth), and
 // each value: a literal, or one ${{ matrix.<key> }} alone whose values
 // are literals, so that nothing an event can write reaches an input.
 func (c *grammar) inputs(step, uses, with, strategy *yaml.Node) {

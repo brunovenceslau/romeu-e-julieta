@@ -5,7 +5,7 @@
 // paths whose changes need the maintainer's approval (05 5.3), and
 // judges the approval lines of a pull request against it (12 12.4): the
 // code of pr. It imports only the standard library, the git runner of
-// tools/ci and the YAML library, so the pr job builds it without the
+// tools/ci and the YAML library, so the ask-first job builds it without the
 // framework of tools/ci (tools/ci/internal/check), and every package it
 // builds is on the approvals surface (05 5.3, REQ-0539; TestPRImports
 // holds it). The askfirst package wraps it for tools/ci: the CODEOWNERS

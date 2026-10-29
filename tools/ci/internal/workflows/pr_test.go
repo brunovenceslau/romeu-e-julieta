@@ -16,9 +16,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
-// goodPR passes the grammar: the pr job row of 10 10.2 as pr.yml holds
+// goodPR passes the grammar: the ask-first job row of 10 10.2 as ask-first.yml holds
 // it.
-const goodPR = `name: pr
+const goodPR = `name: ask-first
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited]
@@ -28,8 +28,8 @@ concurrency:
 permissions:
   contents: read
 ` + citest.WorkflowEnv + `jobs:
-  pr:
-    name: pr
+  ask-first:
+    name: ask-first
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
@@ -44,12 +44,12 @@ permissions:
           version: 2026.10.3
           sha256: aa
           persist_github_token: false
-      - run: go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"
+      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first "$GITHUB_EVENT_PATH"
 `
 
-const prPath = ".github/workflows/pr.yml"
+const prPath = ".github/workflows/ask-first.yml"
 
-// TestWorkflowsPRNames holds the grammar's names of the pr job to the
+// TestWorkflowsPRNames holds the grammar's names of the ask-first job to the
 // ones pr reads the head with.
 func TestWorkflowsPRNames(t *testing.T) {
 	assert.Equal(t, approval.PRWorkflow, Dir+prFile)
@@ -57,7 +57,7 @@ func TestWorkflowsPRNames(t *testing.T) {
 }
 
 // TestWorkflowsPRAdmitted passes the pr workflow, and the committed
-// pr.yml is that shape (TestWorkflowsRepository reads it too).
+// ask-first.yml is that shape (TestWorkflowsRepository reads it too).
 func TestWorkflowsPRAdmitted(t *testing.T) {
 	assert.Empty(t, workflowFindings(prPath, []byte(goodPR)))
 	src, err := os.ReadFile(filepath.Join(citest.ModuleRoot(t), filepath.FromSlash(prPath)))
@@ -65,7 +65,7 @@ func TestWorkflowsPRAdmitted(t *testing.T) {
 	assert.Empty(t, workflowFindings(prPath, src))
 }
 
-// TestWorkflowsPRRefused fails each change the pr job row refuses: one
+// TestWorkflowsPRRefused fails each change the ask-first job row refuses: one
 // fixture per refusal of T181's acceptance (the event with a branches
 // filter, a permission other than contents: read, a step
 // naming a secret or github.token, a checkout of another ref, one of
@@ -81,9 +81,9 @@ func TestWorkflowsPRRefused(t *testing.T) {
 		{"the event filtered to main", "    types: [opened, synchronize, reopened, edited]\n", "    branches: [main]\n    types: [opened, synchronize, reopened, edited]\n", "the filter branches"},
 		{"the event filtered to another branch", "    types: [opened, synchronize, reopened, edited]\n", "    branches: [dev]\n    types: [opened, synchronize, reopened, edited]\n", "the filter branches"},
 		{"the event filtered by branches-ignore", "    types: [opened, synchronize, reopened, edited]\n", "    branches-ignore: [dev]\n    types: [opened, synchronize, reopened, edited]\n", "the filter branches-ignore"},
-		{"a permission other than contents: read, at the top", "permissions:\n  contents: read\nenv", "permissions:\n  contents: read\n  pull-requests: read\nenv", "the permissions of pr.yml is contents: read"},
-		{"a write permission in the job", "    permissions:\n      contents: read\n", "    permissions:\n      contents: write\n", "the permissions of the job of pr.yml"},
-		{"no permissions in the job", "    permissions:\n      contents: read\n", "", "the permissions of the job of pr.yml"},
+		{"a permission other than contents: read, at the top", "permissions:\n  contents: read\nenv", "permissions:\n  contents: read\n  pull-requests: read\nenv", "the permissions of ask-first.yml is contents: read"},
+		{"a write permission in the job", "    permissions:\n      contents: read\n", "    permissions:\n      contents: write\n", "the permissions of the job of ask-first.yml"},
+		{"no permissions in the job", "    permissions:\n      contents: read\n", "", "the permissions of the job of ask-first.yml"},
 		{"a step naming a secret", "          version: 2026.10.3\n", "          version: ${{ secrets.TOKEN }}\n", "a secret is read only"},
 		{"a step naming github.token", "          version: 2026.10.3\n", "          version: ${{ github.token }}\n", "the token is read through no expression"},
 		{"a checkout of the head", checkoutWith, checkoutWith + "          ref: ${{ github.event.pull_request.head.sha }}\n", "its checkout names no ref"},
@@ -104,11 +104,11 @@ func TestWorkflowsPRRefused(t *testing.T) {
 		{"a checkout of part of the history", "          fetch-depth: 0\n", "          fetch-depth: 1\n", "fetch-depth: 0"},
 		{"a checkout of the default depth", "          fetch-depth: 0\n", "", "fetch-depth: 0"},
 		{"a second job", "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci static\n", "holds one job"},
-		{"the job under another id", "jobs:\n  pr:\n", "jobs:\n  judge:\n", "holds one job"},
-		{"the job under another name", "    name: pr\n", "    name: judge\n", "is named pr"},
-		{"a setup step, which builds all of tools/ci", "      - run: go run ./tools/ci/internal/askfirst/cmd/pr", "      - run: go run ./tools/ci setup\n      - run: go run ./tools/ci/internal/askfirst/cmd/pr", "the steps of the pr job"},
-		{"the pr line with another argument", `cmd/pr "$GITHUB_EVENT_PATH"`, `cmd/pr "$HOME"`, "the steps of the pr job"},
-		{"the steps in another order", "      - uses: jdx/mise-action@", "      - run: go run ./tools/ci/internal/askfirst/cmd/pr \"$GITHUB_EVENT_PATH\"\n      - uses: jdx/mise-action@", "the steps of the pr job"},
+		{"the job under another id", "jobs:\n  ask-first:\n", "jobs:\n  judge:\n", "holds one job"},
+		{"the job under another name", "    name: ask-first\n", "    name: judge\n", "is named ask-first"},
+		{"a setup step, which builds all of tools/ci", "      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first", "      - run: go run ./tools/ci setup\n      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first", "the steps of the ask-first job"},
+		{"the pr line with another argument", `cmd/ask-first "$GITHUB_EVENT_PATH"`, `cmd/ask-first "$HOME"`, "the steps of the ask-first job"},
+		{"the steps in another order", "      - uses: jdx/mise-action@", "      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first \"$GITHUB_EVENT_PATH\"\n      - uses: jdx/mise-action@", "the steps of the ask-first job"},
 		{"a matrix", "    timeout-minutes: 10\n", "    timeout-minutes: 10\n    strategy:\n      matrix:\n        os: [ubuntu-26.04-arm]\n", "has no strategy"},
 	}
 	for _, tt := range tests {
@@ -121,15 +121,15 @@ func TestWorkflowsPRRefused(t *testing.T) {
 }
 
 // TestWorkflowsPRElsewhere proves the exemptions of the row stay in the
-// pr job of pr.yml: pull_request_target in a second file, the pr line
+// ask-first job of ask-first.yml: pull_request_target in a second file, the pr line
 // and the fetch-depth input in any other file are refused.
 func TestWorkflowsPRElsewhere(t *testing.T) {
 	good := citest.GoodWorkflow
 	tests := []struct {
 		name, old, new, want string
 	}{
-		{"pull_request_target in a second file", "on:\n", "on:\n  pull_request_target:\n    branches: [main]\n", "is the event of pr.yml alone"},
-		{"the pr line in another file", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci/internal/askfirst/cmd/pr \"$GITHUB_EVENT_PATH\"\n", "run is one line"},
+		{"pull_request_target in a second file", "on:\n", "on:\n  pull_request_target:\n    branches: [main]\n", "is the event of ask-first.yml alone"},
+		{"the pr line in another file", "        run: go run ./tools/ci all\n", "        run: go run ./tools/ci/internal/askfirst/cmd/ask-first \"$GITHUB_EVENT_PATH\"\n", "run is one line"},
 		{"fetch-depth in another file", "          persist-credentials: false\n", "          persist-credentials: false\n          fetch-depth: 0\n", `the input "fetch-depth" is not one`},
 	}
 	for _, tt := range tests {
@@ -140,13 +140,13 @@ func TestWorkflowsPRElsewhere(t *testing.T) {
 		})
 	}
 	t.Run("pull_request_target as one name", func(t *testing.T) {
-		wantAny(t, workflowFindings(".github/workflows/x.yml", []byte("on: pull_request_target\njobs: {}\n"+citest.WorkflowEnv)), "is the event of pr.yml alone")
+		wantAny(t, workflowFindings(".github/workflows/x.yml", []byte("on: pull_request_target\njobs: {}\n"+citest.WorkflowEnv)), "is the event of ask-first.yml alone")
 	})
-	t.Run("the pr line in another job of pr.yml", func(t *testing.T) {
-		src := strings.Replace(goodPR, "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci/internal/askfirst/cmd/pr \"$GITHUB_EVENT_PATH\"\n", 1)
+	t.Run("the pr line in another job of ask-first.yml", func(t *testing.T) {
+		src := strings.Replace(goodPR, "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first \"$GITHUB_EVENT_PATH\"\n", 1)
 		wantAny(t, workflowFindings(prPath, []byte(src)), "run is one line")
 	})
-	t.Run("a pr.yml with no job", func(t *testing.T) {
+	t.Run("an ask-first.yml with no job", func(t *testing.T) {
 		head, _, _ := strings.Cut(goodPR, "jobs:\n")
 		wantAny(t, workflowFindings(prPath, []byte(head+"jobs: {}\n")), "holds one job")
 	})

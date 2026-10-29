@@ -224,7 +224,7 @@ plan task ([10 10.5](10-testing-style.md#105-acceptance-evidence)), so a
 row can be written before its code without turning `all` red; until then
 a row with no code is caught by the plan and by review. A guard deleted
 together with its test and both tags is caught by the diff instead:
-`REQ-0476` `tools/ci pr` fails a pull request that removes the last guard tag or
+`REQ-0476` `tools/ci ask-first` fails a pull request that removes the last guard tag or
 the last test tag of an id whose row it keeps. Removing an invariant
 means removing its row in the same pull request, on the specification
 surface (5.3).
@@ -398,11 +398,11 @@ list and does not copy it. `go generate` derives `.github/CODEOWNERS`
 from it, which names `owner` for each glob; `REQ-0536` `tools/ci mutate` reads it to decide which
 PRs run mutation testing (a `.go` file on a listed path, or a file
 holding an invariant guard tag, so a guard outside every surface is
-tested too); `REQ-0537` `tools/ci pr` requires an approval line in the PR body for
+tested too); `REQ-0537` `tools/ci ask-first` requires an approval line in the PR body for
 each surface the diff touches. A path may match several surfaces; an
 approval line names one surface id, so such a path needs one line per
 surface it matches. The approval line, the ruleset's requirements, and
-which revision of this file `pr` reads are defined in one place,
+which revision of this file `ask-first` reads are defined in one place,
 [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change);
 what an approval is worth with one account is in 5.4. `REQ-0538` At a plan
 checkpoint the maintainer may grant the approval lines of a list of
@@ -412,17 +412,17 @@ grant, are in 12 12.4. `REQ-0539` The `approvals` surface holds
 `tools/ci/internal/askfirst/**`, `tools/ci/git/**`,
 `internal/procgroup/**`, `go.sum`, `tools/ci/denylist.yaml` and
 `.github/workflows/**`: the check of approval lines and grants with
-every package the pr job builds (the git runner and the process starter
+every package the ask-first job builds (the git runner and the process starter
 it calls, and each module dependency by its pin in `go.sum`), the
 forbidden-name denylist and the files that choose what runs, which no
 checkpoint grant covers (decided on 2026-10-29, scope this repository).
 `go.mod` stays off it: its `go` line stays a grantable input under
 REQ-0541, and a local `replace` in it is caught by the test that lists
-the packages the pr job builds (12 12.4, REQ-1150). Each path on
+the packages the ask-first job builds (12 12.4, REQ-1150). Each path on
 `approvals` is also on `checks`, `dependencies` or `procgroup`, and a
 pull request that touches it carries a line for each surface it
-matches. `REQ-0540` The `pr` job holds one invariant: no code that
-a pull request changes judges that pull request. `pr` runs from a
+matches. `REQ-0540` The `ask-first` job holds one invariant: no code that
+a pull request changes judges that pull request. `ask-first` runs from a
 workflow defined in the pull request's base branch, a branch of this
 repository that the pull request does not change (the default branch
 for most, the branch below for one in a stack; decided on 2026-10-09,
@@ -430,18 +430,18 @@ the base in place of the default branch on 2026-10-29), builds that
 branch's commit, and reads the head only as data. For a pull request
 into a stack branch, that code and the lists it reads are the branch's,
 which may hold the unmerged changes of the pull request below, so its
-`pr` result is advisory for the surfaces the lower pull request changes;
-the `pr` run of a pull request whose base is `main`, the bottom of a
+`ask-first` result is advisory for the surfaces the lower pull request changes;
+the `ask-first` run of a pull request whose base is `main`, the bottom of a
 stack or one retargeted to `main`, is the gate, and a retargeted pull
 request is merged after that run (12 12.4). So a
 change to a workflow file does not change the job that judges it; the
 job's shape (its event, its checkout and the git flags it reads the head
 with) is in
 [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change).
-Which code `pr` builds, how it reads the YAML and TOML files of the
+Which code `ask-first` builds, how it reads the YAML and TOML files of the
 head, and how it holds the head's version pins and the files the go
 command reads from the checkout (a `go.work`, `go.work.sum` or
-`vendor/`) are decided by the task that builds `pr`, whose acceptance
+`vendor/`) are decided by the task that builds `ask-first`, whose acceptance
 lists the requirements that make the invariant hold (decided on
 2026-10-09,
 [round 11](../reviews/round-11.md#decisions-for-the-operator)). The pr
@@ -453,7 +453,7 @@ of `mise.toml` and `go.mod` applied to the head from the default
 branch's code are not built yet: until they are, that part of the
 invariant is a requirement, not a property of code that exists. `REQ-0541` The toolchain pinned by `mise.toml` and `mise.lock`, on
 `dependencies`, and the `go` line of `go.mod`, which sets the language
-version `pr` is compiled at, stay grantable inputs under the job, and
+version `ask-first` is compiled at, stay grantable inputs under the job, and
 that task lists each of them in 5.4; keeping them off the grantable list
 is a row of
 [Deferred decisions](../spec.md#in-how-this-repository-is-run).
@@ -475,8 +475,8 @@ The decision records and the code of the checks are surfaces (decided in
 only call `tools/ci` (10 10.2), so the check code is the gate. The steps
 of `all` check a change to `tools/ci` with the changed `tools/ci`, so
 there its only check is the `checks` approval line, or a checkpoint
-grant that stands in for that line, while `pr` runs the base branch's
-code (the `pr` invariant of this section); running the base branch's
+grant that stands in for that line, while `ask-first` runs the base branch's
+code (the `ask-first` invariant of this section); running the base branch's
 `tools/ci` for the steps of `all` too is a row of
 [Deferred decisions](../spec.md#in-how-this-repository-is-run).
 `checks` holds the runner of the gates (`tools/ci/*.go` and
@@ -573,12 +573,12 @@ The record is
 
 | Risk | Why accepted | Mitigation |
 |---|---|---|
-| The approval line in a PR body is a checklist line the PR's author writes, and the maintainer ticks its box: the tick is the approval, and a line granted in `docs/grants.yaml` needs no tick. It names what was approved, not who approved it | anyone who can edit the body can tick a box, so a check can prove that the approval was recorded, not who gave it; with one account and one token for everyone (ADR 0008, decision 4) the line is a record and a guard against mistakes, not a barrier against an agent. The required checks are worth the same against a token holder, for the reasons of the list **Why the required checks guard against mistakes only** after this table. A signed approval record kept on the host is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) | the default-branch ruleset requires a pull request and the four `all on ...` checks, and no review; its bypass actor, the administrator role, bypasses for pull requests only ([10 10.2](10-testing-style.md#release-and-bootstrap), item a), so a direct push to the default branch is refused to every actor, the bypass actor included. The approval line, checked by `tools/ci pr` ([12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)), is the only recorded approval, and until `tools/ci pr` lands, the line and the grant file are read by the maintainer at merge; the next row says what it is worth |
-| The development sandbox's GitHub token is the operator's own: a merge, a `v*` tag and a change to a ruleset or a repository setting are process only against an agent that holds it. Its reach is every repository the account can reach, those of every organization the account is a member of included; that reach is inferred from the account's rights until probe A16 reads the token's type and scopes ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts); the scopes read in the sandbox are an entry of the [review log](../notes/maintainer-block-of-ci-bootstrap.md#review-log)) | it was decided on 2026-10-07, for now, and a second account was declined. It collides with rule 1 of [ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md), which says a merge gate is a need of the start; the collision was accepted by name on 2026-10-07. The merge-gate parts deferred with it are accepted with it, each a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) that says so: a check that reads the rulesets again, a signed approval record, running the change's tests in a separate job, `tools/ci pr`, `tools/ci sequences`, and `tools/ci invariants` with `mutate`. Of four tries with that token, only a direct push to the default branch was refused ([10 10.2](10-testing-style.md#release-and-bootstrap), item d); the try is repeated after the token narrowing (item g) | `REQ-0557` the GitHub security log is read at each sitting, as a judgment and not as a detector: by GitHub's documentation it records ruleset and listed settings changes and no merge, push, tag, branch deletion or release ([ADR 0009, drop the required review and amend the records that assumed it](../adr/0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md), decision 17; the read of 2026-10-09 is in the [review log](../notes/maintainer-block-of-ci-bootstrap.md#review-log)). That an agent can disable the ruleset or change the settings is inferred and stays so (the note on the maintainer block; decided on 2026-10-09). A moved `v*` tag is found by the acceptance check that a tag's commit equals the source digest in its attested provenance ([10 10.5](10-testing-style.md#105-acceptance-evidence)) when step 7 of the release checklist of [12 12.2](12-engineering.md#122-development-commands-and-capability-map) runs at the next release; a tag moved after the latest release stays undetected until then. The development sandbox has no PreToolUse guard of its own until it is romeu-managed (Deferred decisions). Replacing the token with a GitHub App installation token was decided on 2026-10-12 and is proposed in [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md), decision 2; it is applied as a maintainer step once that record is Accepted, and the token stands until then. The App token could still merge through the API and push branches and workflows, and so post a check under a required check's name (the row before); its full list is in the token narrowing row of [Deferred decisions](../spec.md#in-how-this-repository-is-run); what the token can reach is listed in classes in [ADR 0008](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md#decision) |
+| The approval line in a PR body is a checklist line the PR's author writes, and the maintainer ticks its box: the tick is the approval, and a line granted in `docs/grants.yaml` needs no tick. It names what was approved, not who approved it | anyone who can edit the body can tick a box, so a check can prove that the approval was recorded, not who gave it; with one account and one token for everyone (ADR 0008, decision 4) the line is a record and a guard against mistakes, not a barrier against an agent. The required checks are worth the same against a token holder, for the reasons of the list **Why the required checks guard against mistakes only** after this table. A signed approval record kept on the host is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) | the default-branch ruleset requires a pull request and the four `all on ...` checks, and no review; its bypass actor, the administrator role, bypasses for pull requests only ([10 10.2](10-testing-style.md#release-and-bootstrap), item a), so a direct push to the default branch is refused to every actor, the bypass actor included. The approval line, checked by `tools/ci ask-first` ([12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)), is the only recorded approval, and until `tools/ci ask-first` lands, the line and the grant file are read by the maintainer at merge; the next row says what it is worth |
+| The development sandbox's GitHub token is the operator's own: a merge, a `v*` tag and a change to a ruleset or a repository setting are process only against an agent that holds it. Its reach is every repository the account can reach, those of every organization the account is a member of included; that reach is inferred from the account's rights until probe A16 reads the token's type and scopes ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts); the scopes read in the sandbox are an entry of the [review log](../notes/maintainer-block-of-ci-bootstrap.md#review-log)) | it was decided on 2026-10-07, for now, and a second account was declined. It collides with rule 1 of [ADR 0005, decide at the last responsible moment and record the trigger](../adr/0005-decide-at-the-last-responsible-moment-and-record-the-trigger.md), which says a merge gate is a need of the start; the collision was accepted by name on 2026-10-07. The merge-gate parts deferred with it are accepted with it, each a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) that says so: a check that reads the rulesets again, a signed approval record, running the change's tests in a separate job, `tools/ci ask-first`, `tools/ci sequences`, and `tools/ci invariants` with `mutate`. Of four tries with that token, only a direct push to the default branch was refused ([10 10.2](10-testing-style.md#release-and-bootstrap), item d); the try is repeated after the token narrowing (item g) | `REQ-0557` the GitHub security log is read at each sitting, as a judgment and not as a detector: by GitHub's documentation it records ruleset and listed settings changes and no merge, push, tag, branch deletion or release ([ADR 0009, drop the required review and amend the records that assumed it](../adr/0009-drop-the-required-review-and-amend-the-records-that-assumed-it.md), decision 17; the read of 2026-10-09 is in the [review log](../notes/maintainer-block-of-ci-bootstrap.md#review-log)). That an agent can disable the ruleset or change the settings is inferred and stays so (the note on the maintainer block; decided on 2026-10-09). A moved `v*` tag is found by the acceptance check that a tag's commit equals the source digest in its attested provenance ([10 10.5](10-testing-style.md#105-acceptance-evidence)) when step 7 of the release checklist of [12 12.2](12-engineering.md#122-development-commands-and-capability-map) runs at the next release; a tag moved after the latest release stays undetected until then. The development sandbox has no PreToolUse guard of its own until it is romeu-managed (Deferred decisions). Replacing the token with a GitHub App installation token was decided on 2026-10-12 and is proposed in [ADR 0011, keep the administrator's pull-request bypass and give the sandbox a GitHub App token](../adr/0011-keep-the-administrator-s-pull-request-bypass-and-give-the-sandbox-a-github-app-token.md), decision 2; it is applied as a maintainer step once that record is Accepted, and the token stands until then. The App token could still merge through the API and push branches and workflows, and so post a check under a required check's name (the row before); its full list is in the token narrowing row of [Deferred decisions](../spec.md#in-how-this-repository-is-run); what the token can reach is listed in classes in [ADR 0008](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md#decision) |
 | Issue, PR and comment text from any account can steer an agent that holds the operator's token | the token was decided on 2026-10-07 (ADR 0008) | agents read such text as data and take no merge, close, label, workflow or settings action on it without the maintainer's word ([12 12.9](12-engineering.md#129-delivery-practices)); egress and capability widenings still meet the gates; the first issue or pull request from an account other than the operator's, the App's bot excluded, is an event of the token narrowing row |
-| Under a `checks` grant, a change can make a step of `all` pass, and the required checks stay green; and a green `pr` result from before a fix to `pr` landed still counts until an event runs the job again | the steps of `all` run the head's `tools/ci`, and running the base's for them is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) | `REQ-0558` the `pr` job runs the default branch's code and enforces the approval lines, the grants and the forbidden names (5.3, [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)); when `pr` changes, a new event on each open pull request runs the fixed `pr` (an `edited` event from a change to its body, which the job listens to, or a close and reopen), a manual step, while a re-run of an old run keeps the original event's `GITHUB_SHA` and judges with the old code; an automatic new run is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) |
+| Under a `checks` grant, a change can make a step of `all` pass, and the required checks stay green; and a green `ask-first` result from before a fix to `ask-first` landed still counts until an event runs the job again | the steps of `all` run the head's `tools/ci`, and running the base's for them is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) | `REQ-0558` the `ask-first` job runs the default branch's code and enforces the approval lines, the grants and the forbidden names (5.3, [12 12.4](12-engineering.md#124-middleware-before-and-after-every-change)); when `ask-first` changes, a new event on each open pull request runs the fixed `ask-first` (an `edited` event from a change to its body, which the job listens to, or a close and reopen), a manual step, while a re-run of an old run keeps the original event's `GITHUB_SHA` and judges with the old code; an automatic new run is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) |
 | The maintainer runs agent-authored code on the host: the pre-push hook and `hygiene add` run `tools/ci`, and the maintainer runs it on a host clone after block A and block B of 11; that code is merged by the token | the gates must run where the maintainer pushes | `REQ-0559` the host runs `tools/ci` only from a commit whose diff since the last host run the maintainer has read, or from the last released tag; the `checks` surface and its approval line (5.3); a trusted `hooksPath` checkout is a row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) |
-| `tools/ci pr` is not built until its trigger: approval lines, grants and the pull request sections are read by the maintainer at merge | the merge is the maintainer's by working agreement, and the gate's inputs do not exist before a product does | the row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) on `tools/ci pr`, with its trigger; the forbidden-name check over pull request text runs in the agents' own pre-PR gate and the maintainer's read until then |
+| `tools/ci ask-first` is not built until its trigger: approval lines, grants and the pull request sections are read by the maintainer at merge | the merge is the maintainer's by working agreement, and the gate's inputs do not exist before a product does | the row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) on `tools/ci ask-first`, with its trigger; the forbidden-name check over pull request text runs in the agents' own pre-PR gate and the maintainer's read until then |
 | `tools/ci sequences` is not built until its trigger | `tools/new adr` and `tools/ci plan` catch the main errors it would find | the row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) on `tools/ci sequences`, with its trigger |
 | `tools/ci invariants` and `mutate` are not built until their trigger | the guards land with their packages, are tagged by hand and are never narrowed; `tools/mutants` runs by hand on a security invariant | the row of [Deferred decisions](../spec.md#in-how-this-repository-is-run) on `tools/ci invariants` and `mutate`, with its trigger |
 

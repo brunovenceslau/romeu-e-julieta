@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Command pr is the step of the pr job (12 12.4, REQ-1150): it judges
+// Command ask-first is the step of the ask-first job (12 12.4, REQ-1150): it judges
 // the pull request of the event payload file it is given, the one
 // GITHUB_EVENT_PATH names, from the base branch's checkout it runs in.
 //
-//	go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"
+//	go run ./tools/ci/internal/askfirst/cmd/ask-first "$GITHUB_EVENT_PATH"
 //
-// It is the code of "go run ./tools/ci pr" without the framework of
+// It is the code of "go run ./tools/ci ask-first" without the framework of
 // tools/ci: it imports the approval package and what that imports, every
 // package of it on the approvals surface (TestPRImports), so no change
 // that a grant covers changes the code that judges a pull request. Unlike
@@ -31,10 +31,10 @@ import (
 )
 
 // usage is the one form of the command line.
-const usage = "usage: pr <event payload file>"
+const usage = "usage: ask-first <event payload file>"
 
 func main() {
-	os.Exit(procgroup.Main("pr", os.Stderr, func(ctx context.Context) int {
+	os.Exit(procgroup.Main("ask-first", os.Stderr, func(ctx context.Context) int {
 		return run(ctx, os.Args[1:], os.Stdout, os.Stderr)
 	}))
 }
@@ -49,7 +49,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	ok, err := judge(ctx, args[0], stdout)
 	switch {
 	case err != nil:
-		_, _ = fmt.Fprintln(stderr, git.SafeLines("pr: "+err.Error()))
+		_, _ = fmt.Fprintln(stderr, git.SafeLines("ask-first: "+err.Error()))
 		return 2
 	case !ok:
 		return 1
