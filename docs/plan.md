@@ -120,7 +120,7 @@ carries:
 | `milestone` | M0 to M6, or `none` for a folded, removed or left-v1 id |
 | `module` | the module id of 12 12.2; `none` for a task with no file in this repository |
 | `fate` | `kept`, `new`, `deferred`, `folded`, `merged`, `left-v1` or `removed`; `absorbed_by` names the id a folded task went into |
-| `owns` | the globs the task's pull request may edit, besides the task's own file and the generated outputs it regenerates (rule 1); empty for a deferred task until it reopens |
+| `owns` | the globs the task's pull request may edit, besides the task's own file and the generated outputs it regenerates (rule 1); each at most 256 bytes; empty for a deferred task until it reopens |
 | `needs` | a data or interface dependency: the task starts when these are merged |
 | `after` | a file overlap or a review order: the task also waits for these; the critical path counts both kinds, and `after` is kept apart so an overlap can be removed by moving a file |
 | `ask_first` | the surfaces of 05 5.3 the diff is expected to touch; a forecast, so the approvals can be given at each sitting for the grantable surfaces of 12 12.4, while every other surface keeps its approval line on each pull request |
@@ -243,8 +243,8 @@ New or changed, each proposed on 2026-10-12:
    2026-10-12).
 3. **Disjointness is checked.** `tools/ci plan` (T106) fails when two
    open tasks that no `needs` or `after` edge orders, directly or
-   through other tasks, own an overlapping
-   path (a path in the tree, or a literal path, matched by both), the
+   through other tasks, own an overlapping path (a path in the tree, a
+   literal path, or a path not made yet that two globs both match), the
    generated outputs of rule 1 left out. Each pull request still
    measures `git diff --name-only` against every in-flight pull request
    before landing.
