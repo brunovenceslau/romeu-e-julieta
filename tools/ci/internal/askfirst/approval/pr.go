@@ -135,7 +135,7 @@ func ReadArgs(ctx context.Context, r git.Repo, args []string, usage string) (PR,
 	bodyFile := fs.String("body", "", "")
 	base := fs.String("base", localBase, "")
 	if err := fs.Parse(args); err != nil {
-		return PR{}, fmt.Errorf("pr: %w\n%s", err, usage)
+		return PR{}, fmt.Errorf("ask-first: %w\n%s", err, usage)
 	}
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
@@ -157,7 +157,7 @@ func ReadArgs(ctx context.Context, r git.Repo, args []string, usage string) (PR,
 		}
 		return PR{Title: *title, Body: string(body), BaseSHA: baseSHA, HeadSHA: headSHA}, nil
 	}
-	return PR{}, fmt.Errorf("pr takes a payload file, or --title and --body with an optional --base\n%s", usage)
+	return PR{}, fmt.Errorf("ask-first takes a payload file, or --title and --body with an optional --base\n%s", usage)
 }
 
 // ReadPayload reads a saved payload file with ParsePayload.

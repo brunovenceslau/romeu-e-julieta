@@ -267,7 +267,7 @@ type grammar struct {
 	// nil in every other file.
 	rel *release
 	// pr is what ask-first.yml grants its job (pr.go), and nil in every other
-	// file; inPR says the file is ask-first.yml, with a ask-first job or without.
+	// file; inPR says the file is ask-first.yml, with an ask-first job or without.
 	pr   *prRow
 	inPR bool
 }

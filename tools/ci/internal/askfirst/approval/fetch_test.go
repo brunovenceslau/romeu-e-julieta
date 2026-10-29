@@ -135,7 +135,7 @@ func subcommand(args []string) (string, []string) {
 	return "", settings
 }
 
-// TestPRHostileRepository runs pr against a hostile fixture repository
+// TestPRHostileRepository runs ask-first against a hostile fixture repository
 // (REQ-1153): the clone's configuration names a textconv driver and an
 // external diff driver for every path, runs hooks from a directory of
 // its own and recurses into submodules, and the head adds a submodule and

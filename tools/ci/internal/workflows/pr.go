@@ -21,7 +21,7 @@ import (
 //     so a pull request into a stack branch is judged too (the ruleset
 //     of main requires the check on every pull request of a stack;
 //     decided on 2026-10-29), whose types list edited, so a change to
-//     the title or the body runs pr again (REQ-0813), with opened,
+//     the title or the body runs ask-first again (REQ-0813), with opened,
 //     synchronize and reopened and no other, and no other filter;
 //   - permissions, at the top and in the job, is contents: read and
 //     nothing else; no step names a secret or github.token (the
@@ -156,7 +156,7 @@ func (c *grammar) prTrigger(doc *yaml.Node) {
 	event := on.Content[1]
 	for key := range pairs(event) {
 		if key.Value != "types" {
-			c.add(key, "the filter "+key.Value+" of "+prEvent+" is outside the ask-first job row: types alone, so pr runs for a pull request into any branch, a stack branch among them")
+			c.add(key, "the filter "+key.Value+" of "+prEvent+" is outside the ask-first job row: types alone, so ask-first runs for a pull request into any branch, a stack branch among them")
 		}
 	}
 	var types []string
@@ -164,7 +164,7 @@ func (c *grammar) prTrigger(doc *yaml.Node) {
 		types = append(types, t.Value)
 	}
 	if !slices.Contains(types, "edited") {
-		c.add(on, prFile+" lists edited among its "+prEvent+" types, so a change to the title or body runs pr again (REQ-0813)")
+		c.add(on, prFile+" lists edited among its "+prEvent+" types, so a change to the title or body runs ask-first again (REQ-0813)")
 	} else if slices.Sort(types); !slices.Equal(types, prTypes) {
 		c.add(on, "the "+prEvent+" types of "+prFile+" are opened, synchronize, reopened and edited, so every push to the head is judged (the ask-first job row)")
 	}

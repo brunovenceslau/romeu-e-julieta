@@ -146,7 +146,7 @@ func TestWorkflowsPRElsewhere(t *testing.T) {
 		src := strings.Replace(goodPR, "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first \"$GITHUB_EVENT_PATH\"\n", 1)
 		wantAny(t, workflowFindings(prPath, []byte(src)), "run is one line")
 	})
-	t.Run("a ask-first.yml with no job", func(t *testing.T) {
+	t.Run("an ask-first.yml with no job", func(t *testing.T) {
 		head, _, _ := strings.Cut(goodPR, "jobs:\n")
 		wantAny(t, workflowFindings(prPath, []byte(head+"jobs: {}\n")), "holds one job")
 	})

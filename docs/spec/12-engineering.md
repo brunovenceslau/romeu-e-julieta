@@ -247,10 +247,10 @@ E2E (CI):   go test -tags e2e ./e2e/...             # git + docker + fake sbx; n
 E2E (host): go test -tags host -json ./e2e/host/... # maintainer machine only; real sbx
 Setup:      go run ./tools/ci setup                 # trust mise.toml, install the pinned tools, fill the module cache; CI runs it first
 Fast:       go run ./tools/ci fast                  # what the pre-push hook runs; the hook adds the pushed range
-All checks: go run ./tools/ci all                   # the check CI runs, from a built binary; the pr step runs in its own base-defined job
+All checks: go run ./tools/ci all                   # the check CI runs, from a built binary; the ask-first step runs in its own base-defined job
 Plan:       go run ./tools/ci plan                  # the task files: fields, ids, edges, overlap; --ready and --critical-path print the views; in fast
 Reqs:       go run ./tools/ci reqs allocate         # number each REQ-new placeholder (12.11); tools/ci reqs checks the ids, in fast
-PR checks:  go run ./tools/ci ask-first <payload file>     # the pr step, on a saved pull request payload
+PR checks:  go run ./tools/ci ask-first <payload file>     # the ask-first step, on a saved pull request payload
             go run ./tools/ci ask-first --title <t> --body <file>   # the same check on base..HEAD, before the pull request exists
 Pins:       go run ./tools/ci pins                  # pin freshness of the tools of 12.1; needs the network
 Denylist:   go run ./tools/ci hygiene add           # maintainer only, in a terminal; reads one forbidden name, echo off
@@ -623,7 +623,7 @@ a gitlink entry from that list (git 2.53.0, measured on 2026-10-29),
 and a diff of two trees opens no submodule; `ask-first` never runs
 `checkout` or `archive` on the head, and its diffs are tree to tree,
 with `.gitattributes` read from the default branch's work tree. `REQ-1153` The job
-runs the runner image's git, which no pin holds, so a `ask-first` test runs
+runs the runner image's git, which no pin holds, so an `ask-first` test runs
 each of these git calls against a hostile fixture repository (a
 submodule, a textconv driver, an external diff driver and hooks) and
 fails when a flag no longer holds. `ask-first` prints each line of text the

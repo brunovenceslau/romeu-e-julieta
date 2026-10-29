@@ -125,7 +125,7 @@ carries:
 | `after` | a file overlap or a review order: the task also waits for these; the critical path counts both kinds, and `after` is kept apart so an overlap can be removed by moving a file |
 | `ask_first` | the surfaces of 05 5.3 the diff is expected to touch; a forecast, so the approvals can be given at each sitting for the grantable surfaces of 12 12.4, while every other surface keeps its approval line on each pull request |
 | `sitting` | `none`, or the sitting the task waits for or feeds: a milestone id (M0 to M5) names that milestone's sitting, an earlier block id (O1 to O8) names that block |
-| `merged`, `ask-first` | the checkbox: the date and the pull request number, written by the task's own pull request; absent while the task is open |
+| `merged`, `pr` | the checkbox: the date and the pull request number, written by the task's own pull request; absent while the task is open |
 
 The body carries the goal, a dated re-plan paragraph that says what
 changed from the earlier text, and the fields of before: Implements
@@ -441,12 +441,12 @@ Evidence.
 ## Where the task checklist lives
 
 One file per task, `plan/tasks/Tnnn-<slug>.md`, with the front matter
-of [How to read this plan](#how-to-read-this-plan). `merged` and `ask-first`
+of [How to read this plan](#how-to-read-this-plan). `merged` and `pr`
 are the checkbox: the task's own pull request writes them, which is the
 one write a task pull request makes to the plan. The directory is the
 checklist: `grep -L '^merged:' docs/plan/tasks/*.md` is the open list;
 `tools/ci plan` (T106) validates the fields, the id sequence, the edges
-and the overlap rule, and fails on `merged` without `ask-first` or the
+and the overlap rule, and fails on `merged` without `pr` or the
 reverse. `tools/new task` scaffolds a file with the next free id (the
 rebase-and-rerun rule of 12 12.3 covers a collision). A task with no
 file in this repository is ticked by the pull request whose Evidence

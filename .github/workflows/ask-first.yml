@@ -9,8 +9,8 @@
 # branch of this repository, main for most pull requests and the branch
 # below for one in a stack, which the ruleset of main judges by this
 # check too (decided on 2026-10-29). The job checks out the base
-# branch's commit, builds pr from it and reads the head only as git
-# objects, fetched by pr itself without credentials; it runs no other
+# branch's commit, builds ask-first from it and reads the head only as git
+# objects, fetched by ask-first itself without credentials; it runs no other
 # code. "go run ./tools/ci workflows" holds this file to the ask-first job row
 # of 10 10.2.
 name: ask-first
@@ -21,7 +21,7 @@ on:
     # too, since the ruleset of main requires this check on every pull
     # request of a stack.
     # edited: a change to the title or the body, a ticked approval line
-    # among them, runs pr again (REQ-0813).
+    # among them, runs ask-first again (REQ-0813).
     types: [opened, synchronize, reopened, edited]
 
 # One run in progress per pull request: a new event cancels the run it
@@ -74,7 +74,7 @@ jobs:
           cache: false
           env: false
           persist_github_token: false
-      # The code of pr alone (the approval package and what it imports,
+      # The code of ask-first alone (the approval package and what it imports,
       # every package on the approvals surface), on the event's payload.
       - name: Judge the pull request
         run: go run ./tools/ci/internal/askfirst/cmd/ask-first "$GITHUB_EVENT_PATH"

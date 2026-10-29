@@ -50,7 +50,7 @@ func Quote(text string) string {
 	return git.SafeLines(quotePrefix + text)
 }
 
-// Print writes the findings and then the summary line, "pr: ok" or the
+// Print writes the findings and then the summary line, "ask-first: ok" or the
 // number of findings, as a subcommand of tools/ci does, and reports
 // whether there were none. A write that fails has nowhere left to be
 // reported, so its error is dropped.

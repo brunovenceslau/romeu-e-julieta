@@ -42,7 +42,7 @@ removed on 2026-10-12 (ADR 0012; T122). It also creates
 `docs/grants.yaml`, `version: 1` with `grants: []`, on the `ask-first`
 surface (rule 13); each grant is a later one-line pull request. It adds
 the three rows of 05 5.4 that accept by name the deferred merge-gate
-parts (`pr`, `sequences`, `invariants` and `mutate`) with the plan's
+parts (`ask-first`, `sequences`, `invariants` and `mutate`) with the plan's
 triggers, the I34-by-hand row and the approval-line row amended for the
 grants; `docs/plan.md` links them. `after: T122`, so each later spec
 edit carries the requirement ids. The surface question of

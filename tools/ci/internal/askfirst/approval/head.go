@@ -90,7 +90,7 @@ func headGoFiles(ctx context.Context, r git.Repo, head string) ([]Finding, error
 //   - the head's ask-first.yml names no event but pull_request_target, under
 //     which GitHub runs the base branch's file and never the head's;
 //   - a workflow file that does not parse as one YAML mapping fails, as
-//     what pr cannot read it cannot clear.
+//     what ask-first cannot read it cannot clear.
 //
 // Every file directly in .github/workflows that ends in .yml or .yaml, in
 // any case, is read: the two endings GitHub runs.
@@ -123,7 +123,7 @@ func headJobs(ctx context.Context, r git.Repo, head string) ([]Finding, error) {
 func workflowFindings(name string, src []byte) []Finding {
 	doc, err := parseWorkflow(src)
 	if err != nil {
-		return []Finding{{Where: name, Msg: "a workflow file of the head that pr cannot read: " + err.Error()}}
+		return []Finding{{Where: name, Msg: "a workflow file of the head that ask-first cannot read: " + err.Error()}}
 	}
 	if name == PRWorkflow {
 		if !onlyEvent(mappingValue(doc, "on"), PREvent) {
@@ -137,7 +137,7 @@ func workflowFindings(name string, src []byte) []Finding {
 		return nil
 	}
 	if jobs.Kind != yaml.MappingNode {
-		return []Finding{{Where: name, Msg: "the jobs of a workflow file of the head are not a mapping pr can read"}}
+		return []Finding{{Where: name, Msg: "the jobs of a workflow file of the head are not a mapping ask-first can read"}}
 	}
 	for i := 0; i+1 < len(jobs.Content); i += 2 {
 		id, job := jobs.Content[i], jobs.Content[i+1]
@@ -147,7 +147,7 @@ func workflowFindings(name string, src []byte) []Finding {
 		switch n := mappingValue(job, "name"); {
 		case n == nil:
 		case n.Kind != yaml.ScalarNode:
-			findings = append(findings, Finding{Where: name, Msg: "a job of a workflow file of the head has a name pr cannot read"})
+			findings = append(findings, Finding{Where: name, Msg: "a job of a workflow file of the head has a name ask-first cannot read"})
 			continue
 		case n.Tag != "!!null" && n.Value != "":
 			check, label = n.Value, "name"

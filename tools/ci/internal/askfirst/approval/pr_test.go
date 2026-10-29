@@ -608,3 +608,13 @@ func callsOf(t *testing.T, dir string) map[string]map[string]bool {
 	}
 	return calls
 }
+
+// TestPRArgsNameTheCommand pins the name the usage and the error prefix
+// of a local run print: ask-first, the check's name, never pr.
+func TestPRArgsNameTheCommand(t *testing.T) {
+	r, _ := prRepo(t)
+	_, err := ReadArgs(context.Background(), r.Repo, nil, "usage")
+	require.ErrorContains(t, err, "ask-first takes a payload file")
+	_, err = ReadArgs(context.Background(), r.Repo, []string{"--nope"}, "usage")
+	require.ErrorContains(t, err, "ask-first: flag provided but not defined")
+}
