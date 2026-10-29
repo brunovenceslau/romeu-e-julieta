@@ -6,6 +6,7 @@ module: romeu-cli
 fate: new
 owns:
   - internal/cmd/romeu/init/marker*.go
+  - internal/cmd/romeu/sync/step2_fetch.go
 needs:
   - T041
 after:
@@ -27,8 +28,7 @@ breaks once the config project has a second repo. Decided on
    name, mode 0600, create only.
 2. 02 2.3 lists the marker in the host tree.
 3. `sync` step 2 reads the marker and refuses a missing or malformed
-   one with a rule slug, exit 2; the edit of `sync` joins T043's last
-   slice or, once T043 has merged, this task.
+   one with a rule slug, exit 2, in place of T043's guess.
 
 - Implements: none: a layout rule of 02 2.3 that this task writes.
 - Operator: no.
