@@ -221,10 +221,10 @@ func TestPRImports(t *testing.T) {
 func TestPRImportsRule(t *testing.T) {
 	globs := []string{"cmd/**", "ok/**", "go.sum"}
 	base := map[string]string{
-		"go.mod":         "module example.org/fix\n\ngo 1.24\n",
+		"go.mod":                "module example.org/fix\n\ngo 1.24\n",
 		"cmd/ask-first/main.go": "package main\n\nimport (\n\t\"fmt\"\n\n\t\"example.org/fix/ok\"\n)\n\nfunc main() { fmt.Println(ok.X) }\n",
-		"ok/ok.go":       "package ok\n\nconst X = 1\n",
-		"outside/o.go":   "package outside\n\nconst Y = 2\n",
+		"ok/ok.go":              "package ok\n\nconst X = 1\n",
+		"outside/o.go":          "package outside\n\nconst Y = 2\n",
 	}
 	cases := []struct {
 		name   string

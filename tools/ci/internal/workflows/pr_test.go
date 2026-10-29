@@ -105,7 +105,7 @@ func TestWorkflowsPRRefused(t *testing.T) {
 		{"a checkout of the default depth", "          fetch-depth: 0\n", "", "fetch-depth: 0"},
 		{"a second job", "jobs:\n", "jobs:\n  other:\n    runs-on: ubuntu-26.04-arm\n    steps:\n      - run: go run ./tools/ci static\n", "holds one job"},
 		{"the job under another id", "jobs:\n  ask-first:\n", "jobs:\n  judge:\n", "holds one job"},
-		{"the job under another name", "    name: ask-first\n", "    name: judge\n", "is named pr"},
+		{"the job under another name", "    name: ask-first\n", "    name: judge\n", "is named ask-first"},
 		{"a setup step, which builds all of tools/ci", "      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first", "      - run: go run ./tools/ci setup\n      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first", "the steps of the ask-first job"},
 		{"the pr line with another argument", `cmd/ask-first "$GITHUB_EVENT_PATH"`, `cmd/ask-first "$HOME"`, "the steps of the ask-first job"},
 		{"the steps in another order", "      - uses: jdx/mise-action@", "      - run: go run ./tools/ci/internal/askfirst/cmd/ask-first \"$GITHUB_EVENT_PATH\"\n      - uses: jdx/mise-action@", "the steps of the ask-first job"},
