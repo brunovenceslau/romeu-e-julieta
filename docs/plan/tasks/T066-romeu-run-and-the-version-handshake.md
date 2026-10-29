@@ -25,6 +25,7 @@ needs:
   - T103
   - T013
   - T135
+  - T186
 after:
   - T048
 ask_first:
@@ -133,7 +134,7 @@ holds them.
     fields.
   - A romeu built with plain `go build` exits 2 with
     `julieta-not-embedded` on `sync` and `run`, and `status`, `doctor`
-    and `version` work.
+    and `version` work. `run` reads julieta from the package of T186.
   - A gate 1 or a gate 2 change makes `run` exit 3 before a mutating
     call (I7).
   - The julieta exec calls carry the julieta class of the table of 04

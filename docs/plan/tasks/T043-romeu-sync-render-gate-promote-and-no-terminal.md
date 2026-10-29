@@ -23,9 +23,11 @@ needs:
   - T039
   - T183
   - T184
+  - T186
 after: []
 ask_first:
   - contracts
+  - release
 sitting: none
 ---
 
@@ -54,7 +56,11 @@ Re-plan (2026-10-29): built in slices, one file per step under
 `step3_specs.go`, `step4_tree.go`, `step5_memory.go`,
 `step6_render.go`, `step7_drift.go`, `step8_gate.go`,
 `step10_report.go`), and the part that links `sync` into the binary
-(`import_sync.go`) waits on T183 and T184.
+(`import_sync.go`) waits on T183 and T184. Step 1 reads julieta from
+the package of T186. The `sync` e2e builds its romeu through a
+host-native `tools/release` build, since only that build embeds
+julieta (REQ-0131, the e2e row of 10 10.2), so this task asks first
+for `release` too.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700, writes it into the manifest as
