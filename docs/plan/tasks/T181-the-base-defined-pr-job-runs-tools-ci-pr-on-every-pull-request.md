@@ -77,13 +77,15 @@ T180, scope this repository.
    approval line or a checkpoint grant" stay in T005 (decided on
    2026-10-29).
 
+Re-plan (2026-10-29, after the merge): REQ-1314, the stack guard of
+`pr`, landed after this task, with the pr job running on every pull
+request, whatever its base (12 12.4, 12 12.9); this file cites the id
+so that it has an implementing task.
+
 - Implements: REQ-0540 (05 5.3), REQ-0813 (10 10.2), REQ-0815 (10 10.2),
   REQ-0816 (10 10.2), REQ-1148 (12 12.4), REQ-1149 (12 12.4), REQ-1150
   (12 12.4), REQ-1151 (12 12.4), REQ-1152 (12 12.4), REQ-1153 (12 12.4),
   REQ-1154 (12 12.4), REQ-1155 (12 12.4), REQ-1314 (12 12.4).
-  REQ-1314, the stack guard of pr, landed after this task on
-  2026-10-29, with the pr job running on every pull request, whatever
-  its base.
 - Operator: `pr.yml` is wired with `edited`, and whether ticking a
   checklist line in the GitHub UI fires `pull_request_target` `edited`
   and runs the job again is measured on the first pull request after
