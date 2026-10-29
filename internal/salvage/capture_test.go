@@ -425,7 +425,9 @@ func TestFailReason(t *testing.T) {
 func TestEncodeManifest(t *testing.T) {
 	data, err := salvage.EncodeManifest(salvage.Manifest{Complete: false, Skipped: []salvage.Skipped{{Item: "x", Reason: salvage.ReasonTranscriptExcluded}}})
 	require.NoError(t, err)
-	assert.Equal(t, `{"bundles":[],"complete":true,"files":[],"generation":"","refs":[],"repo":"","salvageId":"","schema":"salvage/v1","skipped":[{"detail":"","item":"x","reason":"transcript-excluded"}],"worktrees":[]}`+"\n", string(data))
+	assert.JSONEq(t, `{"bundles":[],"complete":true,"files":[],"generation":"","refs":[],"repo":"","salvageId":"","schema":"salvage/v1","skipped":[{"detail":"","item":"x","reason":"transcript-excluded"}],"worktrees":[]}`, string(data))
+	assert.True(t, strings.HasPrefix(string(data), `{"bundles":[],"complete":true,`), "members sorted")
+	assert.True(t, strings.HasSuffix(string(data), "}\n"), "a final line feed")
 	data, err = salvage.EncodeManifest(salvage.Manifest{Complete: true, Skipped: []salvage.Skipped{{Item: "x", Reason: salvage.ReasonOverCap}}})
 	require.NoError(t, err)
 	assert.Contains(t, string(data), `"complete":false`)

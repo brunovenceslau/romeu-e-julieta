@@ -7,10 +7,10 @@ package salvage
 
 import (
 	"bytes"
+	"context"
 	"encoding/json/v2"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -163,9 +163,10 @@ func TestSalvageUsage(t *testing.T) {
 }
 
 // fixture starts a process named name, a shell script of that name,
-// which ignores SIGTERM when ignore is set, and returns it; the test
-// ends it. A script's process takes the script's name as its comm.
-func fixture(t *testing.T, name string, ignore bool) *exec.Cmd {
+// which ignores SIGTERM when ignore is set, through procgroup in a
+// goroutine, and waits until it runs; the test ends it. A script's
+// process takes the script's name as its comm.
+func fixture(t *testing.T, name string, ignore bool) {
 	t.Helper()
 	script := "#!/bin/sh\n"
 	if ignore {
@@ -174,14 +175,20 @@ func fixture(t *testing.T, name string, ignore bool) *exec.Cmd {
 	script += "while :; do sleep 0.05; done\n"
 	bin := filepath.Join(t.TempDir(), name)
 	require.NoError(t, os.WriteFile(bin, []byte(script), 0o700))
-	cmd := exec.Command(bin)
-	require.NoError(t, cmd.Start())
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = procgroup.Run(ctx, procgroup.Command{Class: procgroup.Unbounded, Argv: []string{bin}, Env: []string{"PATH=/usr/bin:/bin"}})
+	}()
 	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		cancel()
+		<-done
 	})
-	require.Eventually(t, func() bool { return running(cmd.Process.Pid, []string{name}) }, 5*time.Second, 10*time.Millisecond)
-	return cmd
+	require.Eventually(t, func() bool {
+		pids, err := matching([]string{name})
+		return err == nil && len(pids) == 1
+	}, 5*time.Second, 10*time.Millisecond)
 }
 
 // fixtureName returns a process name no other process of the machine

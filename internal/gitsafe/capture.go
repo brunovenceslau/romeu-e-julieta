@@ -250,7 +250,8 @@ func (r *Runner) Gitlinks(ctx context.Context, dir string) ([]string, error) {
 type Capture struct {
 	// Index is the temporary index file the capture builds, an
 	// absolute and clean path outside the worktree that does not exist
-	// yet; CaptureCommit removes it when it returns.
+	// yet; the caller removes it, since gitsafe, which romeu links,
+	// deletes nothing outside the admitted call sites (I16).
 	Index string
 	// Parent is the commit HEAD names, or empty on an unborn branch.
 	Parent string
@@ -301,7 +302,6 @@ func (r *Runner) CaptureCommit(ctx context.Context, dir string, c Capture) (stri
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
-	defer func() { _ = os.Remove(c.Index) }()
 	if c.Parent == "" && len(c.Add) == 0 {
 		return "", nil
 	}

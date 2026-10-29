@@ -389,8 +389,8 @@ const MaxNestedDepth = 4
 func nestedOf(dir string, c gitsafe.Changes) []string {
 	var dirs []string
 	for _, p := range c.Untracked {
-		if strings.HasSuffix(p, "/") {
-			dirs = append(dirs, strings.TrimSuffix(p, "/"))
+		if before, ok := strings.CutSuffix(p, "/"); ok {
+			dirs = append(dirs, before)
 		}
 	}
 	return existingRepos(dir, dirs)

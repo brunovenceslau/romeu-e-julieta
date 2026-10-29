@@ -8,7 +8,6 @@ package gitsafe
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -196,7 +195,7 @@ func capture(t *testing.T, parent string, add ...string) Capture {
 // untracked file not added left out; the author, the committer and the
 // date are the capture's; no signature although the repository asks
 // for one with a gpg that fails; the worktree, its index and its refs
-// are unchanged, and the index file is removed.
+// are unchanged.
 //
 //romeu:invariant I18 test
 func TestCaptureCommitRealGit(t *testing.T) {
@@ -209,7 +208,6 @@ func TestCaptureCommitRealGit(t *testing.T) {
 	oid, err := newRunner(t, Sandbox).CaptureCommit(t.Context(), dir, c)
 	require.NoError(t, err)
 	check()
-	assert.NoFileExists(t, c.Index)
 	require.NotEmpty(t, oid)
 	assert.Equal(t, head, plainGit(t, dir, "rev-parse", oid+"^"))
 	files := plainGit(t, dir, "ls-tree", "-r", "--name-only", oid)
@@ -317,18 +315,11 @@ func TestCaptureCommitRefuses(t *testing.T) {
 	require.ErrorIs(t, err, ErrRefused)
 }
 
-// TestCaptureCommitFails: a git that fails, such as an unreadable file,
-// fails the capture and leaves no index file.
+// TestCaptureCommitFails: a git that fails, here an add of a path that
+// does not exist, fails the capture.
 func TestCaptureCommitFails(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root reads a file of mode 000")
-	}
 	dir, head := newRepo(t)
-	writeFile(t, dir, "secret", "s\n")
-	require.NoError(t, os.Chmod(filepath.Join(dir, "secret"), 0))
-	c := capture(t, head, "secret")
-	_, err := newRunner(t, Sandbox).CaptureCommit(t.Context(), dir, c)
+	_, err := newRunner(t, Sandbox).CaptureCommit(t.Context(), dir, capture(t, head, "missing"))
 	require.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "git add"), "%v", err)
-	assert.NoFileExists(t, c.Index)
+	assert.Contains(t, err.Error(), "git add")
 }

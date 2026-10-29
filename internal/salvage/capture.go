@@ -394,7 +394,7 @@ func (s *salvager) captureWorktree(ctx context.Context, run *repoRun, u unit) (w
 	rec := Worktree{Path: u.label, Location: u.path, Nested: u.nested}
 	defer func() { run.m.Worktrees = append(run.m.Worktrees, rec) }()
 	var last worktreeRead
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := range 2 {
 		before, err := readWorktree(ctx, s.c.Git, u.path)
 		if err != nil {
 			run.skip(u.label, ReasonUnreadable, err)
@@ -483,8 +483,10 @@ func (s *salvager) commit(ctx context.Context, dir, parent string, add []string)
 	if err != nil {
 		return "", err
 	}
+	index := filepath.Join(s.c.Work, "index-"+u.String())
+	defer func() { _ = os.Remove(index) }()
 	return s.c.Git.CaptureCommit(ctx, dir, gitsafe.Capture{
-		Index: filepath.Join(s.c.Work, "index-"+u.String()), Parent: parent, Add: add,
+		Index: index, Parent: parent, Add: add,
 		Name: CaptureName, Email: CaptureEmail, When: s.now,
 		Message: "julieta salvage " + s.c.SalvageID + " of generation " + s.c.Generation,
 	})
