@@ -153,7 +153,27 @@ Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
 4. `REQ-0632` Add `meta` and `base` sets, `tuf-repo-cdn.sigstore.dev` of 7.4 among the `meta` domains.
 5. Add spec `egress.extra` to `gated`.
 6. Add kit-declared network domains (from the normalized capability
-   sets, [06](06-kits.md#61-decisions)).
+   sets, [06](06-kits.md#61-decisions)), each host through
+   `egress.Split`, which strips a numeric port, lowers the case and
+   refuses a host that is no egress domain, naming the kit
+   (REQ-0069). `REQ-1315` Only the hosts of the runtime phase enter the
+   derivation; the hosts of the install phase stay apart, since the
+   rules of this derivation last the life of the sandbox and an install
+   host in them would stay open to the agent: `github.com`, which the
+   `julieta` kit needs at install alone (REQ-0592), takes gists,
+   issues and pushes. A host the kit needs at runtime too is declared
+   in the runtime phase. The install hosts still go through
+   `egress.Split` and are shown in gate 2 with the capability set
+   (REQ-0569). Measured at sitting M0 (sbx v0.48.0): the install
+   steps run inside the sandbox, once at create and before the agent,
+   and the proxy refuses an undeclared host there. Not measured yet:
+   that sbx allows a host of the install phase during the install and
+   closes it before the agent starts. The first real `sbx` build of
+   the `julieta` or `os-base` kit measures all three on the sbx it runs
+   (the host ran v0.50.1 on 2026-10-29, after M0); if the install
+   cannot reach its hosts, or a host still answers at runtime, this
+   rule and the kits are revisited (decided on 2026-10-29, scope this
+   repository).
 7. Move every domain with `upload: true`, or without a `domains` entry,
    to `gated`.
 8. `REQ-0633` `effectiveDigest` = `canon.Digest(canon.Egress, sorted union)`; recorded
