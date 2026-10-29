@@ -149,7 +149,8 @@ func TestSetupTrustFailure(t *testing.T) {
 	code, rep, stderr := setupJSON(t)
 	assert.Equal(t, 0, code, stderr)
 	require.Len(t, rep.Errors, 1)
-	assert.True(t, strings.HasPrefix(rep.Errors[0], "trust: api: "), rep.Errors[0])
+	assert.True(t, strings.HasPrefix(rep.Errors[0], "trust: "), rep.Errors[0])
+	assert.Contains(t, rep.Errors[0], "mise trust failed in api")
 	assert.Contains(t, rep.Errors[0], "denied")
 	assert.Equal(t, 1, count(t, calls))
 }
