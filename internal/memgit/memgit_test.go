@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -540,4 +541,56 @@ func TestSyncPushesAgain(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, w)
 	assert.Equal(t, git(t, filepath.Join(p.EnvDir, "memory.git"), "rev-parse", "refs/heads/main"), r.main(t))
+}
+
+// TestSyncRefusesOverTheCaps commits nothing when a file of entries/ is
+// over the 1 MiB of 08 8.6 (REQ-0648), when a memory dir holds more
+// than 10 000 entries, or when the files together pass the total bound,
+// so the sandbox cannot fill the host's disk through the memory
+// repository.
+func TestSyncRefusesOverTheCaps(t *testing.T) {
+	r := newRemote(t)
+	p := newProject(t, r.url)
+	mem := filepath.Join(p.EnvDir, "memory")
+	write(t, mem, "api/entries/big.md", strings.Repeat("x", 1<<20+1))
+	_, err := memgit.Sync(t.Context(), runner(t), p)
+	require.ErrorContains(t, err, "over the cap")
+	assert.Empty(t, r.main(t), "nothing pushed")
+	require.NoError(t, os.Remove(filepath.Join(mem, "api", "entries", "big.md")))
+
+	restore := memgit.SetMaxTotal(10)
+	_, err = memgit.Sync(t.Context(), runner(t), p)
+	restore()
+	require.ErrorContains(t, err, "more than 10 bytes")
+	assert.Empty(t, r.main(t))
+
+	many := filepath.Join(mem, "web", "entries")
+	require.NoError(t, os.MkdirAll(many, 0o700))
+	for i := range 10_001 {
+		require.NoError(t, os.WriteFile(filepath.Join(many, strconv.Itoa(i)+".md"), nil, 0o600))
+	}
+	_, err = memgit.Sync(t.Context(), runner(t), p)
+	require.ErrorContains(t, err, "more than 10000 names")
+	assert.Empty(t, r.main(t))
+}
+
+// TestSyncFailsOnAnUnreadableDir fails, and stages no deletion, when a
+// memory dir cannot be opened for a reason other than being no
+// directory: the files it holds stay on the remote.
+func TestSyncFailsOnAnUnreadableDir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root opens a directory of mode 000")
+	}
+	r := newRemote(t)
+	p := newProject(t, r.url)
+	_, err := memgit.Sync(t.Context(), runner(t), p)
+	require.NoError(t, err)
+	before := r.main(t)
+	api := filepath.Join(p.EnvDir, "memory", "api")
+	require.NoError(t, os.Chmod(api, 0))
+	t.Cleanup(func() { _ = os.Chmod(api, 0o700) })
+	_, err = memgit.Sync(t.Context(), runner(t), p)
+	require.Error(t, err)
+	assert.Equal(t, before, r.main(t), "no deletion of api/ pushed")
+	assert.Contains(t, git(t, r.dir, "ls-tree", "-r", "--name-only", "main"), "api/entries/02entry.md")
 }

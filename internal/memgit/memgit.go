@@ -31,6 +31,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
 )
 
 // The warnings of 04 4.1 this package returns, by slug.
@@ -314,35 +315,46 @@ func collect(workTree string) ([]gitsafe.StagedFile, func(), error) {
 		return fail(fmt.Errorf("memgit: the memory dir: %w", err))
 	}
 	open = append(open, rootFD)
-	dirs, err := readNames(rootFD)
+	dirs, err := readNames(rootFD, memstore.MaxEntries)
 	if err != nil {
 		return fail(err)
 	}
 	var files []gitsafe.StagedFile
+	var total int64
 	for _, dir := range dirs {
 		dirFD, err := openDir(rootFD, dir)
-		if err != nil {
+		switch {
+		case notADir(err):
 			continue // a file or a link at the top: the excludes leave it out, and so does this
+		case err != nil:
+			return fail(fmt.Errorf("memgit: the memory dir %s: %w", dir, err))
 		}
-		open = append(open, dirFD)
-		for _, sub := range []string{"entries", "stamps"} {
-			subFD, err := openDir(dirFD, sub)
-			switch {
-			case errors.Is(err, unix.ENOENT):
+		subs, err := openSubs(dir, dirFD)
+		_ = unix.Close(dirFD)
+		open = append(open, subs...)
+		if err != nil {
+			return fail(err)
+		}
+		for i, sub := range []string{"entries", "stamps"} {
+			subFD := subs[i]
+			if subFD < 0 {
 				continue
-			case err != nil:
-				return fail(fmt.Errorf("memgit: %s/%s is not a directory, which the layout allowlist of 08 8.1 refuses; nothing was committed or pushed", dir, sub))
 			}
-			open = append(open, subFD)
-			names, err := readNames(subFD)
+			names, err := readNames(subFD, memstore.MaxEntries)
 			if err != nil {
-				return fail(err)
+				return fail(fmt.Errorf("memgit: %s/%s: %w", dir, sub, err))
 			}
 			for _, name := range names {
 				p := dir + "/" + sub + "/" + name
 				size, err := regularSize(subFD, name)
 				if err != nil {
 					return fail(fmt.Errorf("memgit: %s %w, which the layout allowlist of 08 8.1 refuses; nothing was committed or pushed", p, err))
+				}
+				if size > memstore.MaxFileSize {
+					return fail(fmt.Errorf("memgit: %s holds %d bytes, over the cap of %d of 08 8.6 (REQ-0648); nothing was committed or pushed", p, size, memstore.MaxFileSize))
+				}
+				if total += size; total > maxTotal {
+					return fail(fmt.Errorf("memgit: the memory dirs hold more than %d bytes in entries/ and stamps/; nothing was committed or pushed", maxTotal))
 				}
 				fd := subFD
 				files = append(files, gitsafe.StagedFile{Path: p, Size: size, Open: func() (io.ReadCloser, error) {
@@ -354,6 +366,41 @@ func collect(workTree string) ([]gitsafe.StagedFile, func(), error) {
 	return files, closeAll, nil
 }
 
+// maxTotal bounds the bytes of all the files Sync stages, so a sandbox
+// that writes many files at the cap of one cannot fill the host's disk
+// with the memory repository: 08 8.6 caps a file and the entries of one
+// memory dir, not the sum. It is far above a working store.
+var maxTotal int64 = 1 << 30
+
+// notADir reports whether err is that of openDir on a name that is a
+// file, a link or nothing: the reasons to skip a name at the top of the
+// work tree. Any other error (EACCES, EMFILE) fails the walk, so a
+// directory that could not be read never stages as deleted.
+func notADir(err error) bool {
+	return errors.Is(err, unix.ENOTDIR) || errors.Is(err, unix.ELOOP) || errors.Is(err, unix.ENOENT)
+}
+
+// openSubs opens entries/ and stamps/ of the memory dir dir, open at
+// dirFD, and returns their descriptors, -1 for one that does not exist.
+// One that is not a directory is the layout allowlist's refusal.
+func openSubs(dir string, dirFD int) ([]int, error) {
+	fds := []int{-1, -1}
+	for i, sub := range []string{"entries", "stamps"} {
+		fd, err := openDir(dirFD, sub)
+		switch {
+		case errors.Is(err, unix.ENOENT):
+			continue
+		case notADir(err):
+			return slices.DeleteFunc(fds, func(fd int) bool { return fd < 0 }),
+				fmt.Errorf("memgit: %s/%s is not a directory, which the layout allowlist of 08 8.1 refuses; nothing was committed or pushed", dir, sub)
+		case err != nil:
+			return slices.DeleteFunc(fds, func(fd int) bool { return fd < 0 }), fmt.Errorf("memgit: %s/%s: %w", dir, sub, err)
+		}
+		fds[i] = fd
+	}
+	return fds, nil
+}
+
 // openDir opens the directory name below the directory dirFD, following
 // no link.
 func openDir(dirFD int, name string) (int, error) {
@@ -361,22 +408,31 @@ func openDir(dirFD int, name string) (int, error) {
 }
 
 // readNames returns the names in the directory fd that are not
-// dotfiles, sorted, leaving fd open.
-func readNames(fd int) ([]string, error) {
+// dotfiles, sorted, leaving fd open, and fails on more than limit of
+// them, read in batches so a directory of millions of names is not held.
+func readNames(fd, limit int) ([]string, error) {
 	dup, err := unix.Dup(fd)
 	if err != nil {
 		return nil, fmt.Errorf("memgit: %w", err)
 	}
 	f := os.NewFile(uintptr(dup), "dir")
 	defer func() { _ = f.Close() }()
-	all, err := f.Readdirnames(-1)
-	if err != nil {
-		return nil, fmt.Errorf("memgit: %w", err)
-	}
 	var names []string
-	for _, n := range all {
-		if !strings.HasPrefix(n, ".") {
-			names = append(names, n)
+	for {
+		batch, err := f.Readdirnames(256)
+		for _, n := range batch {
+			if !strings.HasPrefix(n, ".") {
+				names = append(names, n)
+			}
+		}
+		if len(names) > limit {
+			return nil, fmt.Errorf("more than %d names, over the cap of 08 8.6 (REQ-0648); nothing was committed or pushed", limit)
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("memgit: %w", err)
 		}
 	}
 	slices.Sort(names)
@@ -397,9 +453,10 @@ func regularSize(dirFD int, name string) (int64, error) {
 }
 
 // openRegular opens the regular file name below dirFD, following no
-// link and blocking on no FIFO, and refuses anything else.
+// link, blocking on no FIFO and taking no terminal, and refuses
+// anything else.
 func openRegular(dirFD int, name string) (io.ReadCloser, error) {
-	fd, err := unix.Openat(dirFD, name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
+	fd, err := unix.Openat(dirFD, name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_NOCTTY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
