@@ -3,7 +3,7 @@ id: T062
 title: "Salvage verification and ref import, the host half"
 milestone: M4
 module: salvage
-fate: kept
+fate: merged
 owns:
   - internal/salvage/verify*.go
   - internal/salvage/import*.go
@@ -17,6 +17,8 @@ after: []
 ask_first:
   - contracts
 sitting: none
+merged: 2026-10-29
+pr: 337
 ---
 
 # T062 - Salvage verification and ref import, the host half

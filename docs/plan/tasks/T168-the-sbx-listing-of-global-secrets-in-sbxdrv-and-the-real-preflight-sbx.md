@@ -3,7 +3,7 @@ id: T168
 title: "The sbx listing of global secrets in `sbxdrv` and the real `preflight.Sbx`"
 milestone: M3
 module: sbxdrv
-fate: new
+fate: merged
 owns:
   - internal/sbxdrv/secret*.go
   - e2e/fakesbx/secret*.go
@@ -20,6 +20,8 @@ after: []
 ask_first:
   - sbxdrv
 sitting: O3
+merged: 2026-10-29
+pr: 332
 ---
 
 # T168 - The sbx listing of global secrets in `sbxdrv` and the real `preflight.Sbx`

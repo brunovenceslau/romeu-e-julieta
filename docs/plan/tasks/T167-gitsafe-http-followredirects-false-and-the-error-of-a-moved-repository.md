@@ -3,7 +3,7 @@ id: T167
 title: "gitsafe: `http.followRedirects=false` and the error of a moved repository"
 milestone: M3
 module: gitsafe
-fate: new
+fate: merged
 owns:
   - internal/gitsafe/**
   - docs/spec/05-security.md
@@ -18,6 +18,8 @@ ask_first:
   - spec
   - contracts
 sitting: none
+merged: 2026-10-29
+pr: 327
 ---
 
 # T167 - gitsafe: `http.followRedirects=false` and the error of a moved repository

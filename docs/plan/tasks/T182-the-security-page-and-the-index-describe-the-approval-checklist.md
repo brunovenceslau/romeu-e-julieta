@@ -3,7 +3,7 @@ id: T182
 title: "the security page and the index describe the approval checklist"
 milestone: M2
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - docs/spec/05-security.md
   - docs/spec.md
@@ -14,6 +14,8 @@ after:
 ask_first:
   - spec
 sitting: none
+merged: 2026-10-29
+pr: 330
 ---
 
 # T182 - the security page and the index describe the approval checklist

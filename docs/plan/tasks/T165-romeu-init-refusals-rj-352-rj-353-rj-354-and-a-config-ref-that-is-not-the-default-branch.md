@@ -3,7 +3,7 @@ id: T165
 title: "`romeu init` refusals: RJ-352, RJ-353, RJ-354 and a config ref that is not the default branch"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/cmd/romeu/init/**
   - internal/cmd/romeu/all/import_init.go
@@ -16,6 +16,8 @@ after:
 ask_first:
   - contracts
 sitting: none
+merged: 2026-10-29
+pr: 326
 ---
 
 # T165 - `romeu init` refusals: RJ-352, RJ-353, RJ-354 and a config ref that is not the default branch
