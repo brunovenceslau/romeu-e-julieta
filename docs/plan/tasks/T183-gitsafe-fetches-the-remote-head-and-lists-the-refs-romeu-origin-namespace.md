@@ -6,6 +6,7 @@ module: gitsafe
 fate: new
 owns:
   - internal/gitsafe/refs*.go
+  - internal/gitsafe/fetch*.go
 needs:
   - T023
 after: []
@@ -34,7 +35,16 @@ that links `sync` into the binary (`import_sync.go`) uses both.
    repo dir, `refs/romeu/origin/<dir>/`, its segment checked as the
    salvage generation is.
 3. A remote branch named `HEAD` would map to the same ref as the
-   remote's HEAD: the fetch refuses it.
+   remote's HEAD: the fetch refuses it. `Fetch` refuses a call whose
+   pattern refspec writes into `refs/romeu/origin/<dir>/` unless the
+   same call carries `HEAD:refs/romeu/origin/<dir>/HEAD`, so git's own
+   check refuses the collision (decided on 2026-10-29, scope this
+   repository: the floor is in gitsafe, not in each caller). `sync`
+   steps 2 and 4 (T043) pass both refspecs.
+   Deferred: on a case-insensitive file system a branch named `head`
+   lands in the same loose ref file, and git's check compares names
+   case-sensitively. Reopened by the first macOS run of the `sync`
+   e2e (T043) or T170, whichever comes first.
 
 - Implements: REQ-0492 (05 5.2), REQ-0336 (04 4.2), REQ-0466 (05 5.1).
 - Operator: no.
@@ -44,5 +54,8 @@ that links `sync` into the binary (`import_sync.go`) uses both.
     source is any other name outside `refs/` is still refused.
   - `ListRefs` over `refs/romeu/origin/` lists the fetched refs and
     refuses a name outside the namespace, as it does for `refs/heads/`.
+  - A `Fetch` with a pattern into `refs/romeu/origin/<dir>/` and no
+    HEAD refspec for that dir is refused before git runs; with both, a
+    remote branch named `HEAD` makes the fetch fail and writes nothing.
   - The table tests of `internal/gitsafe` cover both, on real git.
 - Verify: `go test ./internal/gitsafe/ -run 'Refspec|ListRefs' -v`.
