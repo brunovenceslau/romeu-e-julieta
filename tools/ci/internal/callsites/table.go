@@ -90,6 +90,9 @@ var Admitted = []Site{
 	// replaceFile land with the promotion commit of T039.
 	{KindRemove, "internal/render", "pruneKitDirs"},
 	{KindRemove, "internal/render", "removeKitTemp"},
+	// The render.json an abandoned first promotion wrote at its step 1,
+	// where none was before.
+	{KindRemove, "internal/render", "removeFirstRecord"},
 	// A staged dir renamed onto a path proved absent: the config clone
 	// of init, and a kit dir copied into .romeu/kits/.
 	{KindRename, "internal/cmd/romeu/init", "cloneConfig"},

@@ -296,8 +296,18 @@ idempotent). If the candidate no longer verifies, romeu writes
 files step 2 wrote, and reports `interrupted-promotion-abandoned`
 (exit 4), never drift; `romeu sync` renders a fresh candidate. The old
 live `sbxenv.yaml` and its kit dirs are intact, so nothing unapproved
-is ever live. `status` reports an interrupted promotion without the
-lock.
+is ever live. Step 1 keeps the live `render.json` whole and adds
+`promoting`, so an abandon writes back nothing of the candidate; the
+candidate's own `render.json`, which `filesDigest` covers, is the one
+steps 2-4 read, from one read of the candidate dir, and a finish that
+fails is abandoned too, so no command is refused for ever. An abandoned
+first promotion removes the `render.json` its step 1 wrote. Two faults
+together, a kill after step 3 and a candidate that no longer verifies,
+leave the approved candidate's `sbxenv.yaml` live with no trusted
+digest of it: the next drift check names it, and `romeu sync` or
+`--overwrite-drift` resolves it (decided on 2026-10-29). A live
+`sbxenv.yaml` that no `render.json` records is drift. `status` reports
+an interrupted promotion without the lock.
 
 ### Generation
 
