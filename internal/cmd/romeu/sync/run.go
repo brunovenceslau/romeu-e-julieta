@@ -35,6 +35,10 @@ type run struct {
 	git         *gitsafe.Runner
 	configClone string
 	specCommit  string
+
+	// Step 3: the specs the command line names, validated, with their
+	// secrets bound, in the order of the config repo's projects/.
+	targets []spec.Project
 }
 
 // newRun returns the run of one command line.
