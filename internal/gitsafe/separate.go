@@ -142,7 +142,8 @@ const maxStaged = 200_000
 // the blobs are written from the readers the caller opened, with one
 // git fast-import, which writes no object the repository already
 // holds, and the index is then rebuilt with git read-tree --empty and
-// git update-index --index-info. So no .gitignore, symbolic link or
+// git update-index -z --index-info, whose NUL-terminated paths git does
+// not unquote. So no .gitignore, symbolic link or
 // nested repository of the work tree, which the sandbox writes, can
 // change what is staged (08 8.1, REQ-1304).
 func (r *Runner) StageExactly(ctx context.Context, s Separate, files []StagedFile) error {
@@ -152,18 +153,25 @@ func (r *Runner) StageExactly(ctx context.Context, s Separate, files []StagedFil
 	if len(files) > maxStaged {
 		return fmt.Errorf("%w: %d files to stage, over %d", ErrRefused, len(files), maxStaged)
 	}
-	seen := map[string]bool{}
+	// Two paths one under case folding or Unicode normalization are one
+	// file on APFS, and WalkTree refuses such a tree on every other
+	// machine, so they are refused here, before git runs.
+	seen := map[string]string{}
 	for _, f := range files {
 		if err := checkLiteralPath(f.Path); err != nil {
 			return err
 		}
-		if _, err := checkTreePath(f.Path); err != nil {
+		key, err := checkTreePath(f.Path)
+		if err != nil {
 			return err
 		}
-		if f.Size < 0 || f.Open == nil || seen[f.Path] {
+		if f.Size < 0 || f.Open == nil {
 			return fmt.Errorf("%w: the staged file %q", ErrRefused, f.Path)
 		}
-		seen[f.Path] = true
+		if other, ok := seen[key]; ok {
+			return fmt.Errorf("%w: the staged files %q and %q are one under case folding or normalization", ErrRefused, other, f.Path)
+		}
+		seen[key] = f.Path
 	}
 	oids, err := r.writeBlobs(ctx, s, files)
 	if err != nil {
@@ -174,13 +182,13 @@ func (r *Runner) StageExactly(ctx context.Context, s Separate, files []StagedFil
 	}
 	var info bytes.Buffer
 	for i, f := range files {
-		fmt.Fprintf(&info, "%s %s\t%s\n", modeFile, oids[i], f.Path)
+		fmt.Fprintf(&info, "%s %s\t%s\x00", modeFile, oids[i], f.Path)
 	}
 	noFilters, err := r.filterOverrides(ctx, s.GitDir)
 	if err != nil {
 		return err
 	}
-	return r.exec(ctx, s.WorkTree, s.global(), separateSettings, noFilters, &info, nil, "update-index", "--index-info")
+	return r.exec(ctx, s.WorkTree, s.global(), separateSettings, noFilters, &info, nil, "update-index", "-z", "--index-info")
 }
 
 // writeBlobs writes the blob of each file with git fast-import, which
@@ -279,11 +287,14 @@ type Identity struct {
 	SigningKey, AgentSocket string
 }
 
-// Commit commits the index of s on its branch, with message as the
-// whole message, by id: author and committer id.Name, with an empty
-// email, signed when id names a key. It runs no hook (core.hooksPath of
-// host mode) and passes the identity and the key per call, writing
-// neither into a config (I2).
+// Commit commits the index of s on refs/heads/main, with message as
+// the whole message, by id: author and committer id.Name, with an empty
+// email, signed when id names a key. It reads no path of the work tree:
+// git write-tree writes the index's tree, git commit-tree the commit on
+// the branch's tip, and git update-ref moves the branch from that tip,
+// so a branch another process moved meanwhile is not overwritten. No
+// hook runs, and the identity and the key are passed per call, written
+// into no config (I2).
 func (r *Runner) Commit(ctx context.Context, s Separate, id Identity, message string) error {
 	if err := r.separate(s); err != nil {
 		return err
@@ -298,7 +309,8 @@ func (r *Runner) Commit(ctx context.Context, s Separate, id Identity, message st
 		"GIT_AUTHOR_NAME=" + id.Name, "GIT_AUTHOR_EMAIL=",
 		"GIT_COMMITTER_NAME=" + id.Name, "GIT_COMMITTER_EMAIL=",
 	}
-	extra := []setting{{"commit.gpgSign", "false"}}
+	var extra []setting
+	args := []string{"commit-tree"}
 	switch {
 	case id.SigningKey != "" && id.AgentSocket != "":
 		if strings.ContainsFunc(id.SigningKey, isControl) || !strings.HasPrefix(id.SigningKey, "ssh-") {
@@ -308,16 +320,53 @@ func (r *Runner) Commit(ctx context.Context, s Separate, id Identity, message st
 			return fmt.Errorf("%w: the agent socket %q is not an absolute path", ErrRefused, id.AgentSocket)
 		}
 		extra = []setting{
-			{"commit.gpgSign", "true"},
 			{"gpg.format", "ssh"},
 			{"gpg.ssh.program", "ssh-keygen"},
 			{"user.signingKey", "key::" + id.SigningKey},
 		}
+		args = append(args, "-S")
 		env = append(env, "SSH_AUTH_SOCK="+id.AgentSocket)
 	case id.SigningKey != "" || id.AgentSocket != "":
 		return fmt.Errorf("%w: a signing key without an agent socket, or a socket without a key", ErrRefused)
 	}
-	return r.runSeparate(ctx, s, extra, env, "commit", "-q", "--no-verify", "--cleanup=verbatim", "-m", message)
+	tree, err := r.separateLine(ctx, s, nil, nil, "write-tree")
+	if err != nil {
+		return err
+	}
+	parent, hasParent, err := r.RefOID(ctx, s.GitDir, branchMain)
+	if err != nil {
+		return err
+	}
+	if hasParent {
+		args = append(args, "-p", parent)
+	}
+	args = append(args, "-m", message, tree)
+	commit, err := r.separateLine(ctx, s, extra, env, args...)
+	if err != nil {
+		return err
+	}
+	// update-ref <ref> <new> <old>: an empty old value is "must not exist".
+	return r.runSeparate(ctx, s, nil, nil, "update-ref", branchMain, commit, parent)
+}
+
+// branchMain is the branch of the memory repository.
+const branchMain = "refs/heads/main"
+
+// separateLine runs a verb of s that answers one object id, and returns
+// it.
+func (r *Runner) separateLine(ctx context.Context, s Separate, extra []setting, env []string, args ...string) (string, error) {
+	out := limitedBuffer{limit: maxOIDLine + 1}
+	if err := r.exec(ctx, s.WorkTree, s.global(), slices.Concat(separateSettings, extra), env, nil, &out, args...); err != nil {
+		return "", err
+	}
+	oid := strings.TrimSuffix(out.String(), "\n")
+	if out.truncated {
+		return "", fmt.Errorf("%w: git %s answered more than an object id", ErrRefused, args[0])
+	}
+	if err := checkObjectID(oid); err != nil {
+		return "", err
+	}
+	return oid, nil
 }
 
 // FastForwardSeparate moves the branch of s forward to oid, checking

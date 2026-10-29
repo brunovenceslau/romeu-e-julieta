@@ -7,6 +7,7 @@ package gitsafe
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"io"
@@ -21,6 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // stagedOf returns a StagedFile of path that reads data.
@@ -239,6 +242,16 @@ func TestSeparateArgv(t *testing.T) {
 	require.NoError(t, err)
 	var rec recorder
 	rec.install(r)
+	start := r.start
+	oid := strings.Repeat("b", 40)
+	r.start = func(ctx context.Context, c procgroup.Command) error {
+		if (slices.Contains(c.Argv, "write-tree") || slices.Contains(c.Argv, "commit-tree")) && c.Stdout != nil {
+			_ = start(ctx, c)
+			_, err := io.WriteString(c.Stdout, oid+"\n")
+			return err
+		}
+		return start(ctx, c)
+	}
 	s := newSeparate(t)
 	require.NoError(t, os.Mkdir(s.GitDir, 0o700))
 	writeSep(t, s.GitDir, "HEAD", "ref: refs/heads/main\n")
@@ -248,23 +261,61 @@ func TestSeparateArgv(t *testing.T) {
 	require.NoError(t, r.Commit(t.Context(), s, Identity{Name: "shop", SigningKey: "ssh-ed25519 AAAA k", AgentSocket: "/tmp/s"}, "m"))
 	var verbs [][]string
 	for _, c := range rec.commands {
-		if slices.Contains(c.Argv, "--get-regexp") {
-			continue // the listing of the filter drivers
+		if !slices.Contains(c.Argv, "--git-dir="+s.GitDir) || slices.Contains(c.Argv, "--get-regexp") {
+			continue // the listing of the filter drivers, and the read of the branch's tip
 		}
 		verbs = append(verbs, c.Argv)
 		assert.Equal(t, s.WorkTree, c.Dir)
 		for _, e := range c.Env {
 			if strings.HasPrefix(e, "SSH_AUTH_SOCK=") {
-				assert.Contains(t, c.Argv, "commit", "the socket reaches the commit alone")
+				assert.Contains(t, c.Argv, "commit-tree", "the socket reaches the commit alone")
 			}
 		}
+		assert.NotContains(t, c.Argv, "commit", "git commit, which refreshes the index from the work tree, never runs")
 	}
-	require.Len(t, verbs, 3)
+	require.Len(t, verbs, 5)
 	head := slices.Concat([]string{"/usr/bin/git"}, hostFlags, []string{"-c", "core.bare=false"})
-	assert.Equal(t, slices.Concat(head, []string{"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "read-tree", "--empty"}), verbs[0])
-	assert.Equal(t, slices.Concat(head, []string{"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "update-index", "--index-info"}), verbs[1])
+	dirs := []string{"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree}
+	assert.Equal(t, slices.Concat(head, dirs, []string{"read-tree", "--empty"}), verbs[0])
+	assert.Equal(t, slices.Concat(head, dirs, []string{"update-index", "-z", "--index-info"}), verbs[1])
+	assert.Equal(t, slices.Concat(head, dirs, []string{"write-tree"}), verbs[2])
 	assert.Equal(t, slices.Concat(head, []string{
-		"-c", "commit.gpgSign=true", "-c", "gpg.format=ssh", "-c", "gpg.ssh.program=ssh-keygen", "-c", "user.signingKey=key::ssh-ed25519 AAAA k",
-		"--git-dir=" + s.GitDir, "--work-tree=" + s.WorkTree, "commit", "-q", "--no-verify", "--cleanup=verbatim", "-m", "m",
-	}), verbs[2])
+		"-c", "gpg.format=ssh", "-c", "gpg.ssh.program=ssh-keygen", "-c", "user.signingKey=key::ssh-ed25519 AAAA k",
+	}, dirs, []string{"commit-tree", "-S", "-m", "m", oid}), verbs[3])
+	assert.Equal(t, slices.Concat(head, dirs, []string{"update-ref", "refs/heads/main", oid, ""}), verbs[4], "an unborn branch: must not exist")
+}
+
+// TestStageExactlyRefusesACollision refuses two paths that are one
+// under case folding or Unicode normalization, before git runs: APFS
+// keeps one of them, and WalkTree refuses the tree on every other
+// machine.
+func TestStageExactlyRefusesACollision(t *testing.T) {
+	r, err := New(Config{Mode: Host, Git: "/usr/bin/git", Home: t.TempDir()})
+	require.NoError(t, err)
+	var rec recorder
+	rec.install(r)
+	s := newSeparate(t)
+	require.NoError(t, os.Mkdir(s.GitDir, 0o700))
+	writeSep(t, s.GitDir, "HEAD", "ref: refs/heads/main\n")
+	require.NoError(t, os.Mkdir(filepath.Join(s.GitDir, "objects"), 0o700))
+	for name, pair := range map[string][2]string{
+		"case":          {"api/entries/Foo.md", "api/entries/foo.md"},
+		"normalization": {"api/entries/caf\u00e9.md", "api/entries/cafe\u0301.md"},
+		"exact":         {"api/entries/a.md", "api/entries/a.md"},
+	} {
+		err := r.StageExactly(t.Context(), s, []StagedFile{stagedOf(pair[0], ""), stagedOf(pair[1], "")})
+		require.ErrorIs(t, err, ErrRefused, name)
+	}
+	assert.Empty(t, rec.commands, "no git ran")
+}
+
+// TestStageExactlyTakesAQuoteLiterally stages a path that starts with a
+// double quote as that path: --index-info without -z would unquote it
+// as a C string, and stage another path or fail every run.
+func TestStageExactlyTakesAQuoteLiterally(t *testing.T) {
+	r := newRunner(t, Host)
+	s := newSeparate(t)
+	require.NoError(t, r.InitSeparate(t.Context(), s))
+	require.NoError(t, r.StageExactly(t.Context(), s, []StagedFile{stagedOf(`"api/entries/f"`, "q\n"), stagedOf(`"open`, "u\n")}))
+	assert.Equal(t, "\"api/entries/f\"\x00\"open\x00", sepGit(t, s, "ls-files", "-z"))
 }
