@@ -1,16 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package askfirst
+package approval
 
 import (
-	"bytes"
 	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git/gittest"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
@@ -59,6 +58,15 @@ grants:
     surface: checks
     tasks: [T013]
 `
+
+// messages returns the message of each finding.
+func messages(findings []Finding) []string {
+	var out []string
+	for _, f := range findings {
+		out = append(out, f.Msg)
+	}
+	return out
+}
 
 func mustList(t *testing.T, src string) *List {
 	t.Helper()
@@ -134,7 +142,7 @@ func TestPRApprovalLine(t *testing.T) {
 				head = mustList(t, prListWithoutDecisions)
 			}
 			r := review{body: c.body, base: mustList(t, prList), head: head, changed: []string{"docs/adr/0001-x.md"}}
-			got := r.findings()
+			got := messages(r.findings())
 			if c.want == passes {
 				assert.Empty(t, got)
 				return
@@ -163,8 +171,8 @@ func TestPRGrantLine(t *testing.T) {
 		{"a grant the file holds", "> - [ ] Approval: checks - granted at M0 for T013", "tools/ci/x.go", ""},
 		{"a grant that does not hold on an untouched surface", "> - [ ] Approval: checks - granted at M1 for T013", "README.md", ""},
 		{"a grant the file holds, ticked", "> - [x] Approval: checks - granted at M0 for T013", "tools/ci/x.go", ""},
-		{"a grant the file lacks", "> - [ ] Approval: checks - granted at M1 for T013", "tools/ci/x.go", "which docs/grants.yaml at the base does not hold"},
-		{"a grant the file lacks, ticked", "> - [x] Approval: checks - granted at M0 for T999", "tools/ci/x.go", "which docs/grants.yaml at the base does not hold"},
+		{"a grant the file lacks", "> - [ ] Approval: checks - granted at M1 for T013", "tools/ci/x.go", "names a grant that docs/grants.yaml at the base does not hold"},
+		{"a grant the file lacks, ticked", "> - [x] Approval: checks - granted at M0 for T999", "tools/ci/x.go", "names a grant that docs/grants.yaml at the base does not hold"},
 		{"a grant on decisions", "> - [x] Approval: decisions - granted at M0 for T013", "docs/adr/x.md", "a sitting grants none on that surface"},
 	}
 	for _, c := range cases {
@@ -176,7 +184,11 @@ func TestPRGrantLine(t *testing.T) {
 				return
 			}
 			require.Len(t, got, 1, "%q", got)
-			assert.Contains(t, got[0], c.want)
+			assert.Contains(t, got[0].Msg, c.want)
+			// The sitting and the task are the author's text: the line is
+			// quoted, and the message names neither.
+			assert.Equal(t, c.line, got[0].Quote)
+			assert.NotContains(t, got[0].Msg, " for T")
 		})
 	}
 }
@@ -226,10 +238,10 @@ func prRepo(t *testing.T) (*gittest.Repo, string) {
 	return r, r.Commit("base")
 }
 
-// judge runs judgePR on the fixture and returns the messages.
+// judge runs Judge on the fixture, with no fetch, and returns the messages.
 func judge(t *testing.T, r *gittest.Repo, pr PR) []string {
 	t.Helper()
-	findings, err := judgePR(context.Background(), r.Repo, pr)
+	findings, err := Judge(context.Background(), r.Repo, pr, false)
 	require.NoError(t, err)
 	var msgs []string
 	for _, f := range findings {
@@ -296,7 +308,7 @@ func TestPRReadsTheRangeFromGit(t *testing.T) {
 		body := alert("> - [x] Approval: ask-first - add a grant", "> - [ ] Approval: checks - granted at M0 for T021")
 		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: body})
 		require.Len(t, got, 1, "%q", got)
-		assert.Contains(t, got[0], "which docs/grants.yaml at the base does not hold")
+		assert.Contains(t, got[0], "names a grant that docs/grants.yaml at the base does not hold")
 	})
 	t.Run("a grant present at the base passes", func(t *testing.T) {
 		r, base := prRepo(t)
@@ -362,7 +374,7 @@ func TestPRReadsTheRangeFromGit(t *testing.T) {
 		got := judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert(
 			"> - [x] Approval: ask-first - fix the grants", "> - [ ] Approval: checks - granted at M0 for T013")})
 		require.Len(t, got, 1, "%q", got)
-		assert.Contains(t, got[0], "which docs/grants.yaml at the base does not hold")
+		assert.Contains(t, got[0], "names a grant that docs/grants.yaml at the base does not hold")
 		got = judge(t, r, PR{BaseSHA: base, HeadSHA: head, Body: alert(
 			"> - [x] Approval: ask-first - fix the grants", "> - [x] Approval: checks - a check")})
 		assert.Empty(t, got)
@@ -422,70 +434,6 @@ func TestPRPayload(t *testing.T) {
 	})
 }
 
-// TestPRRun runs the subcommand as a person does, on a clone whose
-// origin is unreachable, so a network read would fail it: a local run
-// with --title and --body, and a run on a saved payload whose commits
-// the clone holds.
-func TestPRRun(t *testing.T) {
-	r, base := prRepo(t)
-	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "gone"))
-	r.Git("update-ref", "refs/remotes/origin/main", base)
-	// Local main moves past origin/main, so a run that took main for the
-	// base instead of origin/main would read a different range.
-	r.Write("kits/k.txt", "k\n")
-	r.Commit("local main moves")
-	r.Git("checkout", "--quiet", "-b", "topic")
-	r.Write("docs/adr/0002-new.md", "new\n")
-	head := r.Commit("a record")
-	dir := t.TempDir()
-	bodyFile := filepath.Join(dir, "body.md")
-	run := func(t *testing.T, body string, args ...string) (bool, string) {
-		t.Helper()
-		require.NoError(t, os.WriteFile(bodyFile, []byte(body), 0o600))
-		var out bytes.Buffer
-		ok, err := RunPR(context.Background(), check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out}, args)
-		require.NoError(t, err)
-		return ok, out.String()
-	}
-	t.Run("a local run that passes", func(t *testing.T) {
-		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
-		assert.True(t, ok, out)
-		assert.Equal(t, "pr: ok\n", out)
-	})
-	t.Run("the default base is origin/main", func(t *testing.T) {
-		ok, out := run(t, alert(validLine), "--title", "docs: a record", "--body", bodyFile)
-		assert.False(t, ok)
-		assert.Contains(t, out, `the diff touches "kits"`)
-	})
-	t.Run("a local run that fails", func(t *testing.T) {
-		ok, out := run(t, alert("> - [ ] Approval: decisions - "+"amend rule 8"), "--title", "docs: a record", "--body", bodyFile, "--base", "main")
-		assert.False(t, ok)
-		assert.Contains(t, out, "pull request body: pr: the diff touches \"decisions\" and its approval line is not ticked")
-		assert.Contains(t, out, "pr: 1 finding(s)")
-	})
-	t.Run("a saved payload", func(t *testing.T) {
-		payload := filepath.Join(dir, "event.json")
-		src := `{"pull_request":{"title":"t","body":null,"head":{"ref":"topic","sha":"` + head + `"},"base":{"sha":"` + base + `","ref":"main","repo":{"default_branch":"main"}}}}`
-		require.NoError(t, os.WriteFile(payload, []byte(src), 0o600))
-		ok, out := run(t, "", payload)
-		assert.False(t, ok)
-		assert.Contains(t, out, "has no approval line for it")
-	})
-	t.Run("a commit the clone lacks", func(t *testing.T) {
-		var out bytes.Buffer
-		_, err := RunPR(context.Background(), check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &out},
-			[]string{"--title", "t", "--body", bodyFile, "--base", strings.Repeat("e", 40)})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "names no commit of this clone")
-	})
-	for _, args := range [][]string{{}, {"a", "b"}, {"--title", "t"}, {"--title", "t", "--body", "b", "extra"}, {"--nosuch"}} {
-		t.Run("usage "+strings.Join(args, " "), func(t *testing.T) {
-			_, err := RunPR(context.Background(), check.Env{Dir: r.Dir, GitEnv: r.Env, Stdout: &bytes.Buffer{}}, args)
-			assert.Error(t, err)
-		})
-	}
-}
-
 // TestPRTemplateHasNoApprovalLine reads the pull request template as a
 // body: a body that keeps the hint holds no approval line and no
 // malformed one (REQ-1158).
@@ -497,20 +445,47 @@ func TestPRTemplateHasNoApprovalLine(t *testing.T) {
 
 // TestPROneReader holds invariant (e) of T005's acceptance, which T180
 // takes: pr and the CODEOWNERS generator read .github/ask-first.yaml with
-// the one reader, Parse, and pr reads docs/grants.yaml with ParseGrants
-// (no generator reads the grants); no other function of the package
-// decodes YAML. A reader inlined into
-// either caller turns it red.
+// the one reader, Parse of this package (the generator through the Parse
+// of the askfirst package, which calls it), and pr reads docs/grants.yaml
+// with ParseGrants (no generator reads the grants); no other function of
+// either package decodes YAML. A reader inlined into either caller turns
+// it red.
 func TestPROneReader(t *testing.T) {
+	calls := map[string]map[string]bool{}
+	for pkg, dir := range map[string]string{"approval": ".", "askfirst": ".."} {
+		for name, called := range callsOf(t, dir) {
+			calls[pkg+"."+name] = called
+		}
+	}
+	assert.True(t, calls["askfirst.CodeownersOutput"]["Parse"], "the generator reads the list with the Parse of askfirst")
+	assert.True(t, calls["askfirst.Parse"]["approval.Parse"], "which is this package's Parse")
+	assert.True(t, calls["approval.readList"]["Parse"], "pr reads the list with Parse")
+	assert.True(t, calls["approval.readGrants"]["ParseGrants"], "pr reads the grants with ParseGrants")
+	for name, called := range calls {
+		for c := range called {
+			if strings.HasPrefix(c, "yaml.") && !slices.Contains(yamlReaders, name) {
+				t.Errorf("%s calls %s: only %v decode YAML", name, c, yamlReaders)
+			}
+		}
+	}
+}
+
+// yamlReaders are the functions that decode YAML (TestPROneReader).
+var yamlReaders = []string{"approval.Parse", "approval.ParseGrants"}
+
+// callsOf returns, for each function of the non-test files of dir, the
+// names it calls: a bare name, or "<package>.<name>".
+func callsOf(t *testing.T, dir string) map[string]map[string]bool {
+	t.Helper()
 	fset := token.NewFileSet()
-	entries, err := os.ReadDir(".")
+	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	calls := map[string]map[string]bool{}
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
 			continue
 		}
-		f, err := parser.ParseFile(fset, e.Name(), nil, 0)
+		f, err := parser.ParseFile(fset, filepath.Join(dir, e.Name()), nil, 0)
 		require.NoError(t, err)
 		for _, d := range f.Decls {
 			fn, ok := d.(*ast.FuncDecl)
@@ -534,14 +509,5 @@ func TestPROneReader(t *testing.T) {
 			calls[fn.Name.Name] = called
 		}
 	}
-	assert.True(t, calls["CodeownersOutput"]["Parse"], "the generator reads the list with Parse")
-	assert.True(t, calls["readList"]["Parse"], "pr reads the list with Parse")
-	assert.True(t, calls["readGrants"]["ParseGrants"], "pr reads the grants with ParseGrants")
-	for name, called := range calls {
-		for c := range called {
-			if strings.HasPrefix(c, "yaml.") && name != "Parse" && name != "ParseGrants" {
-				t.Errorf("%s calls %s: only Parse and ParseGrants decode YAML", name, c)
-			}
-		}
-	}
+	return calls
 }

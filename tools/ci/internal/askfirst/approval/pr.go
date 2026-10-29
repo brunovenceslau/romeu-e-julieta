@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package askfirst
+package approval
 
 import (
 	"bytes"
@@ -14,10 +14,10 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/git"
-	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/check"
 )
 
 // PR is what pr reads of a pull request (REQ-0817): the seven fields of
@@ -118,44 +118,24 @@ func field(obj map[string]jsontext.Value, path string, to *string, nullable bool
 	return nil
 }
 
-// RunPR is the pr subcommand (10 10.2, 12 12.4): it judges the approval
-// lines of a pull request, read from a saved payload file, or, before the
-// pull request exists, from --title and --body over the local range from
-// --base to HEAD. It reads only local objects: a commit the clone lacks
-// is an error, not a fetch (REQ-0816).
-func RunPR(ctx context.Context, e check.Env, args []string) (bool, error) {
-	pr, err := prInput(ctx, e.Repo(), args)
-	if err != nil {
-		return false, err
-	}
-	findings, err := judgePR(ctx, e.Repo(), pr)
-	if err != nil {
-		return false, err
-	}
-	check.Say(e.Stdout, "%s%s\n", check.Lines(findings), check.Summary("pr", len(findings)))
-	return len(findings) == 0, nil
-}
-
-// prInput reads the pull request from the arguments: one payload file,
-// or --title, --body and an optional --base for a local run.
-func prInput(ctx context.Context, r git.Repo, args []string) (PR, error) {
+// ReadArgs reads the pull request of a local run of pr (10 10.2, 12
+// 12.4) from its arguments: one saved payload file, or, before the pull
+// request exists, --title and --body over the local range from --base to
+// HEAD. usage is the text a wrong set of arguments is answered with.
+func ReadArgs(ctx context.Context, r git.Repo, args []string, usage string) (PR, error) {
 	fs := flag.NewFlagSet("pr", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	title := fs.String("title", "", "")
 	bodyFile := fs.String("body", "", "")
 	base := fs.String("base", localBase, "")
 	if err := fs.Parse(args); err != nil {
-		return PR{}, fmt.Errorf("pr: %w\n%s", err, check.Usage())
+		return PR{}, fmt.Errorf("pr: %w\n%s", err, usage)
 	}
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	switch {
 	case len(set) == 0 && fs.NArg() == 1:
-		src, err := os.ReadFile(fs.Arg(0))
-		if err != nil {
-			return PR{}, err
-		}
-		return ParsePayload(src)
+		return ReadPayload(fs.Arg(0))
 	case set["title"] && set["body"] && fs.NArg() == 0:
 		body, err := os.ReadFile(*bodyFile)
 		if err != nil {
@@ -171,27 +151,47 @@ func prInput(ctx context.Context, r git.Repo, args []string) (PR, error) {
 		}
 		return PR{Title: *title, Body: string(body), BaseSHA: baseSHA, HeadSHA: headSHA}, nil
 	}
-	return PR{}, fmt.Errorf("pr takes a payload file, or --title and --body with an optional --base\n%s", check.Usage())
+	return PR{}, fmt.Errorf("pr takes a payload file, or --title and --body with an optional --base\n%s", usage)
 }
 
-// judgePR reads from git what the approval rules need and judges the
+// ReadPayload reads a saved payload file with ParsePayload.
+func ReadPayload(name string) (PR, error) {
+	src, err := os.ReadFile(name)
+	if err != nil {
+		return PR{}, err
+	}
+	return ParsePayload(src)
+}
+
+// Judge reads from git what the approval rules need and judges the
 // pull request: the walk from base.sha to head.sha finds a commit
 // (REQ-0819), and the body carries the approval lines its diff needs.
-func judgePR(ctx context.Context, r git.Repo, pr PR) ([]check.Finding, error) {
+// With fetch set, which only the pr job sets (cmd/pr), a head.sha the
+// clone lacks is fetched first (fetchHead); without it, a missing
+// commit is an error, so a local run reads no network (REQ-0816).
+func Judge(ctx context.Context, r git.Repo, pr PR, fetch bool) ([]Finding, error) {
 	base, err := commit(ctx, r, pr.BaseSHA)
 	if err != nil {
 		return nil, err
 	}
+	if fetch {
+		if err := fetchHead(ctx, r, pr.HeadSHA); err != nil {
+			return nil, err
+		}
+	}
 	head, err := commit(ctx, r, pr.HeadSHA)
 	if err != nil {
 		return nil, err
+	}
+	if base != pr.BaseSHA || head != pr.HeadSHA {
+		return nil, fmt.Errorf("base.sha and head.sha name the commits %s and %s, and not themselves", base, head)
 	}
 	out, err := read(ctx, r, "rev-list", "--max-count=1", base+".."+head)
 	if err != nil {
 		return nil, err
 	}
 	if len(bytes.TrimSpace(out)) == 0 {
-		return []check.Finding{{Where: "pull request", Rule: "pr", Msg: "the walk from base.sha to head.sha finds no commit"}}, nil
+		return []Finding{{Where: "pull request", Msg: "the walk from base.sha to head.sha finds no commit"}}, nil
 	}
 	changed, err := changedPaths(ctx, r, base, head)
 	if err != nil {
@@ -215,22 +215,63 @@ func judgePR(ctx context.Context, r git.Repo, pr PR) ([]check.Finding, error) {
 	if err != nil {
 		grants = nil
 	}
-	var findings []check.Finding
+	var findings []Finding
 	if _, err := readGrants(ctx, r, head); err != nil {
-		findings = append(findings, check.Finding{Where: GrantsPath, Rule: "pr", Msg: "at the head: " + err.Error()})
+		findings = append(findings, Finding{Where: GrantsPath, Msg: "at the head: " + err.Error()})
 	}
 	rv := review{body: pr.Body, base: baseList, head: headList, changed: changed, grants: grants}
-	for _, msg := range rv.findings() {
-		findings = append(findings, check.Finding{Where: "pull request body", Rule: "pr", Msg: msg})
-	}
-	return findings, nil
+	return append(findings, rv.findings()...), nil
 }
 
-// read runs one git command that reads objects of the pull request,
-// with hooks off (REQ-1152); the head is read as objects and never
-// checked out.
+// read runs one git command on objects of the pull request, with hooks
+// off (REQ-1152); the head is read as objects and never checked out.
+// Every git command of pr goes through it, and so through runGit, which
+// the test of the hostile repository records (TestPRHostileRepository).
 func read(ctx context.Context, r git.Repo, args ...string) ([]byte, error) {
-	return r.Run(ctx, nil, append([]string{"-c", "core.hooksPath=/dev/null"}, args...)...)
+	return runGit(ctx, r, append([]string{"-c", "core.hooksPath=/dev/null"}, args...))
+}
+
+// runGit runs one git command. It is a variable so that a test can see
+// each argument list pr passes.
+var runGit = func(ctx context.Context, r git.Repo, args []string) ([]byte, error) {
+	return r.Run(ctx, nil, args...)
+}
+
+// fetchRemote is the remote the pr job fetches a missing head from: the
+// one actions/checkout names, the repository of the default branch,
+// which serves the head of a pull request from a fork too.
+const fetchRemote = "origin"
+
+// noCredentials are the settings the fetch of the head runs with, so it
+// sends no credential whatever the configuration holds (REQ-1152): no
+// credential helper and no askpass program (an empty value resets each
+// list), no extra header, which is where actions/checkout keeps the token
+// when it persists it, and no redirect, so the fetch reads only the URL of
+// the remote.
+var noCredentials = []string{
+	"-c", "credential.helper=",
+	"-c", "core.askPass=",
+	"-c", "http.extraHeader=",
+	"-c", "http.followRedirects=false",
+}
+
+// fetchHead fetches the commit sha from fetchRemote when the clone lacks
+// it (REQ-1152): without credentials, without submodules, tags, a
+// FETCH_HEAD or the maintenance a fetch starts, and only that commit and
+// the history it needs. The repository is public (10 10.2), so the read
+// needs no token. A commit the clone holds is not fetched, so a run on
+// such a clone reads no network.
+func fetchHead(ctx context.Context, r git.Repo, sha string) error {
+	if _, err := commit(ctx, r, sha); err == nil {
+		return nil
+	}
+	r.Env = append(r.Environ(), "GIT_TERMINAL_PROMPT=0")
+	args := slices.Concat(noCredentials, []string{"fetch", "--no-recurse-submodules", "--no-tags",
+		"--no-write-fetch-head", "--no-auto-maintenance", "--quiet", "--end-of-options", fetchRemote, sha})
+	if _, err := read(ctx, r, args...); err != nil {
+		return fmt.Errorf("fetching head.sha %s: %w", sha, err)
+	}
+	return nil
 }
 
 // commit returns the full id of the commit rev names, or an error that

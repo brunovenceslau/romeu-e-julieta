@@ -526,7 +526,7 @@ body with CR LF line ends reads the same. The alert runs from the line
 `> [!IMPORTANT]`, written alone, to the last line before the first one
 that does not start with `>`; a body with a second such line fails
 `pr`. Inside the alert, an approval line is a line that matches the Go
-regular expression `approvalLine` of the askfirst package of
+regular expression `approvalLine` of the approval package of
 `tools/ci`:
 
 ```text
@@ -563,7 +563,7 @@ lives, and the command line of its step, are decided by the task that
 builds it; until then this specification writes `tools/ci pr` for the
 step and `go run ./tools/ci pr` for its command line, and that task's
 pull request updates each where it appears. `approvalLine` is in the
-askfirst package of `tools/ci`, which the `approvals` glob names; a
+approval package of `tools/ci`, which the `approvals` glob names; a
 pull request that moves it updates the glob and this page with it.
 The check that the base is the default branch (12.9) stays, but it is
 not what makes the code trusted. So a run

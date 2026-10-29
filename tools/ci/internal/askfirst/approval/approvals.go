@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bruno Venceslau
 // SPDX-License-Identifier: GPL-3.0-only
 
-package askfirst
+package approval
 
 import (
 	"fmt"
@@ -21,11 +21,11 @@ const approvalPrefix = "Approval: "
 // grant (REQ-1161): the sitting, then the task.
 var grantPhrase = regexp.MustCompile(`^granted at (\S+) for (\S+)$`)
 
-// approval is one approval line of the alert: the surface id, the
-// phrase, and whether the maintainer ticked its box.
+// approval is one approval line of the alert: the line as written, the
+// surface id, the phrase, and whether the maintainer ticked its box.
 type approval struct {
-	id, phrase string
-	ticked     bool
+	line, id, phrase string
+	ticked           bool
 }
 
 // bodyLines returns the lines of a pull request body as 12 12.4 reads
@@ -83,7 +83,7 @@ func readAlert(body string) alertBody {
 			a.malformed = append(a.malformed, l)
 			continue
 		}
-		a.approvals = append(a.approvals, approval{id: m[2], phrase: m[3], ticked: m[1] != " "})
+		a.approvals = append(a.approvals, approval{line: l, id: m[2], phrase: m[3], ticked: m[1] != " "})
 	}
 	return a
 }
@@ -99,29 +99,38 @@ type review struct {
 	grants     *Grants
 }
 
+// bodyWhere is where a finding about the body is reported.
+const bodyWhere = "pull request body"
+
 // findings applies the rules of REQ-1157 and REQ-1161 to the body and
-// returns one message per finding: the alert's malformed lines and a
+// returns one finding per break: the alert's malformed lines and a
 // second alert first, then each approval line in order, then each
 // touched surface, in the order of the base list and then of the head's.
-func (r review) findings() []string {
+// A line of the body is the author's text: a finding about one quotes it
+// (Finding.Quote) and never writes it, or a part of it, into its message.
+func (r review) findings() []Finding {
 	ids, globs := r.union()
 	a := readAlert(r.body)
-	var out []string
+	var out []Finding
+	add := func(quote, format string, args ...any) {
+		out = append(out, Finding{Where: bodyWhere, Msg: fmt.Sprintf(format, args...), Quote: quote})
+	}
 	for _, l := range a.malformed {
-		out = append(out, fmt.Sprintf("malformed approval line: %q", l))
+		add(l, "malformed approval line, quoted below")
 	}
 	if a.alerts > 1 {
-		out = append(out, fmt.Sprintf("the body opens %d approval alerts; it holds one, opened by the line %q", a.alerts, alertLine))
+		add("", "the body opens %d approval alerts; it holds one, opened by the line %q", a.alerts, alertLine)
 	}
 	approved := map[string]bool{}
 	lineFor := map[string]bool{}
 	for _, l := range a.approvals {
 		switch {
 		case globs[l.id] == nil:
-			out = append(out, fmt.Sprintf("an approval line names %q, which neither ask-first list has", l.id))
+			// The id matched [a-z0-9-]+, so it prints as it is.
+			add("", "an approval line names %q, which neither ask-first list has", l.id)
 			continue
 		case lineFor[l.id]:
-			out = append(out, fmt.Sprintf("two approval lines name %q", l.id))
+			add("", "two approval lines name %q", l.id)
 			continue
 		}
 		lineFor[l.id] = true
@@ -131,7 +140,7 @@ func (r review) findings() []string {
 		}
 		ok, msg := r.grant(l)
 		if msg != "" {
-			out = append(out, msg)
+			add(l.line, "%s", msg)
 		}
 		// A grant phrase that fails is reported once, above, and not
 		// again as a line left unticked.
@@ -143,9 +152,9 @@ func (r review) findings() []string {
 		}
 		switch {
 		case !lineFor[id]:
-			out = append(out, fmt.Sprintf("the diff touches %q and the alert has no approval line for it", id))
+			add("", "the diff touches %q and the alert has no approval line for it", id)
 		case !approved[id]:
-			out = append(out, fmt.Sprintf("the diff touches %q and its approval line is not ticked: the maintainer ticks it", id))
+			add("", "the diff touches %q and its approval line is not ticked: the maintainer ticks it", id)
 		}
 	}
 	return out
@@ -154,7 +163,8 @@ func (r review) findings() []string {
 // grant judges the phrase of an approval line as a sitting grant
 // (REQ-1161). A phrase of another form is not a grant: ok is false and
 // msg empty. A grant phrase is ok when the grants of the base hold that
-// grant, and a finding otherwise.
+// grant, and a finding otherwise, whose message names the surface, a
+// known id, and leaves the sitting and the task to the quoted line.
 func (r review) grant(l approval) (ok bool, msg string) {
 	m := grantPhrase.FindStringSubmatch(l.phrase)
 	if m == nil {
@@ -165,7 +175,7 @@ func (r review) grant(l approval) (ok bool, msg string) {
 		return false, fmt.Sprintf("the approval line for %q names a grant, and a sitting grants none on that surface", l.id)
 	}
 	if !r.grants.holds(sitting, l.id, task) {
-		return false, fmt.Sprintf("the approval line for %q names a grant of %s for %s, which %s at the base does not hold", l.id, sitting, task, GrantsPath)
+		return false, fmt.Sprintf("the approval line for %q names a grant that %s at the base does not hold", l.id, GrantsPath)
 	}
 	return true, ""
 }
