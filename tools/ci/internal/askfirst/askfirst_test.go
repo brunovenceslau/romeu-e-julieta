@@ -159,3 +159,19 @@ func TestPRRun(t *testing.T) {
 		})
 	}
 }
+
+// TestWrappers holds the names askfirst keeps for tools/ci to the
+// approval package they wrap.
+func TestWrappers(t *testing.T) {
+	list, err := Parse([]byte(runList))
+	require.NoError(t, err)
+	assert.Len(t, list.Surfaces, 3)
+	_, err = Parse([]byte("version: 2\n"))
+	require.Error(t, err)
+	require.NoError(t, CheckGlob("docs/**"))
+	require.Error(t, CheckGlob("../x"))
+	assert.True(t, GlobMatch("docs/**", "docs/a/b.md"))
+	assert.False(t, GlobMatch("docs/*", "docs/a/b.md"))
+	assert.True(t, GlobsMeet("docs/**", "*/a.md"))
+	assert.False(t, GlobsMeet("docs/*.md", "kits/*.md"))
+}

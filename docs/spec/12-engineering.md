@@ -609,16 +609,18 @@ with whitespace before the `::` or in the older `##[` form too; fixture
 "pr escapes a workflow command in a PR body", with a leading space, a
 leading U+00A0 and a `##[` case. `REQ-1154` A required check is matched by name,
 and the head's own `pull_request` workflows run from the head, so `pr`
-compares each head job's check name (its `name`, else its id) with the
-pr job's name, `pr`, without case and spaces around it, and refuses a
-match outside the pr job's file; refuses a head job outside the pr
+compares each head job's check name (its `name`, else its id, also when
+the `name` is null or empty) with the pr job's name, `pr`, without case
+and spaces around it, and refuses a match outside the pr job's file; refuses a head job outside the pr
 job's file whose `name` holds `${{`, since the check name it posts is
 known only once the run expands the expression, with a fixture for a
 literal expression and one for a matrix value, unless the literal text
 before the first `${{`, without spaces around it, is not empty and is no
 prefix of the pr job's name, since an expansion only adds text after it
 (so `static on ${{ matrix.os }}` stays; decided on 2026-10-29,
-provisional, scope this repository); reads each file of the head's
+provisional, scope this repository, reopened when a check name GitHub
+posts is measured to differ from that reading, or when the maintainer
+prefers the literal rule with those jobs renamed); reads each file of the head's
 `.github/workflows` that ends in `.yml` or `.yaml` as an object, and
 refuses one it cannot read as one YAML mapping without anchors, aliases,
 merge keys or a key written twice; `REQ-1155` and

@@ -115,7 +115,7 @@ func outsideApprovals(pkgs []listedPackage, root string, globs []string, goSum [
 // -test: a package "<path>.test" built from one file of its build cache,
 // outside the tree.
 func testMain(p listedPackage) bool {
-	return strings.HasSuffix(p.ImportPath, ".test") && len(p.files()) == 1 && filepath.IsAbs(p.GoFiles[0])
+	return strings.HasSuffix(p.ImportPath, ".test") && len(p.files()) == 1 && len(p.GoFiles) == 1 && filepath.IsAbs(p.GoFiles[0])
 }
 
 // pinned reports whether go.sum holds the hash of the code of the module

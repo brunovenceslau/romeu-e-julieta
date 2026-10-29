@@ -175,6 +175,7 @@ func ReadPayload(name string) (PR, error) {
 // pr job's checkout and no job that could post the pr job's check
 // (headFindings), and the body carries the approval lines its diff
 // needs.
+//
 // With fetch set, which only the pr job sets (cmd/pr), a head.sha the
 // clone lacks is fetched first (fetchHead); without it, a missing
 // commit is an error, so a local run reads no network (REQ-0816).
@@ -257,7 +258,7 @@ const fetchRemote = "origin"
 // noCredentials are the settings the fetch of the head runs with, so it
 // sends no credential whatever the configuration holds (REQ-1152): no
 // credential helper and no askpass program (an empty value resets each
-// list), no extra header, which is where actions/checkout keeps the token
+// setting, and fetchHead empties GIT_ASKPASS and SSH_ASKPASS too), no extra header, which is where actions/checkout keeps the token
 // when it persists it, and no redirect, so the fetch reads only the URL of
 // the remote.
 var noCredentials = []string{
@@ -277,7 +278,7 @@ func fetchHead(ctx context.Context, r git.Repo, sha string) error {
 	if _, err := commit(ctx, r, sha); err == nil {
 		return nil
 	}
-	r.Env = append(r.Environ(), "GIT_TERMINAL_PROMPT=0")
+	r.Env = append(r.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=", "SSH_ASKPASS=")
 	args := slices.Concat(noCredentials, []string{"fetch", "--no-recurse-submodules", "--no-tags",
 		"--no-write-fetch-head", "--no-auto-maintenance", "--quiet", "--end-of-options", fetchRemote, sha})
 	if _, err := read(ctx, r, args...); err != nil {

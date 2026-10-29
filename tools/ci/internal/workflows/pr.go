@@ -40,7 +40,7 @@ import (
 // file or job.
 const (
 	prFile  = "pr.yml"
-	prEvent = "pull_request_target"
+	prEvent = approval.PREvent
 	// PRLine is the one command of the pr job (REQ-1150).
 	PRLine = `go run ./tools/ci/internal/askfirst/cmd/pr "$GITHUB_EVENT_PATH"`
 	// prDepth is the one fetch-depth of the pr job's checkout: the whole

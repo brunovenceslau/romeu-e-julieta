@@ -23,11 +23,11 @@ const (
 	CodeownersPath = approval.CodeownersPath
 )
 
-// List and Surface are the list and one of its surfaces.
-type (
-	List    = approval.List
-	Surface = approval.Surface
-)
+// List is the ask-first list (approval.List).
+type List = approval.List
+
+// Surface is one surface of the list (approval.Surface).
+type Surface = approval.Surface
 
 // Parse reads and checks the list (approval.Parse), the one reader of
 // it.

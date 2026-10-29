@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/askfirst/approval"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/internal/citest"
 )
 
@@ -48,6 +49,13 @@ permissions:
 `
 
 const prPath = ".github/workflows/pr.yml"
+
+// TestWorkflowsPRNames holds the grammar's names of the pr job to the
+// ones pr reads the head with.
+func TestWorkflowsPRNames(t *testing.T) {
+	assert.Equal(t, approval.PRWorkflow, Dir+prFile)
+	assert.Equal(t, approval.PREvent, prEvent)
+}
 
 // TestWorkflowsPRAdmitted passes the pr workflow, and the committed
 // pr.yml is that shape (TestWorkflowsRepository reads it too).

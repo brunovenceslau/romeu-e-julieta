@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -22,11 +22,13 @@ import (
 // the default branch, and fails closed on what it cannot read.
 
 // workflowsDir is the directory GitHub reads workflow files from, and
-// prWorkflow the file of the pr job (10 10.2, the pr job row).
+// PRWorkflow the file of the pr job (10 10.2, the pr job row).
 const (
 	workflowsDir = ".github/workflows"
-	prWorkflow   = workflowsDir + "/pr.yml"
-	prEvent      = "pull_request_target"
+	// PRWorkflow is the file of the pr job, and PREvent its one event;
+	// the grammar of tools/ci workflows reads the same names.
+	PRWorkflow = workflowsDir + "/pr.yml"
+	PREvent    = "pull_request_target"
 )
 
 // goModeFiles are the paths at the top of the tree that change what the
@@ -82,7 +84,9 @@ func headGoFiles(ctx context.Context, r git.Repo, head string) ([]Finding, error
 //     around it, is not empty and is no prefix of JobName: an expansion
 //     only adds text after that prefix, so the name can never be
 //     JobName (decided on 2026-10-29, provisional, so that a name such as
-//     "static on ${{ matrix.os }}" stays);
+//     "static on ${{ matrix.os }}" stays; reopened when a measured check
+//     name of GitHub differs from that reading, or when the maintainer
+//     prefers the literal rule of REQ-1154 with jobs renamed);
 //   - the head's pr.yml names no event but pull_request_target, under
 //     which GitHub runs the default branch's file and never the head's;
 //   - a workflow file that does not parse as one YAML mapping fails, as
@@ -121,9 +125,9 @@ func workflowFindings(name string, src []byte) []Finding {
 	if err != nil {
 		return []Finding{{Where: name, Msg: "a workflow file of the head that pr cannot read: " + err.Error()}}
 	}
-	if name == prWorkflow {
-		if !onlyEvent(mappingValue(doc, "on"), prEvent) {
-			return []Finding{{Where: name, Msg: "the head's " + prWorkflow + " names an event other than " + prEvent + ", under which the head's file would run and post the check " + JobName + " (REQ-1155)"}}
+	if name == PRWorkflow {
+		if !onlyEvent(mappingValue(doc, "on"), PREvent) {
+			return []Finding{{Where: name, Msg: "the head's " + PRWorkflow + " names an event other than " + PREvent + ", under which the head's file would run and post the check " + JobName + " (REQ-1155)"}}
 		}
 		return nil
 	}
@@ -137,12 +141,15 @@ func workflowFindings(name string, src []byte) []Finding {
 	}
 	for i := 0; i+1 < len(jobs.Content); i += 2 {
 		id, job := jobs.Content[i], jobs.Content[i+1]
+		// A name that is absent, null or empty leaves the check named by
+		// the id, so the id is judged then.
 		check, label := id.Value, "id"
-		if n := mappingValue(job, "name"); n != nil {
-			if n.Kind != yaml.ScalarNode {
-				findings = append(findings, Finding{Where: name, Msg: "a job of a workflow file of the head has a name pr cannot read"})
-				continue
-			}
+		switch n := mappingValue(job, "name"); {
+		case n == nil:
+		case n.Kind != yaml.ScalarNode:
+			findings = append(findings, Finding{Where: name, Msg: "a job of a workflow file of the head has a name pr cannot read"})
+			continue
+		case n.Tag != "!!null" && n.Value != "":
 			check, label = n.Value, "name"
 		}
 		if spoofs(check) {
@@ -187,8 +194,10 @@ func onlyEvent(on *yaml.Node, want string) bool {
 func parseWorkflow(src []byte) (*yaml.Node, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(src))
 	var doc yaml.Node
+	// The library's error may quote the file, the author's text, so
+	// only the kind of failure is returned.
 	if err := dec.Decode(&doc); err != nil {
-		return nil, fmt.Errorf("not YAML: %w", err)
+		return nil, errors.New("not YAML")
 	}
 	var more yaml.Node
 	if err := dec.Decode(&more); !errors.Is(err, io.EOF) {
@@ -220,12 +229,7 @@ func indirect(n *yaml.Node) bool {
 			seen[k] = true
 		}
 	}
-	for _, c := range n.Content {
-		if indirect(c) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(n.Content, indirect)
 }
 
 // mappingValue returns the value of key in a mapping node, or nil;

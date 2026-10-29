@@ -61,8 +61,7 @@ var (
 	globSegment = regexp.MustCompile(`^[A-Za-z0-9._*-]+$`)
 	// approvalLine is one checklist line of the approval alert of a pull
 	// request body (12 12.4): the box, empty or ticked, a surface id, then
-	// a phrase. The first
-	// character of the phrase is a letter, number, punctuation or symbol,
+	// a phrase. The first character of the phrase is a letter, number, punctuation or symbol,
 	// written as the complement of the other categories (C, M and Z)
 	// because RE2 has no class subtraction; the phrase holds no control
 	// or format character and none of the double quotation marks the
@@ -159,10 +158,10 @@ func CheckGlob(g string) error {
 	return nil
 }
 
-// GlobMatch reports whether a glob of the dialect above (checkGlob)
+// GlobMatch reports whether a glob of the dialect above (CheckGlob)
 // matches name, both relative to the top of the tree with forward
 // slashes: "**" matches zero or more whole segments, and "*" any run of
-// characters inside one segment (path.Match, which checkGlob leaves
+// characters inside one segment (path.Match, which CheckGlob leaves
 // nothing else to read). It fills a table over the segments of the glob
 // and of the name, so its work grows with their product: a glob of many
 // "**" segments, which a task file of a change may hold, cannot make it

@@ -57,7 +57,7 @@ func TestPRFetchesTheHead(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, findings)
 		_, err = os.Stat(filepath.Join(job.Dir, ".git", "FETCH_HEAD"))
-		assert.ErrorIs(t, err, os.ErrNotExist, "the fetch writes no FETCH_HEAD")
+		require.ErrorIs(t, err, os.ErrNotExist, "the fetch writes no FETCH_HEAD")
 		refs := job.Git("for-each-ref", "--format=%(refname)")
 		assert.NotContains(t, refs, "pull", "the fetch writes no ref")
 	})
@@ -112,7 +112,8 @@ func gitCalls(t *testing.T) func() [][]string {
 // and no show; were it to, they would pass the flags of the diff and
 // --ignore-submodules=all.
 var requiredFlags = map[string][]string{
-	"fetch":     {"--no-recurse-submodules", "-c credential.helper=", "-c http.extraHeader="},
+	"fetch": {"--no-recurse-submodules", "--no-tags", "--no-write-fetch-head", "--no-auto-maintenance",
+		"-c credential.helper=", "-c core.askPass=", "-c http.extraHeader=", "-c http.followRedirects=false"},
 	"diff":      {"--no-ext-diff", "--no-textconv"},
 	"log":       {"--no-ext-diff", "--no-textconv", "--ignore-submodules=all"},
 	"show":      {"--no-ext-diff", "--no-textconv", "--ignore-submodules=all"},
