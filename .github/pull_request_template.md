@@ -4,10 +4,14 @@
 
 ## What changed
 
-<!-- What the diff does, in a few lines. For each ask-first surface it touches, add one line
-of the form Approval: <surface id> - <what was approved>, where the phrase names what was approved,
-in a few neutral words, and no person, and holds none of the double quotation marks
-that docs/spec/12-engineering.md lists in 12.4.
+<!-- What the diff does, in a few lines. When it touches an ask-first surface, add one alert,
+opened by the line > [!IMPORTANT], and in it one checklist line per touched surface:
+
+> - [ ] Approval: <surface id> - <what is asked>
+
+The phrase names what is asked, in a few neutral words, and no person, and holds none of the
+double quotation marks that docs/spec/12-engineering.md lists in 12.4. Leave each box empty:
+the maintainer ticks it. A sitting grant is the line with the phrase granted at <sitting> for <task id>.
 The surfaces are listed in .github/ask-first.yaml. -->
 
 ## Evidence

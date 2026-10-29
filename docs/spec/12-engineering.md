@@ -503,30 +503,41 @@ ruleset or the repository settings, and an edit is inferred, not
 measured.
 
 `REQ-1144` **The approval line.** A PR whose diff touches a path of an ask-first
-surface ([05 5.3](05-security.md#53-ask-first-surfaces)) carries one
-line per touched surface in its body:
+surface ([05 5.3](05-security.md#53-ask-first-surfaces)) carries in its
+body one alert, opened by the line `> [!IMPORTANT]`, and inside it one
+checklist line per touched surface:
 
 ```text
-Approval: <surface id> - <what was approved>
+> - [ ] Approval: <surface id> - <what is asked>
 ```
 
-`REQ-1145` The phrase after the dash names what was approved, in a few neutral
-words, and no person: for example `Approval: decisions - amend rule 8 of
-ADR 0001`. `REQ-1146` Before the body is read, each HTML comment is removed, from
+The maintainer approves a line by ticking its box: the tick, not the
+line, is the approval, and only the maintainer ticks. A tick in the
+pull request's page saves the line as `> - [x] ` and starts the
+`edited` event of the pull request (measured on 2026-10-29 on a
+throwaway pull request, for the `pull_request` event).
+`REQ-1145` The phrase after the dash names what is asked, in a few neutral
+words, and no person: for example `> - [ ] Approval: decisions - amend
+rule 8 of ADR 0001`. `REQ-1146` Before the body is read, each HTML comment is removed, from
 `<!--` to the next `-->`, or to the end of the body when no `-->`
 follows: a reviewer reads the rendered pull request, where a comment
 does not show, so a line inside a comment does not count. `REQ-1147` The body is
 then split on LF, and one trailing CR is removed from each line, so a
-body with CR LF line ends reads the same. An approval line is a line
-that matches the Go regular expression `approvalLine` of the askfirst
-package of `tools/ci`:
+body with CR LF line ends reads the same. The alert runs from the line
+`> [!IMPORTANT]`, written alone, to the last line before the first one
+that does not start with `>`; a body with a second such line fails
+`pr`. Inside the alert, an approval line is a line that matches the Go
+regular expression `approvalLine` of the askfirst package of
+`tools/ci`:
 
 ```text
-^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$
+^> - \[([ xX])\] Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$
 ```
 
-The line starts with the prefix, with nothing before it. The prefix and
-the id are lowercase ASCII and the separator is a space, a hyphen-minus
+The line starts with `> - [`, then a space for a box left empty, or `x`
+or `X` for a ticked one (GitHub shows both ticked), then `] ` and the
+prefix, with nothing before it. The prefix and the id are lowercase
+ASCII and the separator is a space, a hyphen-minus
 and a space. The phrase is not empty. Its first character is a letter, a
 number, a punctuation mark or a symbol: the first class excludes the
 other Unicode categories, `\p{C}` (control, format, private use,
@@ -604,27 +615,29 @@ default branch into the pull request touches nothing. In a glob, `**`
 matches zero or more path segments, `*` matches inside one segment, and
 each other character matches itself. Across the lines of one body, `pr`:
 
-- `REQ-1157` fails on a line that starts with `Approval: ` and is not an approval
-  line, with the message "malformed approval line", even when another
-  line approves the same surface;
+- `REQ-1157` fails on a line of the alert that holds `Approval: ` and is not an
+  approval line, with the message "malformed approval line", even when
+  another line approves the same surface;
 - fails on an approval line whose id neither list has;
 - fails on two approval lines with the same id;
 - fails when a touched surface has no approval line;
+- fails when a touched surface's line is not ticked, unless it carries a
+  grant that holds (below);
 - accepts an approval line for a known surface the diff does not
-  touch, so an approval given early is not an error.
+  touch, ticked or not, so an approval given early is not an error.
 
-`REQ-1158` A line that starts otherwise, such as `approval: ` in lowercase, is not
-read, so its surface counts as without a line. The pull request
-template keeps its hint inside an HTML comment and shows the form
-inside a sentence, so a body that keeps the hint has no approval line.
-This is the one form of a recorded approval; ADR 0001 rule 8 and
-05 5.3 point here.
+`REQ-1158` A line outside the alert is not read, nor a line of the alert
+without `Approval: `, such as one with `approval: ` in lowercase, so
+its surface counts as without a line. The pull request template keeps
+its hint inside an HTML comment, so a body that keeps the hint has no
+approval line. This is the one form of a recorded approval; ADR 0001
+rule 8 and 05 5.3 point here.
 
-`REQ-1159` An author who does not hold the maintainer's words, an outside
-contributor among them, leaves the line out; `pr` then names each
-surface that needs one, the maintainer gives the words in a review
-comment, and the author pastes them as the phrase. The reason column of
-`.github/ask-first.yaml` says the same.
+`REQ-1159` An author, an outside contributor among them, writes each line with
+what is asked and leaves its box empty; `pr` then names each touched
+surface whose line is not ticked, and the maintainer ticks it, after
+changing the phrase when the words should be others. The reason column
+of `.github/ask-first.yaml` says the same.
 
 **A sitting grant.** At a sitting of the plan the maintainer may grant
 the approval lines of a list of tasks, per surface, on the `contracts`,
@@ -635,15 +648,16 @@ surface, so a grant is itself an ask-first change. `REQ-1160` The file is `versi
 surface: <grantable surface id>, tasks: [<task id>, ...]}`; an entry for
 a surface outside the grantable list, or a task id the plan does not
 define, fails `pr`. `REQ-1161` A pull request for one of those tasks carries the
-approval line with the phrase `granted at <sitting> for <task id>`; `pr`
-reads `docs/grants.yaml` at the base commit and accepts the line only
-when that file holds that grant for that surface and task. The plan
+approval line with the phrase `granted at <sitting> for <task id>`,
+ticked or not, since the grant is the approval (decided on 2026-10-29);
+`pr` reads `docs/grants.yaml` at the base commit and accepts the line
+only when that file holds that grant for that surface and task. The plan
 names the sittings, and it is not where a grant is read from. `REQ-1162` Every
 other surface (`gates`, `gitsafe`, `procgroup`, `sbxdrv`, `signing`,
 `release`, `kits`, `decisions`, `formats`, `spec`, `approvals` and `ask-first`) keeps an approval line
-in the maintainer's words on each pull request. The line is typed by the
-PR's author, so the check proves that the approval was recorded, not who
-gave it. While one account and one token act for everyone
+the maintainer ticks on each pull request. Anyone who can edit the body
+can tick a box, so the check proves that the approval was recorded, not
+who gave it. While one account and one token act for everyone
 ([ADR 0008, let the sandbox act as the maintainer on GitHub](../adr/0008-let-the-sandbox-act-as-the-maintainer-on-github.md),
 decision 4), an approval line is a record and a guard against mistakes,
 not a barrier against an agent. A signed approval record kept on the

@@ -58,8 +58,9 @@ var (
 	// themselves, and "*" inside a segment. A segment of "**" alone is
 	// checked apart.
 	globSegment = regexp.MustCompile(`^[A-Za-z0-9._*-]+$`)
-	// approvalLine is one line of a pull request body that records an
-	// approval (12 12.4): a surface id, then a phrase. The first
+	// approvalLine is one checklist line of the approval alert of a pull
+	// request body (12 12.4): the box, empty or ticked, a surface id, then
+	// a phrase. The first
 	// character of the phrase is a letter, number, punctuation or symbol,
 	// written as the complement of the other categories (C, M and Z)
 	// because RE2 has no class subtraction; the phrase holds no control
@@ -68,12 +69,12 @@ var (
 	// covering unassigned code points (Cn) as well as Cc, Cf, Co and
 	// Cs; the case "a leading unassigned code point" of TestApprovalLine
 	// fails if a Go or Unicode table update changes that.
-	approvalLine = regexp.MustCompile(`^Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$`)
+	approvalLine = regexp.MustCompile(`^> - \[([ xX])\] Approval: ([a-z0-9-]+) - ([^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{C}\p{M}\p{Z}][^"\x{AB}\x{BB}\x{201C}-\x{201F}\x{2033}\x{301D}-\x{301F}\x{FF02}\p{Cc}\p{Cf}]*)$`)
 )
 
 // approvalForm is the form of an approval line, as 12 12.4 and the
 // pull request template show it.
-const approvalForm = "Approval: <surface id> - <what was approved>"
+const approvalForm = "> - [ ] Approval: <surface id> - <what is asked>"
 
 // Parse reads .github/ask-first.yaml and checks it: the keys are
 // the ones of 05 5.3, the version is 1, every id is unique and has the
