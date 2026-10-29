@@ -32,12 +32,17 @@ J2 end-to-end test of the slice that links `sync` into the binary.
 
 1. `Store.FindDescriptor(workload, platform)` returns the cached entry
    whose `Workload` and `Platform` are the pair, reading the entries of
-   `descriptors/` as `GetDescriptor` reads one (an entry that does not
-   decode, or holds another digest than its name says, is
-   record-unreadable, `RJ-334`); an absent pair is the error
-   `GetDescriptor` gives an absent digest, wrapping `fs.ErrNotExist`. A
-   local kit's entry, which has no `Workload`, never matches. The key
-   stays the manifest digest, and `state-descriptor/v1` does not change.
+   `descriptors/` and stopping at the first match; an entry that does
+   not decode, or holds another digest than its name says, is skipped
+   by this lookup (the digest lookup of that entry stays
+   record-unreadable, `RJ-334`), so one bad entry does not fail every
+   `sync`; an absent pair is the error `GetDescriptor` gives an absent
+   digest, wrapping `fs.ErrNotExist`. A local kit's entry, which has no
+   `Workload`, never matches. The key stays the manifest digest, and
+   `state-descriptor/v1` does not change. Known limit: `PutDescriptor`
+   keeps the first `Workload` of a manifest two indexes list, so the
+   second index is not found and reads the registry at each `sync`;
+   accepted, reopened by a project that hits it.
 2. Step 6 of `sync` asks `FindDescriptor` first, and `GetDescriptor` for
    a workload of one manifest: T043 makes the call in
    `step6_render.go`, which it owns, and rewrites the test of slice C
@@ -51,8 +56,9 @@ J2 end-to-end test of the slice that links `sync` into the binary.
     whose `Platform` is `linux/arm64` returns it for that pair, and
     `fs.ErrNotExist` for `linux/amd64`, for another index and for an
     empty workload; an entry with no `Workload` is never returned.
-  - An entry that does not decode makes the lookup record-unreadable
-    (`RJ-334`), as `GetDescriptor` does.
+  - An entry that does not decode beside the matching one is skipped
+    and the match is returned; `GetDescriptor` of the bad entry is
+    still record-unreadable (`RJ-334`).
   - After T043: a second `sync` of a project whose workload is a
     multi-arch index makes no registry read; T043's e2e asserts it with
     the fake registry.

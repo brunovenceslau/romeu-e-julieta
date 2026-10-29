@@ -107,7 +107,7 @@ overlap of `internal/cmd/julieta/setup/migrate*.go` with their
 until T177 stopped waiting on it. It costs nothing, since this task
 already waits on T043.
 
-- Implements: REQ-1295 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
+- Implements: REQ-0140 (02 2.3), REQ-1295 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
   REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-1302 (03 3.9), REQ-0237 (03 3.8), REQ-0244 (03 3.10), REQ-1300
   (03 3.10), REQ-0259 (03 3.12), REQ-0411 (04 4.3), REQ-0413 (04 4.3),
   REQ-1301 (04 4.3), REQ-0642 (08 8.1), REQ-0645 (08 8.1), REQ-0648

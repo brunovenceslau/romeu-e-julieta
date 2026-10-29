@@ -83,11 +83,17 @@ the gitHosts allowlist did not see.
   `refs/romeu/snapshots/<name>/`; salvage refs are created only with
   `CreateRef` (create-only `update-ref`). On the host a fetch may name
   the source `HEAD`, the origin's HEAD, into `refs/romeu/origin/<dir>/HEAD`
-  alone, after `ls-remote --symref` shows the origin advertises one;
-  every fetch into `refs/romeu/origin/` carries a negative refspec for
-  each name git could read `HEAD` as, and a pattern destination there has
-  its `*` as its whole last component, so that ref is written only from
-  the origin's HEAD (decided on 2026-10-29, T183).
+  alone, and only after `ls-remote --symref` shows the origin advertises
+  one `HEAD` with a full object id: an unborn HEAD, or one naming a
+  missing branch, is refused and nothing is written (a HEAD that moves
+  between the two calls is still the origin's, and the fetch takes it).
+  Every fetch into `refs/romeu/origin/` carries a negative refspec for
+  the five names git tries before `HEAD` (`refs/HEAD`, `refs/tags/HEAD`,
+  `refs/heads/HEAD`, `refs/remotes/HEAD`, `refs/remotes/HEAD/HEAD`) and,
+  for each pattern refspec, its source with the `*` read as `HEAD`; a
+  pattern destination there has its `*` as its whole last component, so
+  that ref is written only from the origin's HEAD (decided on
+  2026-10-29, T183).
 - `REQ-0463` One key is not neutralized: a host clone's local `url.<base>.insteadOf`
   rewrites an explicit fetch URL, and `-c` cannot remove it, because it
   appends to a multi-valued key. A host clone's local config is written

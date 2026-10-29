@@ -31,9 +31,12 @@ in `internal/render/promote.go`, which T043 does not own:
 
 1. `Live.Promote` takes the expected files digest of the candidate and
    fails closed on the bytes it reads: a candidate whose files differ
-   from the digest is `ErrNotApproved`, nothing is written, and the
-   candidate is declined. Step 8 of `sync` passes the digest step 6
-   kept; its own check before the call, which narrows the window
+   from the digest is `ErrNotApproved` and nothing is written. An
+   approved candidate (after `y`) is left for the next render to delete,
+   since the candidate machine has no row from approved to declined
+   (REQ-0082); a rendered one, on the no-prompt path, is declined, as
+   step 8's own check does today. Step 8 of `sync` passes the digest
+   step 6 kept; its check before the call, which narrows the window
    between the answer and the copy without closing it, goes.
 2. Under `--overwrite-drift`, a live kit dir that differs from its
    digest is removed and copied again from the candidate; without the
@@ -47,9 +50,11 @@ in `internal/render/promote.go`, which T043 does not own:
 - Operator: approves the `spec` surface for the sentence of REQ-0086.
 - Acceptance:
   - A candidate dir rewritten between the answer and the promotion (a
-    test rewrites one file after the digest is taken) is declined with
+    test rewrites one file after the digest is taken) fails with
     `ErrNotApproved`, every live file is byte for byte as before (I7),
-    and the project record names no promotion.
+    and the project record names no promotion; after `y` the dir is
+    left and the next `sync` deletes it, and on the no-prompt path it
+    is declined and deleted in the same run.
   - A live kit dir with one edited file: `sync` exits 4 naming the dir;
     with `--overwrite-drift` the dir holds the kit's files again, byte
     for byte with their modes, and the run reports the lost edit among

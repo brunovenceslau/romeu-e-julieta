@@ -16,6 +16,9 @@ owns:
   - tools/release/internal/build/host*.go
   - internal/gate/prompt.go
   - internal/gate/prompt_test.go
+  - internal/gate/diff.go
+  - internal/render/workspace.go
+  - internal/render/workspace_test.go
   - docs/spec/01-system-model.md
   - docs/spec/04-cli.md
 needs:
@@ -88,11 +91,18 @@ exit named in 04 4.2 step 8, both landing with the code that links
 `sync` (`contracts`, `spec`); the workspace files `dev.code-workspace`
 and `review.code-workspace` are written once, after the last promotion
 of a run, from every project's record, since they list every clone
-under the root, and REQ-0086 says so in place of the write of each
-promotion (`spec`); `gate.Ask`, which no command calls since step 8
-confirms through `gate.Confirm` and `Diff.WriteTo`, is deleted with
-its test. The promotion failing closed on the candidate digest, and an
-edited kit dir under `--overwrite-drift`, are T189's, after this task.
+under the root, through an exported atomic writer in
+`internal/render/workspace.go` (today the writer is the unexported
+`Live.writeWorkspace` of the promotion; `retire` and `pull`, T067 and
+T069, write the same files through it), and REQ-0086 step 2 and the
+row of REQ-0048 say so in place of the write of each promotion
+(`spec`); 04 4.2 step 4 names the fetch of the origin's HEAD into
+`refs/romeu/origin/<dir>/HEAD` for a repo with no `ref` (T183);
+`gate.Ask`, which no command calls since step 8 confirms through
+`gate.Confirm` and `Diff.WriteTo`, is deleted with its tests, and the
+mentions of it in `prompt.go` and `diff.go` go with it. The promotion
+failing closed on the candidate digest, and an edited kit dir under
+`--overwrite-drift`, are T189's, after this task.
 
 Re-plan (2026-10-28): `sync` also creates the project's shared memory
 directory, `memory/_shared/`, 0700 (REQ-0646, REQ-0140, 03 3.3; ADR
@@ -105,10 +115,10 @@ has no member for the dir (decided on 2026-10-29, in place of the
 member and the mount this note gave this task).
 
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
-  REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01 1.3), REQ-0059 (01
-  1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6), REQ-0084 (01 1.6),
-  REQ-0085 (01 1.6), REQ-0086 (01 1.6), REQ-0087 (01 1.6), REQ-0130 (02
-  2.1), REQ-0135 (02 2.2), REQ-0138 (02 2.3), REQ-0140 (02 2.3),
+  REQ-0048 (01 1.1), REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01
+  1.3), REQ-0059 (01 1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6),
+  REQ-0084 (01 1.6), REQ-0085 (01 1.6), REQ-0086 (01 1.6), REQ-0087 (01
+  1.6), REQ-0130 (02 2.1), REQ-0135 (02 2.2), REQ-0138 (02 2.3),
   REQ-0141 (02 2.3), REQ-0143 (02 2.3), REQ-0147 (02 2.3), REQ-0175 (03
   3.1), REQ-0177 (03 3.1), REQ-0178 (03 3.1), REQ-0179 (03 3.1),
   REQ-0180 (03 3.1), REQ-0185 (03 3.1), REQ-0206 (03 3.4), REQ-0220 (03

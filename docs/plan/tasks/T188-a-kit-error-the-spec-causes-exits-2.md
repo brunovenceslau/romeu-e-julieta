@@ -18,7 +18,6 @@ after:
   - T185
 ask_first:
   - contracts
-  - spec
 sitting: none
 ---
 
@@ -33,19 +32,24 @@ unknown kit id, a kit without its descriptor and a personal kit over
 T043 does not own, so they exit 1 like an I/O failure. Decided on
 2026-10-29 (scope this repository): a task of its own, after the slice
 that links `sync` into the binary, since it edits step 6 and
-`errors.go` of `sync`.
+`errors.go` of `sync`, and after T185, which edits 04 too.
 
 1. `internal/render` exports `ErrKitUnknown` (a kit id the spec names
    that no product kit and no personal kit dir of the config commit
-   matches), `ErrKitDescriptorMissing` and `ErrPersonalTooLarge`,
-   wrapped where the plain errors are made today; every other error of
-   the materializer stays as it is.
+   matches), `ErrKitDescriptorMissing` (a personal kit dir without its
+   descriptor; a product kit without one is a build fault and stays
+   exit 1) and `ErrPersonalTooLarge`, wrapped where the plain errors
+   are made today; every other error of the materializer stays as it
+   is.
 2. `kitRefused` of step 6 maps the three to exit 2 with the slug
-   `kit-refused`; 04 4.4 gains the row of `kit-refused` with its id,
-   naming each cause and `sync` as the command that raises it; the
-   `errors.go` of `sync` gains the error (contracts).
-3. A kit error that is none of these, such as a read that fails, stays
-   exit 1 and names the file.
+   `kit-refused`, which it already raises as an id-less usage error
+   for `ErrPersonalCapability`, `ErrPersonalKind`, `oci.ErrInvalid`
+   and a git read gitsafe refuses or that exits non-zero: every cause
+   shares the one row that 04 4.4 gains, with its id, naming each
+   cause and `sync` as the command that raises it; the `errors.go` of
+   `sync` gains the error (contracts) in place of the `usage` calls.
+3. A kit error that is none of these, such as a file read that fails
+   on the host, stays exit 1 and names the file.
 
 - Implements: none: the exit of the kit errors of REQ-0573 and REQ-0574
   (06 6.1), which T038 and T043 implement.
@@ -56,8 +60,11 @@ that links `sync` into the binary, since it edits step 6 and
     personal kit dir without its descriptor, and one over
     `MaxPersonalKit` (lowered by the test), the same, each naming the
     kit.
-  - A kit file whose read fails for another reason exits 1 naming the
-    file.
+  - The causes `kit-refused` carries today (a refused personal kind or
+    capability, a descriptor the grammar refuses, a git read gitsafe
+    refuses) still exit 2, now with the row's id.
+  - A kit file whose read fails on the host for another reason exits 1
+    naming the file.
   - The row of `kit-refused` in 04 4.4 has an id, the contract test of
     `sync` checks it, and `go run ./tools/ci reqs` passes.
 - Verify: `go test -race ./internal/render/ ./internal/cmd/romeu/sync/`.
