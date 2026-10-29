@@ -590,8 +590,9 @@ func reach(tasks []Task, byID map[string]Task) map[string]map[string]bool {
 }
 
 // overlaps applies rule 3: two open tasks that no edge orders, directly
-// or through other tasks, may not own one path, a path of the tree or a
-// literal path matched by both, the generated outputs left out.
+// or through other tasks, may not own one path, a path of the tree, a
+// literal path or a path two globs both match, the generated outputs
+// left out.
 func overlaps(tasks []Task, byID map[string]Task, paths, generated []string) []check.Finding {
 	isGenerated := func(p string) bool {
 		return slices.ContainsFunc(generated, func(g string) bool { return askfirst.GlobMatch(g, p) })
@@ -624,29 +625,36 @@ func overlaps(tasks []Task, byID map[string]Task, paths, generated []string) []c
 	return findings
 }
 
-// shared returns a path both tasks own: a tree path, or a literal owns
-// entry of one that a glob of the other matches. Two globs that match
-// no tree path and neither matches the other (x_*.go and *_test.go)
-// are not compared: the check reads paths, not the languages of globs.
+// shared returns a path both tasks own, or the two globs a path both
+// own would match: a tree path first, then a literal owns entry of one
+// that a glob of the other matches, then two globs that meet
+// (askfirst.GlobsMeet), so a file neither task has made yet counts
+// (x_*.go and *_test.go meet in x_test.go). An entry that names a
+// generated output is left out.
 func shared(a, b Task, owned map[string][]string, isGenerated func(string) bool) (string, bool) {
 	for _, p := range owned[a.ID] {
 		if slices.Contains(owned[b.ID], p) {
 			return p, true
 		}
 	}
-	for _, pair := range [][2]Task{{a, b}, {b, a}} {
-		for _, lit := range pair[0].Owns {
-			if isGenerated(lit) {
+	literal := func(g string) bool { return !strings.Contains(g, "*") }
+	var globs string
+	for _, g := range a.Owns {
+		for _, h := range b.Owns {
+			if isGenerated(g) || isGenerated(h) || !askfirst.GlobsMeet(g, h) {
 				continue
 			}
-			for _, g := range pair[1].Owns {
-				if askfirst.GlobMatch(g, lit) {
-					return lit, true
-				}
+			switch {
+			case literal(g):
+				return g, true
+			case literal(h):
+				return h, true
+			case globs == "":
+				globs = fmt.Sprintf("a path of both %s and %s", g, h)
 			}
 		}
 	}
-	return "", false
+	return globs, globs != ""
 }
 
 // forecasts checks each open task's ask_first against its owns: a

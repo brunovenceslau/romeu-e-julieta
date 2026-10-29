@@ -244,8 +244,8 @@ New or changed, each proposed on 2026-10-12:
 3. **Disjointness is checked.** `tools/ci plan` (T106) fails when two
    open tasks that no `needs` or `after` edge orders, directly or
    through other tasks, own an overlapping
-   path (a path in the tree, or a literal path, matched by both), the
-   generated outputs of rule 1 left out. Each pull request still
+   path (a path in the tree, a literal path, or a path not made yet that
+   two globs both match), the generated outputs of rule 1 left out. Each pull request still
    measures `git diff --name-only` against every in-flight pull request
    before landing.
 4. **Registration by file, no shared table.** A `tools/ci` check is

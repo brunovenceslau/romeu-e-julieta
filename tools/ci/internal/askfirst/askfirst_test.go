@@ -312,6 +312,60 @@ func TestApprovalsSurface(t *testing.T) {
 // against a name of thirty segments, both ways. Before the table it
 // tried every split of the name, and the run did not end; no clock
 // bounds the test, since a hang fails it at go test's own timeout.
+// TestGlobsMeet holds GlobsMeet to GlobMatch: two globs meet when some
+// name matches both, and the pairs below name one (or say why none is).
+func TestGlobsMeet(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want bool
+	}{
+		{"internal/setup/migrate*.go", "internal/setup/*_test.go", true},   // migrate_test.go
+		{"internal/render/kits*.go", "internal/render/promote*.go", false}, // kits... and promote... differ at the first character
+		{"internal/handoff/**", "internal/handoff/stamp*.go", true},        // internal/handoff/stamp.go
+		{"e2e/**", "e2e/julieta_setup_test.go", true},                      // the literal
+		{"a/x_*.go", "a/*_test.go", true},                                  // a/x_test.go
+		{"a/b/c.go", "a/**/d.go", false},                                   // c.go is not d.go
+		{"a/**", "a", true},                                                // "**" matches zero segments
+		{"a/*", "a", false},                                                // "*" is one segment
+		{"a/*.go", "a/b/c.go", false},                                      // "*" stays in one segment
+		{"**/x.go", "a/**", true},                                          // a/x.go
+		{"**", "**", true},                                                 // any name
+		{"a/**/b/**/c", "**/b/c", true},                                    // a/b/c
+		{"go.mod", "go.mod", true},                                         // two literals, equal
+		{"go.mod", "go.sum", false},                                        // two literals, different
+		{"*.toml", "mise.*", true},                                         // mise.toml
+		{"*.go", "*.md", false},                                            // no name ends in both
+		{"x*y*z", "*y*", true},                                             // xyz
+		{"internal/cmd/julieta/setup/*_test.go", "internal/cmd/julieta/handoff/show*.go", false}, // another directory
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, GlobsMeet(tt.a, tt.b), "%s ~ %s", tt.a, tt.b)
+		assert.Equal(t, tt.want, GlobsMeet(tt.b, tt.a), "%s ~ %s", tt.b, tt.a)
+	}
+}
+
+// TestGlobsMeetAgreesWithGlobMatch: a literal is a glob without
+// wildcards, so GlobsMeet of a glob and a literal is GlobMatch of the
+// two, over the cases of TestGlobMatch.
+func TestGlobsMeetAgreesWithGlobMatch(t *testing.T) {
+	for _, tt := range []struct{ glob, name string }{
+		{"go.mod", "go.mod"}, {"go.mod", "x/go.mod"}, {"mise.*.toml", "mise.local.toml"},
+		{"mise.*.toml", "mise.toml"}, {"mise/**", "mise/config.toml"}, {"mise/**", "mise"},
+		{"mise/**", "x/mise/config.toml"}, {"a/**/b", "a/b"}, {"a/**/b", "a/x/y/b"}, {"a/**/b", "a/x/y/c"},
+	} {
+		assert.Equal(t, GlobMatch(tt.glob, tt.name), GlobsMeet(tt.glob, tt.name), "%s ~ %s", tt.glob, tt.name)
+	}
+}
+
+// TestGlobsMeetOfManyDoubleStars: many "**" on both sides cost a table,
+// not a search over every split.
+func TestGlobsMeetOfManyDoubleStars(t *testing.T) {
+	a := strings.Repeat("**/", 30) + "zzz"
+	b := strings.Repeat("d/**/", 30) + "yyy"
+	assert.False(t, GlobsMeet(a, b))
+	assert.True(t, GlobsMeet(a, b+"/zzz"))
+}
+
 func TestGlobMatchOfManyDoubleStars(t *testing.T) {
 	glob := strings.Repeat("**/", 30) + "zzz"
 	name := strings.TrimSuffix(strings.Repeat("d/", 30), "/")

@@ -188,6 +188,47 @@ func GlobMatch(glob, name string) bool {
 	return match[0][0]
 }
 
+// GlobsMeet reports whether some name matches both globs a and b, each
+// of the dialect of CheckGlob, in the sense of GlobMatch. The dialect has
+// two wildcards, "**" over whole segments and "*" inside one, and every
+// other character is itself, so the answer is exact: no name need be in
+// the tree. Like GlobMatch, it fills a table over the segments of the
+// two globs, and one over the characters of each pair of segments.
+func GlobsMeet(a, b string) bool {
+	return meet(strings.Split(a, "/"), strings.Split(b, "/"), "**", func(s, t string) bool {
+		return meet([]rune(s), []rune(t), '*', func(c, d rune) bool { return c == d })
+	})
+}
+
+// meet reports whether the token lists x and y can match one sequence:
+// the token star matches zero or more elements of it, and any other
+// token one element, which a token of the other list matches too when
+// compatible holds for the two.
+func meet[T comparable](x, y []T, star T, compatible func(T, T) bool) bool {
+	// m[i][j] reports whether x[i:] and y[j:] can match one sequence.
+	m := make([][]bool, len(x)+1)
+	for i := range m {
+		m[i] = make([]bool, len(y)+1)
+	}
+	m[len(x)][len(y)] = true
+	for i := len(x); i >= 0; i-- {
+		for j := len(y); j >= 0; j-- {
+			switch {
+			case i == len(x) && j == len(y):
+			case i < len(x) && x[i] == star:
+				// The star matches nothing more, or the element y[j]
+				// matches (or y[j] is a star that matches nothing).
+				m[i][j] = m[i+1][j] || (j < len(y) && m[i][j+1])
+			case j < len(y) && y[j] == star:
+				m[i][j] = m[i][j+1] || (i < len(x) && m[i+1][j])
+			case i < len(x) && j < len(y):
+				m[i][j] = compatible(x[i], y[j]) && m[i+1][j+1]
+			}
+		}
+	}
+	return m[0][0]
+}
+
 // Codeowners renders .github/CODEOWNERS: one line per glob, anchored at
 // the repository root with a leading "/", all for the one owner. Every
 // owner is the same, so the order of the lines (the last match wins in
