@@ -11,6 +11,7 @@ owns:
   - tools/ci/internal/lint/config_directives_test.go
   - tools/ci/internal/imports/rows.go
   - tools/release/main.go
+  - tools/release/main_test.go
   - REUSE.toml
   - docs/spec/02-layouts.md
   - docs/spec/10-testing-style.md
@@ -68,5 +69,5 @@ with T183 and T184, and which `sync` (T043) and `run`
   - `tools/ci imports` refuses a julieta package that imports
     `internal/embedded`.
   - `go run ./tools/ci all` passes, `license` and `lint` included.
-- Verify: `go run ./tools/release build --version v0.0.0-dev --dry-run`
+- Verify: `go run ./tools/release build --version v1.0.0 --dry-run`
   prints no line saying the archives carry no julieta.

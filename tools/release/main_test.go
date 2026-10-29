@@ -29,7 +29,7 @@ func TestRunDryRun(t *testing.T) {
 	require.Equal(t, exitOK, run(t.Context(), args, &stdout, &stderr), stderr.String())
 	assert.Contains(t, stdout.String(), filepath.Join(out, "romeu_v1.0.0_darwin_arm64.tar.gz"))
 	assert.Contains(t, stdout.String(), filepath.Join(out, "checksums.txt"))
-	assert.Contains(t, stdout.String(), "note: the archives carry no julieta")
+	assert.NotContains(t, stdout.String(), "note: the archives carry no julieta")
 	assert.FileExists(t, filepath.Join(out, "checksums.txt"))
 	assert.Empty(t, stderr.String())
 }
