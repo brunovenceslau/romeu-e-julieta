@@ -12,8 +12,7 @@ func init() {
 	check.Register(check.Check{
 		Name:    "callsites",
 		Guards:  "romeu deletes nothing outside the admitted-call-site table (I16), and every subprocess starts through internal/procgroup",
-		Row:     "imports",
-		Req:     "REQ-0839",
+		Row:     "callsites",
 		Usage:   "go run ./tools/ci callsites",
 		All:     true,
 		Order:   96,

@@ -67,9 +67,11 @@ var Admitted = []Site{
 	{KindRunner, "internal/mise", AnyFunc},
 	{KindRunner, "internal/hooks", AnyFunc},
 
-	// I16 (05 5.2): the functions that remove temp files, candidate dirs
-	// and kit dirs no longer referenced by the live sbxenv.yaml, replace
-	// files under .romeu/bin/ by rename, and run sbx env rm for rm.
+	// I16 (05 5.2): the functions that remove temp files, candidate dirs,
+	// kit dirs no longer referenced by the live sbxenv.yaml and what the
+	// same command created on a path proved absent when it then fails;
+	// rename a staged dir onto a path proved absent; replace the files
+	// romeu owns by rename; and run sbx env rm for rm.
 	// Temporary files and directories.
 	{KindRemove, "internal/gitsafe", "Runner.BundleOf"},
 	{KindRemove, "internal/cmd/romeu/init", "cloneConfig"},
@@ -77,13 +79,25 @@ var Admitted = []Site{
 	{KindRemove, "internal/state", "RenderCandidate"},
 	{KindRemove, "internal/state", "Candidate.remove"},
 	{KindRemove, "internal/render", "removeCandidateDir"},
+	// What the command created on a path proved absent, removed when it
+	// then fails: the config clone and the empty dirs init made, and a
+	// clone whose checkout failed.
+	{KindRemove, "internal/cmd/romeu/init", "run"},
+	{KindRemove, "internal/cmd/romeu/init", "made.undo"},
+	{KindRemove, "internal/gitsafe", "Runner.clone"},
 	// Kit dirs no longer referenced, and the half-copied .tmp-* dir a
 	// crash leaves. The three functions of internal/render other than
 	// replaceFile land with the promotion commit of T039.
 	{KindRemove, "internal/render", "pruneKitDirs"},
 	{KindRemove, "internal/render", "removeKitTemp"},
-	// Files under .romeu/bin/ replaced by rename; render.json and
-	// sbxenv.yaml go through the same function.
+	// A staged dir renamed onto a path proved absent: the config clone
+	// of init, and a kit dir copied into .romeu/kits/.
+	{KindRename, "internal/cmd/romeu/init", "cloneConfig"},
+	{KindRename, "internal/render", "ensureKitDir"},
+	// The files romeu owns, replaced by rename under the atomic write
+	// rule of 03 3.8: host state, and render.json, sbxenv.yaml,
+	// .romeu/bin/* and the workspace files.
+	{KindRename, "internal/state", "writeFile"},
 	{KindRename, "internal/render", "replaceFile"},
 	// sbx env rm, for rm.
 	{KindEnvRm, "internal/sbxdrv", "EnvRm"},
