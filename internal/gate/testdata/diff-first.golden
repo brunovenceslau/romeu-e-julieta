@@ -54,7 +54,7 @@ kit files:
 workload repository:
   !!! changed: (none) -> docker.io/example/dev !!!
 
-render (sbxenv.yaml without the ungated keys run, sandboxOptions):
+render (sbxenv.yaml without the ungated keys memory, run, sandboxOptions):
   kits:
     + ["julieta","tools"]
 

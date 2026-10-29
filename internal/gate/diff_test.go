@@ -344,7 +344,7 @@ func TestDiffShowsTheRender(t *testing.T) {
 	cand.r.Render["sandboxOptions"] = map[string]any{"cpus": 16}
 	approved := side(t, old)
 	got := text(t, &approved, side(t, cand))
-	assert.Contains(t, got, "render (sbxenv.yaml without the ungated keys run, sandboxOptions):\n  mounts:\n    + [\"/var/run/docker.sock\"]\n")
+	assert.Contains(t, got, "render (sbxenv.yaml without the ungated keys memory, run, sandboxOptions):\n  mounts:\n    + [\"/var/run/docker.sock\"]\n")
 	assert.NotContains(t, got, "cpus", "an ungated key is not part of the gate")
 }
 

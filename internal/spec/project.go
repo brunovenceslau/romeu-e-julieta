@@ -42,6 +42,13 @@ type Project struct {
 	// Secrets are the names of the secrets the sandbox gets; each
 	// resolves through the host settings entry <name>@<project>.
 	Secrets []string `json:"secrets,omitzero" yaml:"secrets,omitempty" gate:"widening" apply:"recreate"`
+	// Memory names the private repository that keeps the durable copy
+	// of the project's memory (08 8.1). It is ungated: the remote is a
+	// destination of the host's push that the sandbox never reaches, so
+	// it changes nothing the sandbox may reach or read; it applies live,
+	// at the next command's push. sync refuses a spec without it
+	// (CheckMemoryRemote), which the general validation does not.
+	Memory *Memory `json:"memory,omitzero" yaml:"memory,omitempty" apply:"live"`
 	// Egress holds the domains the spec adds to the derived egress; each
 	// is always gated.
 	Egress *Egress `json:"egress,omitzero" yaml:"egress,omitempty" gate:"widening" apply:"live"`
@@ -54,15 +61,17 @@ type Project struct {
 }
 
 // ungated is the committed list of the members of Project, by path, that
-// carry no gate:"widening" tag (01 1.4, I7): the two top-level fields
+// carry no gate:"widening" tag (01 1.4, I7): the three top-level fields
 // left ungated and every member below them. Resource limits change how
-// much of the host the sandbox uses, not what it can reach or read, and
-// the run layout's pane commands run only inside the sandbox. Classify
+// much of the host the sandbox uses, not what it can reach or read; the
+// memory remote is where the host pushes, which the sandbox never sees;
+// and the run layout's pane commands run only inside the sandbox. Classify
 // fails when the reflected members differ from it, so a new field, at
 // any depth of an ungated field, is never left out of the gate by
 // omission.
 var ungated = []string{
 	"sandboxOptions", "sandboxOptions.cpus", "sandboxOptions.memory",
+	"memory", "memory.remote",
 	"run", "run.tabs", "run.tabs[].label", "run.tabs[].root",
 	"run.tabs[].root.pane", "run.tabs[].root.split", "run.tabs[].root.ratio",
 	"run.tabs[].root.first", "run.tabs[].root.second",

@@ -30,6 +30,7 @@ var wideningFields = []string{
 // gate tag, the committed list of spec.Ungated: RenderDigest strips
 // them from the render.
 var ungatedFields = []string{
+	"memory",
 	"run",
 	"sandboxOptions",
 }

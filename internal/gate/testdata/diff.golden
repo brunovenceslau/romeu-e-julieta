@@ -45,7 +45,7 @@ kit files:
 workload repository:
   !!! changed: docker.io/example/dev -> docker.io/other/dev !!!
 
-render (sbxenv.yaml without the ungated keys run, sandboxOptions):
+render (sbxenv.yaml without the ungated keys memory, run, sandboxOptions):
   (unchanged)
 
 secret argv (host settings):

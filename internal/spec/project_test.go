@@ -13,7 +13,7 @@ import (
 )
 
 // TestClassify classifies every top-level field of Project but schema,
-// with the widening fields of 03 3.2 and the two ungated ones (I7).
+// with the widening fields of 03 3.2 and the three ungated ones (I7).
 func TestClassify(t *testing.T) {
 	got, err := Classify()
 	require.NoError(t, err)
@@ -23,11 +23,11 @@ func TestClassify(t *testing.T) {
 	}
 	assert.Equal(t, map[string]string{
 		"name": "widening", "repos": "widening", "workload": "widening", "agent": "widening", "kits": "widening",
-		"sandboxOptions": "", "secrets": "widening", "egress": "widening", "ports": "widening", "salvage": "widening", "run": "",
+		"sandboxOptions": "", "secrets": "widening", "memory": "", "egress": "widening", "ports": "widening", "salvage": "widening", "run": "",
 	}, gates)
 	assert.Equal(t, map[string]string{
 		"name": "recreate", "repos": "recreate", "workload": "recreate", "agent": "recreate", "kits": "recreate",
-		"sandboxOptions": "recreate", "secrets": "recreate", "egress": "live", "ports": "recreate", "salvage": "live", "run": "live",
+		"sandboxOptions": "recreate", "secrets": "recreate", "memory": "live", "egress": "live", "ports": "recreate", "salvage": "live", "run": "live",
 	}, applies)
 }
 
@@ -109,5 +109,5 @@ func TestTagNamesAgree(t *testing.T) {
 	}
 	visit(reflect.TypeFor[Project]())
 	visit(reflect.TypeFor[HostSettings]())
-	assert.Len(t, seen, 16)
+	assert.Len(t, seen, 17)
 }

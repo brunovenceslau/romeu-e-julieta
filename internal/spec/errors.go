@@ -53,3 +53,14 @@ var (
 		RecoveredIn: "none: the edit of the hint adds the spec or fixes the settings",
 	}
 )
+
+// MemoryRemoteMissing is the error memory-remote-missing (RJ-357): a
+// project spec without memory.remote, which sync refuses (08 8.1,
+// REQ-1305). The message names the project.
+var MemoryRemoteMissing = cli.Row{
+	ID:          "RJ-357",
+	Slug:        "memory-remote-missing",
+	Exit:        2,
+	Fix:         "decide: add memory: {remote: <url of a private repository>} to the spec, or memory: {remote: none} to keep memory on this machine only",
+	RecoveredIn: "none: the edit of the hint adds the member to the spec in the config repo",
+}
