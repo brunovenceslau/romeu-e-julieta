@@ -640,7 +640,7 @@ reads `docs/grants.yaml` at the base commit and accepts the line only
 when that file holds that grant for that surface and task. The plan
 names the sittings, and it is not where a grant is read from. `REQ-1162` Every
 other surface (`gates`, `gitsafe`, `procgroup`, `sbxdrv`, `signing`,
-`release`, `kits`, `decisions`, `spec`, `approvals` and `ask-first`) keeps an approval line
+`release`, `kits`, `decisions`, `formats`, `spec`, `approvals` and `ask-first`) keeps an approval line
 in the maintainer's words on each pull request. The line is typed by the
 PR's author, so the check proves that the approval was recorded, not who
 gave it. While one account and one token act for everyone
