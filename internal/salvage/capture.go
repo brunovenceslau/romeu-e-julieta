@@ -140,6 +140,11 @@ func RefPrefix(generation, salvageID string) string {
 	return "refs/salvage/" + generation + "/" + salvageID + "/"
 }
 
+// afterCapture is the test seam of the recheck of step 2 (10 10.4):
+// called with the worktree's root after its capture commit and before
+// it is read again; nil outside tests.
+var afterCapture func(dir string)
+
 // salvager is one run of Salvage.
 type salvager struct {
 	c      Config
@@ -313,7 +318,10 @@ func (s *salvager) captureRepo(ctx context.Context, run *repoRun) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
+		// No worktree list: the repo is not one git reads, such as a
+		// secondary not cloned, so nothing else of it can be read.
 		run.skip("worktrees", ReasonUnreadable, err)
+		return nil
 	}
 	for i, w := range set {
 		u := unit{repo: run.repo.Path, path: w.Path, label: label(i), ref: s.prefix + worktreeRef + strconv.Itoa(i)}
@@ -408,6 +416,9 @@ func (s *salvager) captureWorktree(ctx context.Context, run *repoRun, u unit) (w
 				run.skip(u.label, failReason(err), err)
 				return last, true
 			}
+		}
+		if afterCapture != nil {
+			afterCapture(u.path)
 		}
 		after, err := readWorktree(ctx, s.c.Git, u.path)
 		if err != nil {

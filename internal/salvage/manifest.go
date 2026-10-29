@@ -82,8 +82,8 @@ type Manifest struct {
 	Schema string `json:"schema"`
 	// Skipped are the items the salvage left out, each with its reason.
 	Skipped []Skipped `json:"skipped"`
-	// Worktrees are the worktrees the salvage read: the repo's, then
-	// those of each nested repository.
+	// Worktrees are the worktrees the salvage read, by label, each
+	// nested repository's right after the worktree that holds it.
 	Worktrees []Worktree `json:"worktrees"`
 }
 

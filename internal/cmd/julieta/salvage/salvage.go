@@ -76,8 +76,8 @@ var _ = cli.Register(func() cli.Command {
 }())
 
 // stopWait is how long --stop-agents waits after SIGTERM before SIGKILL
-// (08 8.5 step 1, REQ-0695).
-const stopWait = 10 * time.Second
+// (08 8.5 step 1, REQ-0695). A variable, so a test can lower it.
+var stopWait = 10 * time.Second
 
 // sharedDir is the dir of the project's shared memory dir, whose store
 // lock stamps take (08 8.1, REQ-0642, REQ-0655).

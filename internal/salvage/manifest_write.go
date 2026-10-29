@@ -57,13 +57,6 @@ func (c *countWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// rel returns the path p of root relative to the salvage dir of run,
-// as the manifest names it.
-func (r *repoRun) rel(p string) string {
-	out, _ := filepath.Rel(r.dir, p)
-	return filepath.ToSlash(out)
-}
-
 // writeManifest writes the manifest of run last (REQ-0708): a temporary
 // file .tmp-<ULID> of the salvage dir, 0600, synced, renamed to
 // manifest.json, and the directory synced.
