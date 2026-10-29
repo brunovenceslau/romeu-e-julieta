@@ -46,17 +46,16 @@ type Link struct {
 	Target string `json:"target"`
 }
 
-// The outcomes of the fast-forward of a default branch (Repo.FastForward).
+// The states of a default branch against origin's (Repo.BranchState).
 const (
-	ffMoved         = "moved"           // fast-forwarded from From to To
-	ffCurrent       = "current"         // already at origin's tip
-	ffNotFetched    = "not-fetched"     // the fetch failed
-	ffNoDefault     = "no-default"      // origin/HEAD is missing or dangling
-	ffNotCheckedOut = "not-checked-out" // HEAD is another branch, detached or unborn
-	ffNotClean      = "not-clean"       // the working tree holds a change
-	ffAhead         = "ahead"           // the branch has commits origin's lacks, and lacks none of origin's
-	ffDiverged      = "diverged"        // each has commits the other lacks
-	ffFailed        = "failed"          // a read or the fast-forward failed: Error says why
+	ffBehind     = "behind"      // behind origin's tip, with nothing of its own
+	ffCurrent    = "current"     // at origin's tip
+	ffAhead      = "ahead"       // has commits origin's lacks, and lacks none of origin's
+	ffDiverged   = "diverged"    // each has commits the other lacks
+	ffNotFetched = "not-fetched" // the fetch failed
+	ffNoDefault  = "no-default"  // origin/HEAD is missing or dangling
+	ffNoBranch   = "no-branch"   // the repo has no local branch of that name
+	ffFailed     = "failed"      // a read failed: Error says why
 )
 
 // Repo is what setup did in one repo.
@@ -69,14 +68,28 @@ type Repo struct {
 	Dir string `json:"dir"`
 	// Error is why a step failed in the repo, empty when none did.
 	Error string `json:"error"`
-	// FastForward is the outcome of the fast-forward of the default
-	// branch: moved, current, not-fetched, no-default,
-	// not-checked-out, not-clean, ahead, diverged or failed.
+	// BranchState is the state of the local default branch against
+	// origin's, whatever the work tree holds or HEAD names: behind,
+	// current, ahead, diverged, not-fetched, no-default, no-branch or
+	// failed. setup moves no branch (REQ-0399). A document an older
+	// julieta wrote has none, which a reader takes as unknown.
+	BranchState string `json:"branchState,omitzero"`
+	// FastForward was the outcome of the fast-forward of the default
+	// branch, when setup made one.
+	//
+	// Deprecated: setup moves no branch since 2026-10-28 (REQ-0399), so
+	// FastForward is always empty; BranchState carries the state of the
+	// branch. The member stays in julieta-setup/v1 for its readers, and
+	// its name is never used again (REQ-0163, REQ-1310).
 	FastForward string `json:"fastForward"`
 	// Fetched: the fetch of origin succeeded.
 	Fetched bool `json:"fetched"`
-	// From and To are the commits a move went from and to; empty unless
-	// FastForward is moved.
+	// From and To were the commits a move went from and to.
+	//
+	// Deprecated: setup moves no branch since 2026-10-28 (REQ-0399), so
+	// both are always empty. They stay in julieta-setup/v1 for its
+	// readers, and their names are never used again (REQ-0163,
+	// REQ-1310).
 	From string `json:"from"`
 	To   string `json:"to"`
 	// Path is the repo's path in the sandbox.

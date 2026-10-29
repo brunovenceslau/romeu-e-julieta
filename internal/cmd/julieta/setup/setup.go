@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package setup holds the command julieta setup (04 4.3): it links the
-// binary on PATH, clones the missing secondary repos, fetches origin in
-// every repo and fast-forwards the clean default branches, recording
-// the warnings in julieta state for julieta status and the next
-// SessionStart. Its steps are the slice of steps.go. Every git call
+// binary on PATH, clones the missing secondary repos and fetches origin
+// in every repo, moving no branch (REQ-0399), and records the warnings
+// in julieta state for julieta status and the next SessionStart. Its steps are the slice of steps.go. Every git call
 // runs through gitsafe in sandbox mode (05 5.1).
 //
 // The package also holds what julieta's commands share about the
@@ -157,12 +156,10 @@ func repoLine(r Repo) string {
 	if r.Fetched {
 		parts = append(parts, "fetched")
 	}
-	switch r.FastForward {
-	case ffMoved:
-		parts = append(parts, fmt.Sprintf("%s moved %s..%s", r.DefaultBranch, r.From, r.To))
+	switch r.BranchState {
 	case ffNotFetched:
 	default:
-		parts = append(parts, strings.TrimSpace(r.DefaultBranch+" "+r.FastForward))
+		parts = append(parts, strings.TrimSpace(r.DefaultBranch+" "+r.BranchState))
 	}
 	if r.Error != "" {
 		parts = append(parts, "error: "+r.Error)
@@ -178,8 +175,6 @@ func PrintWarning(out *cli.Writer, w Warning) {
 	switch w.Slug {
 	case FetchFailed:
 		cli.Warn(out, "fetch-failed", w.Message)
-	case DefaultBranchMoved:
-		cli.Warn(out, "default-branch-moved", w.Message)
 	case SnapshotsDisabled:
 		cli.Warn(out, "snapshots-disabled", w.Message)
 	case AgentMemoryWritable:

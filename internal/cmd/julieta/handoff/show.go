@@ -20,8 +20,7 @@ import (
 )
 
 var _ = cli.Register(func() cli.Command {
-	// show --hook records the time of its run and clears a
-	// default-branch-moved warning it showed, so a second run converges
+	// show --hook records the time of its run, so a second run converges
 	// to the same state but for that time.
 	c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.Converges)
 	c.Binary, c.Name, c.Sub = "julieta", "handoff", "show"
@@ -36,36 +35,21 @@ var _ = cli.Register(func() cli.Command {
 			Args: cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				if !hook {
-					out, err := render(cmd.Context(), repo, false, nil)
+					out, err := render(cmd.Context(), repo, false)
 					if err != nil {
 						return err
 					}
 					_, err = env.Stdout.Write([]byte(out))
 					return err
 				}
-				var moved []setup.Warning
 				return runHook(env, HookSessionStart, "julieta handoff show --hook", func() (string, string, error) {
-					out, err := render(cmd.Context(), repo, true, &moved)
+					out, err := render(cmd.Context(), repo, true)
 					// api and ./api are one record of a failure.
 					if repo != "" {
 						return out, filepath.Clean(repo), err
 					}
 					return out, repo, err
-				}, func() func(*setup.State) error {
-					if len(moved) == 0 {
-						return nil
-					}
-					// The warning this run showed is cleared with the run
-					// (REQ-0399, REQ-0665): the first SessionStart after a
-					// move shows it, and the second does not. Only
-					// setup.UpdateState writes setup.json.
-					return func(s *setup.State) error {
-						s.Warnings = slices.DeleteFunc(s.Warnings, func(w setup.Warning) bool {
-							return w.Slug == setup.DefaultBranchMoved && slices.Contains(moved, w)
-						})
-						return nil
-					}
-				})
+				}, nil)
 			},
 		}
 		cmd.Flags().BoolVar(&hook, "hook", false, "print for SessionStart: the warnings, the fixed memory line and the lessons too, cut at 8 KiB")
@@ -77,10 +61,8 @@ var _ = cli.Register(func() cli.Command {
 
 // render returns the print of show (08 8.2, REQ-0664): of every repo of
 // the manifest, or of repo alone. For a hook it also holds julieta's
-// warnings, the fixed memory line and the lessons, and is bounded; the
-// warnings it shows that setup recorded as default-branch-moved are
-// appended to moved, for the caller to clear.
-func render(ctx context.Context, repo string, hook bool, moved *[]setup.Warning) (string, error) {
+// warnings, the fixed memory line and the lessons, and is bounded.
+func render(ctx context.Context, repo string, hook bool) (string, error) {
 	sb, err := load()
 	if err != nil {
 		return "", err
@@ -113,7 +95,7 @@ func render(ctx context.Context, repo string, hook bool, moved *[]setup.Warning)
 	hf.SortItems(s.Lessons)
 	if hook {
 		s.Limit = hf.DefaultLimit
-		if s.Warnings, err = warnings(sb.home, moved); err != nil {
+		if s.Warnings, err = warnings(sb.home); err != nil {
 			return "", err
 		}
 	}
@@ -162,10 +144,9 @@ func counter(ctx context.Context, home string, paths map[string]string) hf.Count
 }
 
 // warnings returns the lines of julieta's warnings, each by its slug
-// (REQ-0665): those setup recorded in julieta state, the
-// default-branch-moved ones among them (appended to moved), and every
+// (REQ-0665): those setup recorded in julieta state, and every
 // recorded hook failure, the newest of each hook and repo.
-func warnings(home string, moved *[]setup.Warning) ([]string, error) {
+func warnings(home string) ([]string, error) {
 	// An unreadable setup.json is one warning line, not a failed print,
 	// and the file is left as it is.
 	st, serr := setup.ReadState(home)
@@ -175,9 +156,6 @@ func warnings(home string, moved *[]setup.Warning) ([]string, error) {
 		out = append(out, "julieta state: setup.json could not be read and is left as it is: "+oneLine(serr.Error()))
 	}
 	for _, w := range st.Warnings {
-		if w.Slug == setup.DefaultBranchMoved && moved != nil {
-			*moved = append(*moved, w)
-		}
 		out = append(out, "warning "+esc(w.Slug)+": "+oneLine(w.Message))
 	}
 	// Every recorded failure, the git hooks' too (08 8.2); a file of the

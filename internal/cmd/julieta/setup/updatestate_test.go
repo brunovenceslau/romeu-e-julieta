@@ -17,13 +17,13 @@ import (
 )
 
 // TestUpdateStateKeepsAWarningSetupRecordsMeanwhile: while one writer
-// of setup.json holds the lock to clear default-branch-moved, setup
+// of setup.json holds the lock to clear a warning, setup
 // records a new warning; it waits (the seam says so, no sleep) and its
 // warning is there after the clear, which does not undo it.
 func TestUpdateStateKeepsAWarningSetupRecordsMeanwhile(t *testing.T) {
 	home := t.TempDir()
-	moved := setup.Warning{Slug: setup.DefaultBranchMoved, Message: "api a..b"}
-	_, err := setup.RecordState(home, time.Unix(1, 0), "v1", []setup.Warning{moved})
+	old := setup.Warning{Slug: setup.FetchFailed, Message: "api: offline"}
+	_, err := setup.RecordState(home, time.Unix(1, 0), "v1", []setup.Warning{old})
 	require.NoError(t, err)
 
 	waiting := make(chan struct{})
@@ -39,7 +39,7 @@ func TestUpdateStateKeepsAWarningSetupRecordsMeanwhile(t *testing.T) {
 		case <-time.After(30 * time.Second):
 			t.Error("setup did not wait for the lock")
 		}
-		s.Warnings = slices.DeleteFunc(s.Warnings, func(w setup.Warning) bool { return w.Slug == setup.DefaultBranchMoved })
+		s.Warnings = slices.DeleteFunc(s.Warnings, func(w setup.Warning) bool { return w == old })
 		return nil
 	})
 	require.NoError(t, err)
