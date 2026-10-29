@@ -166,7 +166,14 @@ func Sync(ctx context.Context, g *gitsafe.Runner, p Project) ([]Warning, error) 
 	if err := writeExclude(s.GitDir); err != nil {
 		return nil, err
 	}
-	if err := g.Fetch(ctx, s.GitDir, p.Remote, []string{"+refs/heads/main*:" + remoteRefs + "main*"}); err != nil {
+	// Every branch of the memory remote is mirrored under remoteRefs,
+	// and only remoteMain is read. A whole-component * is the one
+	// pattern gitsafe takes under refs/romeu/origin/ (T183): a partial
+	// one such as main* could take HEAD from refs/heads/HEA. The plain
+	// refs/heads/main fails on an empty remote (exit 128), and a pattern
+	// matches nothing there. Decided on 2026-10-29, scope this
+	// repository.
+	if err := g.Fetch(ctx, s.GitDir, p.Remote, []string{"+refs/heads/*:" + remoteRefs + "*"}); err != nil {
 		return []Warning{{SlugPushFailed, "the fetch of " + p.Remote + " failed, so nothing was committed or pushed: " + err.Error()}}, nil
 	}
 	remote, hasRemote, err := g.RefOID(ctx, s.GitDir, remoteMain)
