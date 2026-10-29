@@ -32,7 +32,7 @@ var steps = []step{
 	{n: 3, name: "read and validate the specs", do: readSpecs},
 	{n: 4, name: "create the tree and fetch the repos", do: makeTree},
 	{n: 5, name: "check the memory dirs", do: checkMemory},
-	{n: 6, name: "read descriptors and render the candidate", do: notBuilt},
+	{n: 6, name: "read descriptors and render the candidate", do: renderCandidates},
 	{n: 7, name: "check the live files for drift", do: notBuilt},
 	{n: 8, name: "gate 2 and promote", do: notBuilt},
 	{n: 9, name: "apply live changes", do: skipLive},

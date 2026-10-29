@@ -8,6 +8,7 @@ package sync
 import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
@@ -28,6 +29,9 @@ type run struct {
 	// which every git and sbx call runs with.
 	settings spec.HostSettings
 	home     string
+	// Step 1: the julieta binary of .romeu/bin, whose files render.json
+	// names.
+	bin render.Bin
 
 	// Step 2: the hardened git of the host settings, the path of the
 	// config repo's clone, and the spec commit, a full object id the
@@ -44,6 +48,12 @@ type run struct {
 	// targets: its env dir, its memory dirs, the clone of each repo and
 	// its egress ref and commit.
 	trees []tree
+
+	// Step 6: the candidate of each target, in the order of targets:
+	// its dir, its kits, its egress, its widening set and digest, the
+	// candidate side of the gate 2 diff and its render.json, which
+	// step 8 reads.
+	candidates []candidate
 
 	// Steps 4 and 5 (and each later step that warns): the warnings of
 	// the run, in the order they were found. Each is a print to the CLI
