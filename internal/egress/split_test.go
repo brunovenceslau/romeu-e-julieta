@@ -74,9 +74,9 @@ func TestSplitRefuses(t *testing.T) {
 			got, err := egress.Split("os-base", []string{"deb.debian.org:443", tt.host})
 			require.Error(t, err)
 			assert.Nil(t, got)
-			assert.ErrorContains(t, err, "os-base")
-			assert.ErrorContains(t, err, strconv.Quote(tt.host))
-			assert.ErrorContains(t, err, tt.want)
+			require.ErrorContains(t, err, "os-base")
+			require.ErrorContains(t, err, strconv.Quote(tt.host))
+			require.ErrorContains(t, err, tt.want)
 		})
 	}
 }
