@@ -108,7 +108,7 @@ Fields julieta writes. Each is a claim of the sandbox:
 | Field | Domain | In the cross-project view |
 |---|---|---|
 | `schema` | `runtime-event/v<n>` | yes |
-| `id` | a ULID in the lowercase Crockford alphabet (26 characters), from julieta's injected entropy ([10 10.4](10-testing-style.md#104-determinism-seams-and-golden-governance)); equals the spool file's name without `.json` | no: it is 26 characters an agent chose, and no consumer in another project needs it |
+| `id` | `spl_<ulid>` ([03 3.12](03-formats.md#312-digests-internalcanon)), the ULID in the lowercase Crockford alphabet (26 characters), from julieta's injected entropy ([10 10.4](10-testing-style.md#104-determinism-seams-and-golden-governance)); equals the spool file's name without `.json` | no: it is 26 characters an agent chose, and no consumer in another project needs it |
 | `observedAt` | RFC 3339, UTC, the `Z` suffix, whole seconds, from julieta's injected clock | yes |
 | `type` | a member of the event-type table: `command-failed`, `hook-failed`, `note` | yes |
 | `tool` | a member of the tool table: a julieta command name, a key of the embedded catalog's `tools`, or `other` | yes |
@@ -226,7 +226,8 @@ reader and the caps helper are the ones `memstore` has, so the regime
 has one implementation.
 
 - **Layout**: `<id>.json` files directly under `spool/`, where `<id>`
-  is a lowercase ULID. A name in another case is outside the layout.
+  is `spl_<ulid>`, the ULID lowercase ([03 3.12](03-formats.md#312-digests-internalcanon)).
+  A bare name, or one in another case, is outside the layout.
   The reason is the host filesystem: APFS is case-insensitive by
   default, so two names that differ in case alone would collide there
   and one event would be dropped as a duplicate, which a Linux CI run
