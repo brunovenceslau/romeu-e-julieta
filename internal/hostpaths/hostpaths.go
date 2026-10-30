@@ -10,10 +10,10 @@
 // the settings and the state directory from it; doctor (T049) is to
 // call the root check for its root-unsafe row.
 //
-// The settings path is built from the environment by spec.SettingsPath
-// and the state directory by state.DefaultDir, which their packages
-// keep; a command takes both from here, which adds the path the binary
-// or a test set in cli.Env.
+// The settings path is built from the environment here and nowhere
+// else, so only romeu links it; the state directory is built by
+// state.DefaultDir, which the state package keeps, and a command takes
+// it from here.
 package hostpaths
 
 import (
@@ -30,12 +30,21 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
-// SettingsPath returns the path of the host settings file (03 3.4):
-// env.SettingsPath when the binary or a test set it, or the path the
-// environment getenv reads names (spec.SettingsPath: ROMEU_SETTINGS,
-// XDG_CONFIG_HOME, HOME; REQ-0148, REQ-0150). A env.SettingsPath that is
-// not absolute is refused, as spec.SettingsPath refuses ROMEU_SETTINGS,
-// so the path never depends on the working directory.
+// SettingsEnv is the one romeu-specific override of a path: the path of
+// settings.yaml, used by tests (02 2.4, REQ-0150). No other ROMEU_*
+// variable moves a path, and the root comes only from the settings file.
+const SettingsEnv = "ROMEU_SETTINGS"
+
+// SettingsPath returns the path of the host settings file, settings.yaml
+// (03 3.4): env.SettingsPath when the binary or a test set it, or else
+// the path of the environment getenv reads: ROMEU_SETTINGS, or
+// $XDG_CONFIG_HOME/romeu/settings.yaml, or
+// $HOME/.config/romeu/settings.yaml (REQ-0148, REQ-0150). A XDG variable
+// that is not an absolute path counts as unset, as the XDG specification
+// says; an env.SettingsPath or a ROMEU_SETTINGS that is not absolute is
+// refused, so the path never depends on the working directory. Every
+// romeu command that reads or writes the settings takes the path from
+// here.
 func SettingsPath(env *cli.Env, getenv func(string) string) (string, error) {
 	if env != nil && env.SettingsPath != "" {
 		if !filepath.IsAbs(env.SettingsPath) {
@@ -43,7 +52,19 @@ func SettingsPath(env *cli.Env, getenv func(string) string) (string, error) {
 		}
 		return filepath.Clean(env.SettingsPath), nil
 	}
-	return spec.SettingsPath(getenv)
+	if p := getenv(SettingsEnv); p != "" {
+		if !filepath.IsAbs(p) {
+			return "", fmt.Errorf("%s is not an absolute path", SettingsEnv)
+		}
+		return filepath.Clean(p), nil
+	}
+	if x := getenv("XDG_CONFIG_HOME"); filepath.IsAbs(x) {
+		return filepath.Join(x, "romeu", "settings.yaml"), nil
+	}
+	if h := getenv("HOME"); filepath.IsAbs(h) {
+		return filepath.Join(h, ".config", "romeu", "settings.yaml"), nil
+	}
+	return "", errors.New("neither ROMEU_SETTINGS, XDG_CONFIG_HOME nor HOME names an absolute path")
 }
 
 // StateDir returns the host state directory of the environment getenv

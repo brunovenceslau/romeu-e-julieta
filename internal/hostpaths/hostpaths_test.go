@@ -13,7 +13,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,7 +31,7 @@ func envOf(m map[string]string) func(string) string {
 }
 
 // TestSettingsPath: the path cli.Env holds wins; without one, the
-// environment names it (spec.SettingsPath).
+// environment names it (TestSettingsPathOfTheEnvironment).
 func TestSettingsPath(t *testing.T) {
 	getenv := envOf(map[string]string{"XDG_CONFIG_HOME": "/x", "HOME": "/h"})
 	for _, tc := range []struct {
@@ -52,6 +51,37 @@ func TestSettingsPath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := SettingsPath(tc.env, tc.getenv)
 			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestSettingsPathOfTheEnvironment: ROMEU_SETTINGS, then
+// XDG_CONFIG_HOME, then HOME; nothing else moves it. Every romeu command
+// reads the path through SettingsPath, so they agree on every case.
+func TestSettingsPathOfTheEnvironment(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  map[string]string
+		want string
+		err  bool
+	}{
+		{"override", map[string]string{"ROMEU_SETTINGS": "/a/s.yaml", "XDG_CONFIG_HOME": "/x", "HOME": "/h"}, "/a/s.yaml", false},
+		{"override is cleaned", map[string]string{"ROMEU_SETTINGS": "/a//b/../s.yaml"}, "/a/s.yaml", false},
+		{"override must be absolute", map[string]string{"ROMEU_SETTINGS": "s.yaml", "HOME": "/h"}, "", true},
+		{"xdg", map[string]string{"XDG_CONFIG_HOME": "/x", "HOME": "/h"}, "/x/romeu/settings.yaml", false},
+		{"relative xdg is unset", map[string]string{"XDG_CONFIG_HOME": "x", "HOME": "/h"}, "/h/.config/romeu/settings.yaml", false},
+		{"home", map[string]string{"HOME": "/h"}, "/h/.config/romeu/settings.yaml", false},
+		{"other variables", map[string]string{"ROMEU_ROOT": "/r", "ROMEU_CONFIG": "/c", "HOME": "/h"}, "/h/.config/romeu/settings.yaml", false},
+		{"nothing", map[string]string{}, "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := SettingsPath(nil, envOf(tc.env))
+			if tc.err {
 				require.Error(t, err)
 				return
 			}
@@ -119,8 +149,8 @@ func TestLoadSettings(t *testing.T) {
 	})
 }
 
-// settingsFile is the name of the host settings file, which only
-// internal/spec, internal/state and this package spell out.
+// settingsFile is the name of the host settings file, which only this
+// package spells out in a path.
 const settingsFile = "settings.yaml"
 
 // allowedSettingsSites are the findings of the call-site test that are
@@ -130,32 +160,25 @@ var allowedSettingsSites = map[string]map[string]string{
 	"internal/preflight/check_trust.go": {
 		`"XDG_CONFIG_HOME"`: "the config directory of mise, which the auto-trust check scans (04 4.2), not romeu's settings",
 	},
+	"internal/spec/validate.go": {
+		`"settings.yaml"`: "the file a finding of the settings' validation names, not a path",
+	},
 	"e2e/internal/romeu/env.go": {
 		`"settings.yaml"`: "the e2e harness names the settings path on its own, to check romeu's from outside",
 	},
-	// Pending: the memory push of romeu (T175), outside the file set of
-	// T169, still builds the settings path; it moves to SettingsPath in a
-	// change of its own.
-	"internal/cmd/romeu/all/memory_push.go": {
-		"spec.SettingsPath": "pending: moves to hostpaths.SettingsPath",
-	},
 }
 
-// TestNoOtherPackageBuildsTheSettingsPath: outside internal/spec, which
-// builds the path, and this package, no Go file of the module (tests
-// aside) refers to spec.SettingsPath or spec.SettingsEnv, or holds the
-// string "ROMEU_SETTINGS" or "XDG_CONFIG_HOME", and outside those two
-// and internal/state none holds "settings.yaml", so every command takes
-// the settings path from SettingsPath and a copy built by hand from the
-// environment is caught. allowedSettingsSites holds the exceptions. A dot
-// import of internal/spec is refused, since its bare names would escape
-// the scan.
+// TestNoOtherPackageBuildsTheSettingsPath: outside this package, which
+// alone builds the settings path, no Go file of the module (tests aside)
+// holds the string "ROMEU_SETTINGS", "XDG_CONFIG_HOME" or
+// "settings.yaml", so every command takes the settings path from
+// SettingsPath and a copy built by hand from the environment is caught.
+// allowedSettingsSites holds the exceptions.
 func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 	// The test runs in internal/hostpaths, two levels below the root.
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(root, "go.mod"))
-	specPath := reflect.TypeFor[spec.HostSettings]().PkgPath()
 
 	found := map[string][]string{}
 	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -177,14 +200,11 @@ func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if strings.HasPrefix(rel, "internal/spec/") || strings.HasPrefix(rel, "internal/hostpaths/") {
+		if strings.HasPrefix(rel, "internal/hostpaths/") {
 			return nil
 		}
-		for _, hit := range settingsSites(t, p, specPath) {
-			if hit == strconv.Quote(settingsFile) && strings.HasPrefix(rel, "internal/state/") {
-				continue
-			}
-			found[rel] = append(found[rel], hit)
+		if hits := settingsSites(t, p); len(hits) > 0 {
+			found[rel] = hits
 		}
 		return nil
 	})
@@ -203,43 +223,19 @@ func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 	}
 }
 
-// settingsSites returns what the Go file at p holds of the settings
-// path: a reference to spec.SettingsPath or spec.SettingsEnv of
-// internal/spec (the package at specPath), a dot import of it, and the
-// strings "ROMEU_SETTINGS", "XDG_CONFIG_HOME" and "settings.yaml",
-// quoted.
-func settingsSites(t *testing.T, p, specPath string) []string {
+// settingsSites returns the strings of the settings path the Go file at
+// p holds, quoted: "ROMEU_SETTINGS", "XDG_CONFIG_HOME" and
+// "settings.yaml".
+func settingsSites(t *testing.T, p string) []string {
 	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.SkipObjectResolution)
 	require.NoError(t, err, p)
-	var names, hits []string
-	for _, im := range f.Imports {
-		path, err := strconv.Unquote(im.Path.Value)
-		require.NoError(t, err)
-		if path != specPath {
-			continue
-		}
-		switch {
-		case im.Name == nil:
-			names = append(names, "spec")
-		case im.Name.Name == ".":
-			hits = append(hits, "a dot import of internal/spec")
-		default:
-			names = append(names, im.Name.Name)
-		}
-	}
-	literals := []string{spec.SettingsEnv, "XDG_CONFIG_HOME", settingsFile}
+	literals := []string{SettingsEnv, "XDG_CONFIG_HOME", settingsFile}
+	var hits []string
 	ast.Inspect(f, func(n ast.Node) bool {
-		switch n := n.(type) {
-		case *ast.SelectorExpr:
-			if x, ok := n.X.(*ast.Ident); ok && slices.Contains(names, x.Name) && (n.Sel.Name == "SettingsPath" || n.Sel.Name == "SettingsEnv") {
-				hits = append(hits, "spec."+n.Sel.Name)
-			}
-		case *ast.BasicLit:
-			if n.Kind == token.STRING {
-				if s, err := strconv.Unquote(n.Value); err == nil && slices.Contains(literals, s) {
-					hits = append(hits, strconv.Quote(s))
-				}
+		if n, ok := n.(*ast.BasicLit); ok && n.Kind == token.STRING {
+			if s, err := strconv.Unquote(n.Value); err == nil && slices.Contains(literals, s) {
+				hits = append(hits, strconv.Quote(s))
 			}
 		}
 		return true
