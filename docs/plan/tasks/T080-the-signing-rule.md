@@ -11,7 +11,6 @@ owns:
   - internal/sbxdrv/env_signing.go
   - e2e/signing_test.go
   - internal/cmd/romeu/sync/signing_rule_test.go
-  - internal/cmd/romeu/sync/step6_render_test.go
   - internal/cmd/romeu/doctor/signing_test.go
   - internal/cmd/romeu/doctor/step5_test.go
   - internal/preflight/signing_test.go
@@ -63,7 +62,9 @@ function, `preflight.CheckSigning`, once per project whose approved
 widening set holds the product kit, and `doctor/step5.go` is unchanged.
 Two tests of T049 named `signing-socket` as a slug with no row, and a
 test of T043 rendered the kit with no socket; they move to a slug of no
-check and to a served agent. The tests of each new file sit beside it.
+check and to a served agent, the last as a caller update of
+`step6_render_test.go`, which T188 owns. The tests of each new file sit
+beside it.
 
 - Implements: REQ-0075 (01 1.5), REQ-0296 (04 4.1), REQ-0384 (04 4.2),
   REQ-0520 (05 5.2), REQ-0549 (05 5.4), REQ-0600 (06 6.4), REQ-0601 (06

@@ -127,7 +127,7 @@ func TestSigningRule(t *testing.T) {
 			testsupport.RequireID(t, "RJ-204", err)
 			assert.Equal(t, "signing-socket", cli.Of(err).Slug)
 			assert.Equal(t, 2, cli.Of(err).Exit)
-			assert.ErrorIs(t, err, tt.want)
+			require.ErrorIs(t, err, tt.want)
 			assert.Contains(t, err.Error(), "the project shop uses the kit git-ssh-sign")
 		})
 	}

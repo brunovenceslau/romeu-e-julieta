@@ -62,9 +62,12 @@ func CheckSigning(ctx context.Context, project string, s Signing) error {
 	if err == nil {
 		return nil
 	}
+	var details []cli.Detail
+	if s.Socket != "" {
+		details = append(details, cli.Detail{Key: "socket", Value: termsafe.Escape(s.Socket)})
+	}
 	return SigningSocket.Wrap(err, "the project "+termsafe.Escape(project)+" uses the kit "+SigningKit+
-		", and signing.agentSocket does not hold its signingKey as its one key",
-		cli.Detail{Key: "socket", Value: termsafe.Escape(s.Socket)})
+		", and signing.agentSocket does not hold its signingKey as its one key", details...)
 }
 
 // checkSigning is the row signing-socket of step 5: the check of the

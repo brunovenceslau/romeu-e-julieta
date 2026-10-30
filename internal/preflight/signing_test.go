@@ -4,7 +4,6 @@
 package preflight
 
 import (
-	"errors"
 	"path/filepath"
 	"testing"
 
@@ -78,7 +77,7 @@ func TestPreflightStep5Signing(t *testing.T) {
 			}
 			testsupport.RequireID(t, "RJ-204", err)
 			assert.Equal(t, 2, cli.Of(err).Exit)
-			assert.ErrorIs(t, err, tt.want)
+			require.ErrorIs(t, err, tt.want)
 			assert.Contains(t, err.Error(), "the project shop uses the kit git-ssh-sign")
 		})
 	}
@@ -95,7 +94,7 @@ func TestPreflightSigningForDoctor(t *testing.T) {
 	findings, _ := HostFindings(t.Context(), d, in)
 	require.Len(t, findings, 1)
 	assert.Equal(t, "signing-socket", findings[0].Slug)
-	assert.True(t, errors.Is(findings[0].Err, signing.ErrNoSocket))
+	assert.ErrorIs(t, findings[0].Err, signing.ErrNoSocket)
 	assert.Contains(t, HostSlugs(), "signing-socket")
 
 	in.Command = CmdSalvage
