@@ -18,15 +18,16 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/mise"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	projectspec "github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // lockFetcher returns the mise.lock of the repo at url as it is at the
 // tip of its branch ref on origin, the default branch when ref is
-// empty, and whether that commit holds one. What gitsafe refuses of the
-// origin's content (a lock over the cap or a link, a HEAD it does not
-// accept) is an error that wraps gitsafe.ErrRefused.
+// empty, and whether that commit holds one. A lock that is no regular
+// file within the cap (a link, a directory, over the cap) is an error
+// that wraps gitsafe.ErrFileRefused.
 type lockFetcher func(ctx context.Context, url, ref string) (data []byte, found bool, err error)
 
 // gitFetcher returns the lockFetcher of julieta: a shallow fetch of the
@@ -53,13 +54,13 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 // the lock that the catalog does not produce for these tools, nor its
 // meta and base sets, is the warning lock-host-gated, since sync gates
 // it (step 3), and so is an artifact URL with no host it can read. A
-// lock that does not parse, or what gitsafe refuses of the origin's
-// content (a lock that is a link or over the cap, a HEAD it does not
-// accept), is the finding lock-unparsed: a property of the repo, not of
-// the network. The domains found are added to eg. A repo whose lock
-// cannot be fetched otherwise (git fails, the ref or a default branch
-// is missing) stops the command with fetch-failed (RJ-360), so nothing
-// passes on a lock it did not read.
+// lock that does not parse, or that is no regular file within the cap
+// (gitsafe.ErrFileRefused), is the finding lock-unparsed: a property of
+// the repo, not of the network. The domains found are added to eg. A
+// repo whose lock cannot be fetched otherwise (git fails or runs past
+// repoTimeout, a redirect, the ref or a default branch missing) stops
+// the command with fetch-failed (RJ-360), so nothing passes on a lock
+// it did not read.
 func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, file string, p projectspec.Project, eg egressSet) ([]finding, []setup.Warning, error) {
 	produced := egressSet{}
 	produced.add(cat.Meta()...)
@@ -69,10 +70,12 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 	var warnings []setup.Warning
 	for i, r := range p.Repos {
 		at := fmt.Sprintf("repos[%d]", i)
-		data, found, err := fetch(ctx, r.URL, r.Ref)
-		if errors.Is(err, gitsafe.ErrRefused) {
+		repoCtx, cancel := context.WithTimeout(ctx, repoTimeout)
+		data, found, err := fetch(repoCtx, r.URL, r.Ref)
+		cancel()
+		if errors.Is(err, gitsafe.ErrFileRefused) {
 			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
-				message: fmt.Sprintf("gitsafe refuses what the origin %s sent for its mise.lock: %v", r.URL, err)})
+				message: fmt.Sprintf("the mise.lock of %s at %s is no regular file within the cap of %d bytes: %v", r.URL, refName(r.Ref), mise.MaxFileSize, err)})
 			continue
 		}
 		if err != nil {
@@ -152,6 +155,17 @@ func hostOf(raw string) string {
 	}
 	return strings.ToLower(u.Hostname())
 }
+
+// The deadlines of --catalog. No section of the spec names one, so they
+// are taken from the subprocess classes of 04 4.1 (internal/procgroup):
+// a repo gets the limit of one julieta git call, JulietaGit, for its
+// whole read (init, ls-remote, fetch and the reads of the file), and
+// the whole check gets the limit of julieta's longest command,
+// JulietaSetup, which also reaches every repo of a project.
+var (
+	repoTimeout    = procgroup.JulietaGit.Timeout()
+	catalogTimeout = procgroup.JulietaSetup.Timeout()
+)
 
 // lockHostGated is the slug of the warning of a lock host the catalog
 // does not produce (04 4.1, Warnings).

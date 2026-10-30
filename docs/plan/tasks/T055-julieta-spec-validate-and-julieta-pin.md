@@ -94,7 +94,16 @@ Decided for slice A, the same day:
   operator on 2026-10-30 in place of a full clone; what gitsafe refuses
   of the origin's content is the finding `lock-unparsed`, and a failed
   fetch, a missing ref or an origin with no default branch is
-  `fetch-failed`.
+  `fetch-failed`. Deferred (2026-10-30, scope this repository): depth 1
+  bounds the commits fetched, not the bytes of the tip's tree;
+  `--filter=blob:limit=<cap>`, which works with `GIT_NO_LAZY_FETCH`,
+  is the change, reopened when a tip tree is too large for the config
+  repo's CI. From the security review of the same day, `TipFile`'s
+  ls-remote and fetch follow no redirect and run no automatic gc or
+  maintenance and check every object, the tip is peeled to its commit,
+  and each repo's read and the whole `--catalog` run have a deadline,
+  the limits of the classes `julieta-git` and `julieta-setup` of
+  `internal/procgroup`, since no section names one.
 - An origin `--catalog` cannot read is the new error `fetch-failed`
   (`RJ-360`, exit 1, a row of 04 4.4 declared in the command's
   `errors.go`); a lock host the catalog does not produce is the new
@@ -103,8 +112,8 @@ Decided for slice A, the same day:
   the command's exit-code cell of 04 4.3.
 - `--json` prints the format `julieta-spec.v1`, whose schema is
   registered in `tools/ci/internal/schema/julieta.go`: the files judged,
-  the findings, each `{file, message, path, rule}` as internal/spec
-  names one, the rules not checked and the warnings, each text escaped
+  the findings, each `{field, file, message, rule}`, `field` the place
+  inside the file and empty for a finding of the whole file, the rules not checked and the warnings, each text escaped
   (I29); under `--json` stderr holds nothing but an error.
 - A lock artifact URL with no host julieta can read is the warning
   `lock-host-gated` too, and a pass of `--catalog` is no gate on lock

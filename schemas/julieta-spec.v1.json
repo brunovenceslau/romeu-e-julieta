@@ -13,13 +13,13 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "field": {
+            "type": "string"
+          },
           "file": {
             "type": "string"
           },
           "message": {
-            "type": "string"
-          },
-          "path": {
             "type": "string"
           },
           "rule": {
@@ -27,9 +27,9 @@
           }
         },
         "required": [
+          "field",
           "file",
           "message",
-          "path",
           "rule"
         ],
         "type": "object"

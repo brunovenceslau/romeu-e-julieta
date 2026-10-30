@@ -37,19 +37,25 @@ type Report struct {
 }
 
 // Finding is one finding, as internal/spec names one: the file, the
-// place of the value, the slug of the rule and why it is refused. The
-// fields are in the order of their JSON names.
+// field of the value in it, the slug of the rule and why it is refused.
+// The fields are in the order of their JSON names.
 type Finding struct {
+	// Field is the place of the value inside the file, as
+	// "repos[1].dir", or "repos[0]" for a repo's lock; empty for a
+	// finding of the whole file (a stray file of projects/, a file that
+	// does not decode, the manifest size).
+	Field string `json:"field"`
 	// File is the path of the file, as the files judged name it.
 	File string `json:"file"`
 	// Message says why the value is refused, escaped (I29).
 	Message string `json:"message"`
-	// Path is the place of the value, as "repos[1].dir", "the file" or
-	// "repos[0]" for a repo's lock; empty for the whole spec.
-	Path string `json:"path"`
 	// Rule is the slug of the rule.
 	Rule string `json:"rule"`
 }
+
+// wholeFile is the path internal/spec gives a finding of the whole
+// file, which the document writes as an empty field.
+const wholeFile = "the file"
 
 // newReport returns the report of the files judged, the findings and
 // the warnings.
@@ -59,8 +65,12 @@ func newReport(files []projectspec.File, findings []finding, warnings []setup.Wa
 		rep.Files = append(rep.Files, f.Path)
 	}
 	for _, f := range findings {
-		rep.Findings = append(rep.Findings, Finding{File: termsafe.Escape(f.file), Message: termsafe.Escape(f.message),
-			Path: termsafe.Escape(f.path), Rule: f.rule})
+		field := f.path
+		if field == wholeFile {
+			field = ""
+		}
+		rep.Findings = append(rep.Findings, Finding{Field: termsafe.Escape(field), File: termsafe.Escape(f.file),
+			Message: termsafe.Escape(f.message), Rule: f.rule})
 	}
 	for _, r := range projectspec.HostOnly() {
 		rep.NotChecked = append(rep.NotChecked, r.Slug)

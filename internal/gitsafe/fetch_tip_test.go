@@ -7,8 +7,10 @@ package gitsafe
 
 import (
 	"bytes"
+	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -151,4 +153,78 @@ func TestTipFileAdvertisedHEAD(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.True(t, bytes.Equal([]byte("trunk\n"), data))
+}
+
+// TestTipFileNoDefaultBranch: an origin whose HEAD is detached, or names
+// a ref outside refs/heads/, names no default branch: ErrNoDefaultBranch,
+// a state of the origin and not a refusal (no ErrRefused).
+func TestTipFileNoDefaultBranch(t *testing.T) {
+	src, _ := newRepo(t)
+	plainGit(t, src, "tag", "v1")
+	base := bareCopy(t, src, "repo.git")
+	repo := filepath.Join(base, "repo.git")
+	url := serveGit(t, base) + "repo.git"
+	r := newRunner(t, Sandbox)
+	for name, point := range map[string][]string{
+		"detached": {"update-ref", "--no-deref", "HEAD", "refs/heads/main"},
+		"a tag":    {"symbolic-ref", "HEAD", "refs/tags/v1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			plainGit(t, repo, point...)
+			_, _, err := r.TipFile(t.Context(), t.TempDir(), url, "", "mise.lock", 64)
+			require.ErrorIs(t, err, ErrNoDefaultBranch)
+			assert.NotErrorIs(t, err, ErrRefused)
+		})
+	}
+}
+
+// TestTipFileFlags: the ls-remote and the fetch of TipFile run with its
+// own hardening, as host mode's every call does (05 5.1): no redirect
+// followed, no automatic gc or maintenance, every object checked; the
+// other calls of sandbox mode do not get them.
+func TestTipFileFlags(t *testing.T) {
+	r := newRunner(t, Sandbox)
+	var rec recorder
+	rec.install(r)
+	_, _, _ = r.TipFile(t.Context(), t.TempDir(), "https://example.com/o/r", "", "mise.lock", 64)
+	_, _, _ = r.TipFile(t.Context(), t.TempDir(), "https://example.com/o/r", "main", "mise.lock", 64)
+	want := []string{"-c", "http.followRedirects=false", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "transfer.fsckObjects=true"}
+	seen := map[string]bool{}
+	for _, c := range rec.commands {
+		verb := ""
+		for i, a := range c.Argv[1:] {
+			if a != "-c" && (i == 0 || c.Argv[i] != "-c") {
+				verb = a
+				break
+			}
+		}
+		has := strings.Contains(strings.Join(c.Argv, "\x00"), strings.Join(want, "\x00"))
+		switch {
+		case verb == "fetch" || verb == "ls-remote" && slices.Contains(c.Argv, "--symref"):
+			assert.True(t, has, "%s runs with the flags of TipFile: %q", verb, c.Argv)
+			seen[verb] = true
+		case verb == "init":
+			assert.False(t, has, "init runs with the flags of the mode only")
+		}
+	}
+	assert.True(t, seen["fetch"], "a fetch ran")
+	assert.True(t, seen["ls-remote"], "an ls-remote --symref ran")
+}
+
+// TestTipFileFollowsNoRedirect: an origin whose server answers with a
+// redirect fails with ErrMoved, and no request reaches the other host,
+// for the read of the default branch and for the fetch. The sandbox's
+// own global config trusts the test CA (http.sslCAInfo), as a sandbox's
+// git config is its own in sandbox mode.
+func TestTipFileFollowsNoRedirect(t *testing.T) {
+	for _, ref := range []string{"", "main"} {
+		url, hosts, reached := moved(t, http.StatusMovedPermanently)
+		home := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("[http]\n\tsslCAInfo = "+hosts[0].CAFile+"\n"), 0o600))
+		r, err := New(Config{Mode: Sandbox, Git: gitPath(t), Home: home})
+		require.NoError(t, err)
+		_, _, err = r.TipFile(t.Context(), t.TempDir(), url, ref, "mise.lock", 64)
+		require.ErrorIs(t, err, ErrMoved, "ref %q: %v", ref, err)
+		assert.Zero(t, reached.Load(), "no request reaches the new host")
+	}
 }

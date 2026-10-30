@@ -119,6 +119,11 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 	if err != nil {
 		return fmt.Errorf("the embedded egress catalog: %w", err)
 	}
+	if fetch != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, catalogTimeout)
+		defer cancel()
+	}
 	var warnings []setup.Warning
 	for _, f := range files {
 		if path.Ext(f.Path) != ".yaml" {

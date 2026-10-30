@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -163,7 +164,7 @@ func TestSpecValidateCatalogUnparsedLock(t *testing.T) {
 	var out, errOut bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
 	assert.Equal(t, 6, cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, refused)))
-	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: gitsafe refuses what the origin https://github.com/example/shop-api sent for its mise.lock: ")
+	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: the mise.lock of https://github.com/example/shop-api at main is no regular file within the cap of 1048576 bytes: ")
 }
 
 // TestSpecValidateCatalogFetchFails: an origin that cannot be read stops
@@ -360,4 +361,25 @@ func serveGit(t *testing.T, base string) string {
 		wg.Wait()
 	})
 	return "git://" + ln.Addr().String() + "/"
+}
+
+// TestSpecValidateCatalogDeadline: a repo whose read runs past its
+// deadline stops the command with fetch-failed (RJ-360), never a pass.
+func TestSpecValidateCatalogDeadline(t *testing.T) {
+	configRepo(t, map[string]string{"shop.yaml": shopSpec})
+	saved := repoTimeout
+	repoTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { repoTimeout = saved })
+	slow := func(ctx context.Context, _, _ string) ([]byte, bool, error) {
+		<-ctx.Done()
+		return nil, false, ctx.Err()
+	}
+	var out, errOut bytes.Buffer
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
+
+	err := run(t.Context(), env, []string{"projects/shop.yaml"}, slow)
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, "RJ-360", cli.Of(err).ID)
+	assert.Empty(t, out.String())
 }

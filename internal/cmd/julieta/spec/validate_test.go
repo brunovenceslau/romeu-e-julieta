@@ -228,7 +228,7 @@ func TestSpecValidateJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(stdout), &rep, json.RejectUnknownMembers(true)), stdout)
 	assert.Equal(t, Report{
 		Files: []string{"projects/shop.yaml", "projects/notes.txt"},
-		Findings: []Finding{{File: "projects/notes.txt", Message: "is a file under projects/ that is not *.yaml", Path: "the file",
+		Findings: []Finding{{Field: "", File: "projects/notes.txt", Message: "is a file under projects/ that is not *.yaml",
 			Rule: "projects-yaml-only"}},
 		NotChecked: []string{"config-project", "repo-url-host", "workload-repository"},
 		Schema:     "julieta-spec/v1",
@@ -273,4 +273,23 @@ func TestSpecValidateJSONEscapes(t *testing.T) {
 		assert.NotContains(t, s, "\x07")
 	}
 	assert.Equal(t, termsafe.Escape("projects/x\x1b[31m.yaml"), back.Findings[0].File)
+}
+
+// TestSpecValidateJSONFields: a finding of a value names its field, and
+// every finding of the whole file, the manifest size among them, has an
+// empty field, whatever the text output says.
+func TestSpecValidateJSONFields(t *testing.T) {
+	findings := []finding{
+		{file: "projects/a.yaml", path: "repos[0].dir", rule: "repo-dir", message: "m"},
+		{file: "projects/b.txt", path: "the file", rule: "projects-yaml-only", message: "m"},
+		{file: "projects/a.yaml", rule: "manifest-size", message: "m"},
+	}
+
+	rep := newReport(nil, findings, nil)
+
+	require.Len(t, rep.Findings, 3)
+	assert.Equal(t, "repos[0].dir", rep.Findings[0].Field)
+	assert.Empty(t, rep.Findings[1].Field)
+	assert.Empty(t, rep.Findings[2].Field)
+	assert.Equal(t, "projects/b.txt: the file: m", findings[1].String(), "the text keeps its wording")
 }
