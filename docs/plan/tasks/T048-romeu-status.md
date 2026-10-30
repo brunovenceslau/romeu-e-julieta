@@ -11,6 +11,7 @@ owns:
   - internal/state/store.go
   - internal/state/lock.go
   - internal/state/load.go
+  - internal/state/lock_commands_test.go
   - internal/render/live.go
   - internal/render/drift.go
   - internal/render/live_test.go
@@ -64,9 +65,8 @@ is the machine's and not a project's, whatever REQ-0327 lists per
 project. Slice D1: the command file over T169's `hostpaths`, which
 runs the sbx floor check once before any other sbx call, as the driver
 requires, `import_status.go` and the e2e cases `TestStatus*`. Slice D2:
-the `versions`
-object of `romeu version --json` (which reads the settings too), the
-e2e cases, the J10 line and the schema `romeu-status.v1` (`formats`),
+the `versions` object of `romeu version --json` (which reads the
+settings too), the J10 line and the schema `romeu-status.v1` (`formats`),
 once the report is whole; and the text of REQ-0327, REQ-0329 and the
 RJ-359 row amended for what slice C put at the head of the report (the
 toolchain, its warnings and the failed reads outside a project's
