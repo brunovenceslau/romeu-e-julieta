@@ -164,7 +164,7 @@ func TestPreflightHostFindings(t *testing.T) {
 	assert.Equal(t, []string{"RJ-329", "RJ-331"}, ids)
 	assert.Equal(t, []string{"sbx-global-secret", "home-symlink"}, slugs, "each finding names its check")
 	assert.Equal(t, []string{UncheckedVSCodeFolders}, unchecked, "the folders of VS Code were not given, and the report says so")
-	assert.Equal(t, []string{"sbx-global-secret", "sbx-broad-allow", "home-symlink", "auto-trust", "vscode-trust"}, HostSlugs())
+	assert.Equal(t, []string{"sbx-global-secret", "sbx-broad-allow", "home-symlink", "auto-trust", "vscode-trust", "signing-socket"}, HostSlugs())
 }
 
 // TestPreflightTouchesNoNetwork shows REQ-0077 and 10 10.1: no file of

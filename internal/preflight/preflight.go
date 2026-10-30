@@ -137,6 +137,9 @@ type Input struct {
 	// Generations are the generations of the project's record, newest
 	// last; none when the project has no record.
 	Generations []state.Generation
+	// Signing is what the check signing-socket reads of a project that
+	// uses git-ssh-sign (signing.go); nil for a project that does not.
+	Signing *Signing
 }
 
 // Printed is a failure that a protective command prints and goes on

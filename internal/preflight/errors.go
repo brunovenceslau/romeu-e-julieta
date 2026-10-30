@@ -22,6 +22,21 @@ var (
 		RecoveredIn: "none: nothing was changed, and adopting the sandbox records it",
 	}
 
+	// SigningSocket is the error signing-socket (RJ-204): a project uses
+	// the kit git-ssh-sign and signing.agentSocket of the host settings
+	// is unset, unreachable, or holds a number of keys other than one,
+	// or its one key is not the kit's signingKey (06 6.4, I34, REQ-0384,
+	// REQ-0600). sync raises it before it renders the kit, and step 5
+	// before a command of that project changes a sandbox; doctor reports
+	// the same check by its slug.
+	SigningSocket = cli.Row{
+		ID:          "RJ-204",
+		Slug:        "signing-socket",
+		Exit:        2,
+		Fix:         "decide: start the dedicated signing agent with the one key of the kit's signingKey (ssh-add -c), and set signing.agentSocket of the host settings to its socket, as J1 step 5 says",
+		RecoveredIn: "none: nothing was changed, and the next run checks the socket again",
+	}
+
 	// SbxGlobalSecret is the error sbx-global-secret (RJ-329): step 5
 	// found an sbx secret whose scope is not one sandbox for a service
 	// the project uses (I22, REQ-0371, REQ-0506). The hint is filled with

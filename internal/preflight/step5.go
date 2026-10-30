@@ -40,6 +40,7 @@ var hostChecks = []hostCheck{
 	{"home-symlink", checkHomeSymlinks},
 	{"auto-trust", checkAutoTrust},
 	{"vscode-trust", checkVSCodeTrust},
+	{"signing-socket", checkSigning},
 }
 
 // hostStep is step 5: the first host check that fails stops the step. A
