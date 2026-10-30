@@ -10,6 +10,7 @@ owns:
   - internal/cmd/romeu/approve/**
   - internal/cmd/romeu/sync/step1_lock.go
   - docs/spec/02-layouts.md
+  - docs/spec/12-engineering.md
 needs:
   - T041
   - T042
@@ -48,6 +49,19 @@ directory, and a root or `<root>/<cfg>-env` that is a symlink, not
 owned by the user or writable by its group or others. `init` and
 `approve` call it and delete their copies; `doctor` (T049) calls it for
 its `root-unsafe` row.
+
+Decided on 2026-10-30, scope this repository, written here: the
+settings path stays built by `spec.SettingsPath` (`internal/spec`,
+T041) and the state directory by `state.DefaultDir`, which predate the
+package and which `hostpaths` imports, so neither is a copy;
+`hostpaths.SettingsPath` adds the path `cli.Env` holds, and every
+command takes the path from it. The package's path joins the
+`romeu-cli` row of the module table of 12 12.2, which the tree check
+requires of a package under `internal/`. The memory push
+(`internal/cmd/romeu/all/memory_push.go`, T175), outside this file set,
+still builds the settings path; the call-site test lists it as
+pending, and its one-line move to `hostpaths.SettingsPath` lands in a
+change of its own.
 
 - Implements: REQ-1277 (04 4.2), REQ-1281 (05 5.2), REQ-1282 (05 5.2).
 - Operator: no.
