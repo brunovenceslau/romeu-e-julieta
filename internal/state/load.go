@@ -31,6 +31,10 @@ var ErrImmutable = errors.New("state: a descriptor entry is immutable")
 // bytes (one more tells the reader it is over the cap). A file that is
 // absent is an error that wraps fs.ErrNotExist.
 func readRecord(root *os.Root, name string) ([]byte, error) {
+	if root == nil {
+		// A subdirectory OpenRead found absent holds no record.
+		return nil, fmt.Errorf("state: %s: %w", name, fs.ErrNotExist)
+	}
 	// O_NONBLOCK keeps the open of a FIFO from waiting for a writer, and
 	// the Stat refuses anything but a regular file: a record is a file
 	// romeu wrote, and a device or a pipe in its place is damage.

@@ -62,6 +62,8 @@ type Store struct {
 	root        *os.Root
 	projects    *os.Root
 	descriptors *os.Root
+	// readOnly marks a store OpenRead opened, which takes no lock.
+	readOnly bool
 }
 
 // Open makes the state directory and its two subdirectories, mode
