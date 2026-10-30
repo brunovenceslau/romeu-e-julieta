@@ -19,7 +19,8 @@ import (
 // The check memory-layout (04 4.2, REQ-0387): a memory dir of the tree,
 // <name>-env/memory/<dir>/ or memory/_shared/, that breaks the layout
 // allowlist of 08 8.1, judged by memstore.Check, the check julieta runs
-// (I24); an entry of memory/ that is not a directory is a finding too.
+// (I24); an entry of memory/ that is not a directory, and a link in
+// place of memory/ itself, is a finding too.
 // Every node is read with Lstat through an os.Root on the memory dir,
 // so no link is followed.
 var _ = register(row{slug: "memory-layout", run: checkMemoryLayout})
@@ -36,10 +37,17 @@ func checkMemoryLayout(_ context.Context, h *host) Check {
 	var found []string
 	for _, env := range envs {
 		memory := filepath.Join(h.settings.Root, env, "memory")
-		entries, err := os.ReadDir(memory)
-		if errors.Is(err, fs.ErrNotExist) {
+		info, err := os.Lstat(memory)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			continue
+		case err != nil:
+			return errorOf(slug, err)
+		case info.Mode()&fs.ModeSymlink != 0:
+			found = append(found, notMade(path.Join(env, "memory")))
 			continue
 		}
+		entries, err := os.ReadDir(memory)
 		if err != nil {
 			return errorOf(slug, err)
 		}

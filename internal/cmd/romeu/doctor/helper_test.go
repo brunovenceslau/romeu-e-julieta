@@ -20,6 +20,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/approve"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/preflight"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
@@ -58,6 +59,10 @@ type fixture struct {
 	sbx                                    *fakeSbx
 	gitErr                                 error
 	env                                    map[string]string
+	// hostFindings is the preflight's step 5 doctor calls.
+	hostFindings func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string)
+	// noSettings leaves the host settings unwritten.
+	noSettings bool
 	// settingsMode, when set, is the mode the settings file is given.
 	settingsMode os.FileMode
 	// acknowledged writes toolchain.json for the toolchain doctor
@@ -83,6 +88,7 @@ func newFixture(t *testing.T) *fixture {
 			secrets:  "SCOPE SERVICE SECRET\n",
 		},
 		acknowledged: true,
+		hostFindings: preflight.HostFindings,
 	}
 	f.root = filepath.Join(f.home, "Developer")
 	for _, d := range []string{f.home, f.configHome, f.stateHome, f.root, filepath.Join(tmp, "bin")} {
@@ -164,12 +170,14 @@ var version = cli.Version{Version: "v0.1.0", Commit: "0123456", Date: "2026-10-3
 // the process, returns the report it printed and the error it returned.
 func (f *fixture) output(t *testing.T) (Report, string, error) {
 	t.Helper()
-	data, err := spec.EncodeHostSettings(f.settings)
-	require.NoError(t, err)
-	require.NoError(t, os.MkdirAll(filepath.Dir(f.settingsPath()), 0o700))
-	require.NoError(t, os.WriteFile(f.settingsPath(), data, 0o600))
-	if f.settingsMode != 0 {
-		require.NoError(t, os.Chmod(f.settingsPath(), f.settingsMode))
+	if !f.noSettings {
+		data, err := spec.EncodeHostSettings(f.settings)
+		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(filepath.Dir(f.settingsPath()), 0o700))
+		require.NoError(t, os.WriteFile(f.settingsPath(), data, 0o600))
+		if f.settingsMode != 0 {
+			require.NoError(t, os.Chmod(f.settingsPath(), f.settingsMode))
+		}
 	}
 	if f.acknowledged {
 		f.acknowledge(t, f.sbx.release)
@@ -183,10 +191,11 @@ func (f *fixture) output(t *testing.T) (Report, string, error) {
 		gitFloor: func(*spec.HostSettings, string) func(context.Context) error {
 			return func(context.Context) error { return f.gitErr }
 		},
-		secret: runSecretArgv,
+		preflight: f.hostFindings,
+		secret:    runSecretArgv,
 	})
 	defer h.close()
-	err = run(t.Context(), env, h)
+	err := run(t.Context(), env, h)
 	var rep Report
 	require.NoError(t, json.Unmarshal(out.Bytes(), &rep), "stdout: %s", out.String())
 	return rep, out.String() + errOut.String(), err

@@ -15,6 +15,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/hostpaths"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/preflight"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
@@ -46,6 +47,8 @@ type seams struct {
 	// gitFloor returns the floor check of the git of the settings h,
 	// run with HOME home: nil, or the error git-floor (RJ-344).
 	gitFloor func(h *spec.HostSettings, home string) func(ctx context.Context) error
+	// preflight runs the host checks of step 5: preflight.HostFindings.
+	preflight func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string)
 	// secret runs one secret argv with exactly HOME and
 	// PATH=/usr/bin:/bin and says whether it printed anything on its
 	// standard output, which it never keeps (I25).
@@ -115,12 +118,12 @@ func newHost(env *cli.Env, s seams) *host {
 		h.baseErr = usage("home", "HOME is not an absolute path")
 	}
 	if p, err := hostpaths.SettingsPath(env, s.getenv); err != nil {
-		h.baseErr = cmpErr(h.baseErr, usage("settings-path", err.Error()))
+		h.baseErr = firstErr(h.baseErr, usage("settings-path", err.Error()))
 	} else {
 		h.settingsPath = p
 	}
 	settings, err := hostpaths.LoadSettings(env, s.getenv, usage)
-	h.baseErr = cmpErr(h.baseErr, err)
+	h.baseErr = firstErr(h.baseErr, err)
 	if err == nil {
 		h.settings = settings
 	}
@@ -147,8 +150,8 @@ func (h *host) close() {
 	}
 }
 
-// cmpErr returns a, or b when a is nil: the first error found.
-func cmpErr(a, b error) error {
+// firstErr returns a, or b when a is nil: the first error found.
+func firstErr(a, b error) error {
 	if a != nil {
 		return a
 	}

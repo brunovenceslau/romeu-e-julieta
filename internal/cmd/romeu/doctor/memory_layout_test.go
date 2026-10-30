@@ -56,3 +56,23 @@ func TestDoctorMemoryLayout(t *testing.T) {
 		})
 	}
 }
+
+// TestDoctorMemoryLayoutReportsALink: a link in place of a memory/ of
+// the tree fails memory-layout and is not followed.
+func TestDoctorMemoryLayoutReportsALink(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	env := filepath.Join(f.root, "shop-env")
+	require.NoError(t, os.Mkdir(env, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(env, neverIndex), nil, 0o600))
+	target := filepath.Join(f.tmp, "elsewhere")
+	require.NoError(t, os.MkdirAll(filepath.Join(target, "shop-api", "stray"), 0o700))
+	require.NoError(t, os.Symlink(target, filepath.Join(env, "memory")))
+
+	rep, out, _ := f.output(t)
+
+	c := check(t, rep, "memory-layout")
+	assert.Equal(t, resultFail, c.Result, out)
+	assert.Contains(t, c.Message, "memory is a link, not the directory romeu made")
+	assert.NotContains(t, c.Message, "stray", "the link is not followed")
+}

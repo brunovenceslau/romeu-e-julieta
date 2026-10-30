@@ -17,7 +17,8 @@ import (
 // folder under it trusted. It is the check of step 5 of the preflight,
 // called from here. The trusted folders live in VS Code's SQLite state
 // database, which the preflight does not read (UncheckedVSCodeFolders),
-// so a pass says they were not checked. Deferred decision, reopened at
+// so when nothing else fails the result is a warning that says they were
+// not checked (decided on 2026-10-30). Deferred decision, reopened at
 // T049 by step5.go and kept: doctor passes no reader of the trusted
 // folders, since reading SQLite is a dependency; the trigger is the
 // first task that adds an SQLite reader, or T134.
@@ -28,8 +29,8 @@ func checkVSCodeTrust(ctx context.Context, h *host) Check {
 	if c.Result != resultPass {
 		return c
 	}
-	s, _ := h.findings.get(func() (stepFive, error) { return h.stepFive(ctx), nil })
-	if slices.Contains(s.unchecked, preflight.UncheckedVSCodeFolders) {
+	if slices.Contains(h.hostFindings(ctx).unchecked, preflight.UncheckedVSCodeFolders) {
+		c.Result = resultWarn
 		c.Message = "workspace trust is on; the trusted folders of VS Code are not checked, since they live in its state database"
 	}
 	return c

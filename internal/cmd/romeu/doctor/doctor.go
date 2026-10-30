@@ -28,6 +28,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/preflight"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -77,7 +78,8 @@ func hostSeams() seams {
 				return g.CheckFloor(ctx)
 			}
 		},
-		secret: runSecretArgv,
+		preflight: preflight.HostFindings,
+		secret:    runSecretArgv,
 	}
 }
 

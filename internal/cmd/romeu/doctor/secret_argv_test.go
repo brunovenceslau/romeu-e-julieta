@@ -127,3 +127,24 @@ func TestDoctorSecretArgv(t *testing.T) {
 		assert.Equal(t, []string{"HOME", "PATH"}, names)
 	})
 }
+
+// TestDoctorRunsNoSecretArgvFromForeignSettings: settings that are not a
+// regular file of mode 0600 owned by this user run no secret argv; the
+// check is an error that names settings-mode.
+func TestDoctorRunsNoSecretArgvFromForeignSettings(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	ran := filepath.Join(f.tmp, "ran")
+	argv := stub(t, f, "secret", "/usr/bin/touch "+ran+"; echo value")
+	f.settings.Secrets = map[string]spec.Secret{"token@shop": {Service: "svc-alpha", Argv: []string{argv}}}
+	f.settingsMode = 0o640
+
+	rep, out, err := f.output(t)
+
+	c := check(t, rep, "secret-argv")
+	assert.Equal(t, resultError, c.Result, out)
+	assert.Contains(t, c.Message, "settings-mode")
+	assert.Equal(t, resultFail, check(t, rep, "settings-mode").Result)
+	assert.Equal(t, 1, exitOf(err))
+	assert.NoFileExists(t, ran, "no secret argv ran")
+}

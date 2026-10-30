@@ -48,11 +48,11 @@ docs/reference/manifest.md -text
 docs/reference/project.md -text
 docs/reference/romeu.md -text
 docs/reference/romeu/approve.md -text
-docs/reference/romeu/doctor.md -text
 docs/reference/romeu/completion.md -text
 docs/reference/romeu/completion/bash.md -text
 docs/reference/romeu/completion/fish.md -text
 docs/reference/romeu/completion/zsh.md -text
+docs/reference/romeu/doctor.md -text
 docs/reference/romeu/init.md -text
 docs/reference/romeu/sync.md -text
 docs/reference/romeu/version.md -text
@@ -71,6 +71,7 @@ schemas/manifest.v1.json -text
 schemas/memory-entry.v1.json -text
 schemas/project.v1.json -text
 schemas/render.v1.json -text
+schemas/romeu-doctor.v1.json -text
 schemas/salvage.v1.json -text
 schemas/state-descriptor.v1.json -text
 schemas/state-project.v1.json -text

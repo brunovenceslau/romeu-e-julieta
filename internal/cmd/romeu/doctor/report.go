@@ -14,9 +14,18 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 )
 
-// Report is the --json document of romeu doctor: one object per check,
-// in slug order, and the leftover temporary files of the state
-// directory.
+// Schema is the value of the schema field of the --json document of
+// romeu doctor, the format romeu-doctor.v1.
+const Schema = "romeu-doctor/v1"
+
+// Results are the values of the result of a check, in the order of 04
+// 4.2 (REQ-0331): the schema of romeu-doctor.v1 admits these alone.
+var Results = []string{resultPass, resultWarn, resultFail, resultError}
+
+// Report is the --json document of romeu doctor, the format
+// romeu-doctor.v1 (04 4.1, Output; 04 4.2, REQ-0331): one object per
+// check, in slug order, and the leftover temporary files of the state
+// directory. The fields are in the order of their JSON names.
 type Report struct {
 	// Checks are the results, one per registered check.
 	Checks []Check `json:"checks"`
@@ -25,6 +34,8 @@ type Report struct {
 	// hand: doctor lists them and deletes none (T049, re-plan of
 	// 2026-10-22). They are no check, so they change no exit code.
 	Leftovers []string `json:"leftovers"`
+	// Schema is "romeu-doctor/v1".
+	Schema string `json:"schema"`
 }
 
 // Check is the result of one check (04 4.2, REQ-0331).
@@ -47,7 +58,7 @@ type Check struct {
 // when a check could not run, check-findings (exit 6) when every check
 // ran and one failed, nil when none did. A warning changes no exit.
 func run(ctx context.Context, env *cli.Env, h *host) error {
-	rep := Report{Checks: []Check{}, Leftovers: leftovers(h)}
+	rep := Report{Checks: []Check{}, Leftovers: leftovers(h), Schema: Schema}
 	for _, r := range rows {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -58,6 +69,7 @@ func run(ctx context.Context, env *cli.Env, h *host) error {
 		c.Message = strings.ToValidUTF8(c.Message, "�")
 		rep.Checks = append(rep.Checks, c)
 	}
+	rep.Checks = append(rep.Checks, h.unplaced(ctx)...)
 	if err := write(env, rep); err != nil {
 		return err
 	}

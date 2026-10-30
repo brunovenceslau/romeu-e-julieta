@@ -6,6 +6,8 @@
 package doctor
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/preflight"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
 
@@ -87,9 +90,9 @@ func TestDoctorI22Rows(t *testing.T) {
 	}
 }
 
-// TestDoctorI22RowsPlaceAShapeError: an upstream-shape of one listing,
-// the other one readable, is reported on the row of that listing alone
-// when the other row has a finding of its own, and never as a pass.
+// TestDoctorI22RowsPlaceAShapeError: an upstream-shape of one listing is
+// reported on the row of that listing, by the slug the preflight gives
+// its finding, and the other row keeps its own result.
 func TestDoctorI22RowsPlaceAShapeError(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
@@ -139,8 +142,11 @@ func TestDoctorI23Rows(t *testing.T) {
 			assert.Equal(t, 6, exitOf(err), out)
 			for _, slug := range []string{slugHomeSymlink, slugAutoTrust, slugVSCodeTrust} {
 				want := resultPass
-				if slug == tc.slug {
+				switch slug {
+				case tc.slug:
 					want = resultFail
+				case slugVSCodeTrust:
+					want = resultWarn
 				}
 				assert.Equal(t, want, check(t, rep, slug).Result, slug)
 			}
@@ -148,9 +154,10 @@ func TestDoctorI23Rows(t *testing.T) {
 	}
 }
 
-// TestDoctorVSCodeTrustSaysWhatIsNotChecked: a pass of vscode-trust says
-// that the trusted folders, which live in VS Code's state database, were
-// not checked.
+// TestDoctorVSCodeTrustSaysWhatIsNotChecked: with workspace trust on,
+// vscode-trust is a warning that says the trusted folders, which live in
+// VS Code's state database, were not checked, and changes no exit
+// (decided on 2026-10-30).
 func TestDoctorVSCodeTrustSaysWhatIsNotChecked(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
@@ -158,5 +165,26 @@ func TestDoctorVSCodeTrustSaysWhatIsNotChecked(t *testing.T) {
 	rep, out, err := f.output(t)
 
 	require.NoError(t, err, out)
-	assert.Contains(t, check(t, rep, slugVSCodeTrust).Message, "not checked")
+	c := check(t, rep, slugVSCodeTrust)
+	assert.Equal(t, resultWarn, c.Result)
+	assert.Contains(t, c.Message, "not checked")
+}
+
+// TestDoctorKeepsAFindingWithNoRow: a finding of step 5 whose check has
+// no row in doctor, such as a check the preflight gained first, is
+// reported as an error under its slug, never dropped, and doctor exits 1.
+func TestDoctorKeepsAFindingWithNoRow(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.hostFindings = func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string) {
+		findings, unchecked := preflight.HostFindings(ctx, d, in)
+		return append(findings, preflight.Finding{Slug: "signing-socket", Err: errors.New("the socket answers no key")}), unchecked
+	}
+
+	rep, out, err := f.output(t)
+
+	assert.Equal(t, 1, exitOf(err), out)
+	c := check(t, rep, "signing-socket")
+	assert.Equal(t, resultError, c.Result)
+	assert.Contains(t, c.Message, "the socket answers no key")
 }

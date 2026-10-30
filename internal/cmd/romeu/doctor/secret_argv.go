@@ -13,9 +13,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"syscall"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
 // The check secret-argv (04 4.2, REQ-0382): a secret entry of the host
@@ -31,6 +33,11 @@ func checkSecretArgv(ctx context.Context, h *host) Check {
 	const slug = "secret-argv"
 	if h.baseErr != nil {
 		return errorOf(slug, h.baseErr)
+	}
+	if len(h.settings.Secrets) > 0 {
+		if err := ownSettings(h.settingsPath); err != nil {
+			return errorOf(slug, err)
+		}
 	}
 	var found []string
 	for _, name := range slices.Sorted(maps.Keys(h.settings.Secrets)) {
@@ -61,4 +68,22 @@ func checkSecretArgv(ctx context.Context, h *host) Check {
 		return fail(slug, joined(found))
 	}
 	return pass(slug, fmt.Sprintf("%d secret argv(s) ran and printed something", len(h.settings.Secrets)))
+}
+
+// ownSettings returns why the host settings at p are not a file this
+// user alone wrote, read with Lstat: not a regular file, a mode other
+// than 0600, or an owner other than the effective user. A secret argv is
+// a program to run, so none runs from settings another user or a link
+// could have put there; the error names settings-mode, the check that
+// reports the mode.
+func ownSettings(p string) error {
+	info, err := os.Lstat(p)
+	if err != nil {
+		return err
+	}
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if info.Mode() != state.FileMode || !ok || int(st.Uid) != os.Geteuid() {
+		return usage("settings-mode", fmt.Sprintf("the host settings at %s are not a regular file of mode 0600 that this user owns (%v), so no secret argv runs", p, info.Mode()))
+	}
+	return nil
 }

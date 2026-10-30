@@ -36,3 +36,25 @@ func TestDoctorTreeMode(t *testing.T) {
 		})
 	}
 }
+
+// TestDoctorTreeModeReportsALink: a link in place of a <name>-env/ or of
+// the .attic fails tree-mode as a link, not the directory romeu made,
+// and is not followed.
+func TestDoctorTreeModeReportsALink(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"shop-env", ".attic"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixture(t)
+			target := filepath.Join(f.tmp, "elsewhere")
+			require.NoError(t, os.Mkdir(target, 0o700))
+			require.NoError(t, os.Symlink(target, filepath.Join(f.root, name)))
+
+			rep, out, _ := f.output(t)
+
+			c := check(t, rep, "tree-mode")
+			assert.Equal(t, resultFail, c.Result, out)
+			assert.Contains(t, c.Message, name+" is a link, not the directory romeu made")
+		})
+	}
+}
