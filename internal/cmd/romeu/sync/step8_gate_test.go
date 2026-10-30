@@ -7,6 +7,7 @@ package sync
 
 import (
 	"bytes"
+	"context"
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"io"
@@ -602,6 +603,41 @@ func TestGateAndPromoteLeavesTheWorkspaceFilesWhenNothingIsPromoted(t *testing.T
 			}
 		})
 	}
+}
+
+// TestGateStepDefersADecline: a decline of gate 2 does not stop the
+// run, so step 10 still reports, and the run then returns
+// candidate-declined; another error of step 8 stops the run there.
+func TestGateStepDefersADecline(t *testing.T) {
+	f := gateRun(t)
+	master, terminal := openPTY(t)
+	withTerminal(t, terminal, int(terminal.Fd()))
+	f.r.env.Stderr = cli.NewWriter(&typingBuffer{lockedBuffer: f.stderr, master: master, answer: "N\n"})
+	reported := false
+	list := []step{
+		{8, "gate 2 and promote", gateStep},
+		{10, "report orphans", func(context.Context, *run) error { reported = true; return nil }},
+	}
+
+	err := runSteps(t.Context(), f.r, list)
+
+	requireDeclined(t, err, "shop")
+	assert.True(t, reported, "step 10 ran after the decline")
+}
+
+// TestGateAndPromoteLeavesOutARecordItCannotRead: the record of another
+// project that does not decode is left out of the workspace files with
+// a line among the warnings, and the sync that promoted does not fail.
+func TestGateAndPromoteLeavesOutARecordItCannotRead(t *testing.T) {
+	f := gateRun(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(f.root, "blog-env"), 0o700))
+	require.NoError(t, os.MkdirAll(filepath.Join(f.r.store.Dir(), "projects"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.r.store.Dir(), "projects", "blog.json"), []byte("{not json"), 0o600))
+
+	f.approve(t)
+
+	assert.Equal(t, []string{"shop-env/shop-api", "shop-env/shop-web"}, f.workspaceFolders(t, render.DevWorkspaceFile))
+	assert.Contains(t, warned(f.r), "the workspace files leave out blog")
 }
 
 // TestGateAndPromoteRefusesACandidateChangedAfterTheRender: a candidate

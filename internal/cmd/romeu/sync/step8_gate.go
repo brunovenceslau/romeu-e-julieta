@@ -97,11 +97,13 @@ const (
 // On an error each candidate still rendered is declined, which deletes
 // its dir, and the error stops the step and is the one returned: a
 // target declined or refused before it is reported by the line printed
-// for it alone, and the workspace files are still written when a
-// target before it was promoted. An approved candidate
-// whose promotion failed is the one exception to the decline: the
-// candidate machine has no row from approved to declined, so its dir is
-// left, and the next sync's render deletes it (REQ-0082).
+// for it alone, by choice: joined to it, the row of the decline would be
+// the one cli.Main reports, and the text of the error that stopped the
+// step would be lost. The workspace files are still written when a
+// target before it was promoted. An approved candidate whose promotion
+// failed is the one exception to the decline: the candidate machine has
+// no row from approved to declined, so its dir is left, and the next
+// sync's render deletes it (REQ-0082).
 func gateAndPromote(ctx context.Context, r *run) error {
 	names := map[outcome][]string{}
 	for i, p := range r.targets {
@@ -146,9 +148,11 @@ func named(row cli.Row, names []string, prefix string) error {
 // into the root (REQ-0048) from every project's record: the repos of
 // the approved widening set of each <name>-env/ under the root whose
 // record holds an approval, as host clones. A dir whose name is no
-// project name, or has no record, is no project of host state. Host
-// state records no review checkout until romeu pull does (T069), so
-// review.code-workspace lists none.
+// project name, or has no record, is no project of host state; a record
+// that cannot be read is left out with a line among the warnings, so a
+// damaged record of another project does not fail a sync that promoted.
+// Host state records no review checkout until romeu pull does (T069),
+// so review.code-workspace lists none; T069 passes them here.
 func writeWorkspaces(r *run) error {
 	names, err := envDirs(r.settings.Root)
 	if err != nil {
@@ -161,7 +165,9 @@ func writeWorkspaces(r *run) error {
 			continue
 		}
 		if err != nil {
-			return err
+			line := "the workspace files leave out " + termsafe.Escape(name) + ": " + termsafe.Escape(err.Error())
+			r.warnings = append(r.warnings, func(w *cli.Writer) { _, _ = fmt.Fprintln(w, line) })
+			continue
 		}
 		if rec.Approval == nil {
 			continue

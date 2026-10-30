@@ -62,6 +62,10 @@ type run struct {
 	// the warnings as lost edits once their project is promoted.
 	overwritten []lostEdit
 
+	// Step 8: a decline or a refusal of gate 2, which the run returns
+	// once step 10 has reported (gateStep).
+	deferred error
+
 	// Steps 4 and 5 (and each later step that warns): the warnings of
 	// the run, in the order they were found. Each is a print to the CLI
 	// writer of stderr, which runSteps makes once the steps end, after

@@ -271,8 +271,8 @@ dir`, see J13).
 8. `REQ-0343` Gate 2 and the candidate state machine
    ([01 1.6](01-system-model.md#candidate)); promotion commit on
    approval or when unchanged. A target declined or refused does not
-   stop the targets after it; once every target is done, a refusal
-   without a TTY exits 3 with `project-approval-required` (`RJ-301`)
+   stop the targets after it, nor step 10; once step 10 has reported, a
+   refusal without a TTY exits 3 with `project-approval-required` (`RJ-301`)
    and an answer other than `y` on a TTY exits 1 with
    `candidate-declined` (`RJ-358`), as gate 1's decline does
    (REQ-1276), each naming the projects. After the last promotion of

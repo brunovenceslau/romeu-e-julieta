@@ -57,8 +57,12 @@ func treeMade(v Vars) func(scenarios.World) error {
 		private := []string{env, filepath.Join(env, "memory", "_shared")}
 		for _, d := range v.Dirs {
 			private = append(private, filepath.Join(env, "memory", d), filepath.Join(env, "memory", d, "entries"))
-			if info, err := os.Lstat(filepath.Join(env, d, ".git")); err != nil || !info.IsDir() {
-				return fmt.Errorf("step 3 did not clone %s: %v", d, err)
+			info, err := os.Lstat(filepath.Join(env, d, ".git"))
+			if err != nil {
+				return fmt.Errorf("step 3 did not clone %s: %w", d, err)
+			}
+			if !info.IsDir() {
+				return fmt.Errorf("the clone %s has no .git directory", d)
 			}
 		}
 		for _, d := range private {
@@ -81,10 +85,10 @@ func treeMade(v Vars) func(scenarios.World) error {
 			return fmt.Errorf("a candidate dir is left: %s", entries[0].Name())
 		}
 		if _, err := os.Lstat(filepath.Join(env, "sbxenv.yaml")); !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("sbxenv.yaml is live without an approval: %v", err)
+			return errors.Join(errors.New("sbxenv.yaml is live without an approval"), err)
 		}
 		if _, err := w.State(filepath.Join("projects", v.Name+".json")); !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("a project record is written without an approval: %v", err)
+			return errors.Join(errors.New("a project record is written without an approval"), err)
 		}
 		return nil
 	}

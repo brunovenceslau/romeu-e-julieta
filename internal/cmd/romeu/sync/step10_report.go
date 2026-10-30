@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
@@ -24,7 +25,9 @@ import (
 // directories (03 3.1, the row of a repo dir, REQ-0176), compared
 // case-insensitively: none is a repo dir, so none is orphaned. The
 // other reserved names, .romeu, .git and sbxenv.yaml, start with a dot
-// or are a file, and the walk skips those already.
+// or are a file, and the walk skips those already. They are compared
+// case-insensitively, as 03 3.1 reserves them, while a repo dir of the
+// spec is compared as written, as git and the file system name it.
 var reservedDirs = []string{memoryDir, "review", "ledger"}
 
 // reportOrphans is step 10 of 04 4.2 (REQ-0345, REQ-0334): it reports
@@ -34,7 +37,9 @@ var reservedDirs = []string{memoryDir, "review", "ledger"}
 // not name, a host clone or a memory dir, as "orphaned repo dir:
 // <name>-env/<path>" (01 1.7; J7, J13). It reads every spec, not the
 // targets alone, and judges each entry by Lstat, so a link is no dir
-// of either kind.
+// of either kind. An env dir it cannot read is a line among the
+// warnings, not an error: the report changes nothing, and a sync that
+// promoted does not fail on it.
 //
 // The warning julieta-pin-mismatch, which REQ-0345 also places here,
 // needs the pin of the config repo's validate.yml, whose format and
@@ -55,7 +60,9 @@ func reportOrphans(_ context.Context, r *run) error {
 		env := name + "-env"
 		dirs, err := orphanedDirs(filepath.Join(r.settings.Root, env), r.specs[i])
 		if err != nil {
-			return fmt.Errorf("the orphans of %s: %w", termsafe.Escape(env), err)
+			line := "the orphans of " + termsafe.Escape(env) + " were not read: " + termsafe.Escape(err.Error())
+			r.warnings = append(r.warnings, func(w *cli.Writer) { _, _ = fmt.Fprintln(w, line) })
+			continue
 		}
 		for _, d := range dirs {
 			if _, err := fmt.Fprintf(r.env.Stdout, "orphaned repo dir: %s\n", termsafe.Escape(path.Join(env, d))); err != nil {

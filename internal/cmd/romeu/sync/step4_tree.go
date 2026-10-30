@@ -258,7 +258,10 @@ func fetchRepo(ctx context.Context, g *gitsafe.Runner, repo spec.Repo, clone str
 	if err != nil {
 		return "", "", "", err
 	}
-	if !ok {
+	switch {
+	case !ok && repo.Ref == "":
+		return "", "", "", usage("ref-missing", "the origin of "+termsafe.Escape(repo.URL)+" sent no HEAD; name the branch in ref")
+	case !ok:
 		return "", "", "", usage("ref-missing", "the origin of "+termsafe.Escape(repo.URL)+" has no branch "+termsafe.Escape(branch))
 	}
 	return branch, egressRef, commit, nil
