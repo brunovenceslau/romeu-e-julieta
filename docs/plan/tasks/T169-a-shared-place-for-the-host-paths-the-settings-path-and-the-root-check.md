@@ -3,7 +3,7 @@ id: T169
 title: "A shared place for the host paths: the settings path and the root check"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/hostpaths/**
   - internal/cmd/romeu/init/**
@@ -24,6 +24,8 @@ ask_first:
   - checks
   - contracts
 sitting: none
+merged: 2026-10-30
+pr: 355
 ---
 
 # T169 - A shared place for the host paths: the settings path and the root check
