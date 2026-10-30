@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
@@ -33,9 +34,11 @@ type lister interface {
 }
 
 // host is what status reads: the state directory, open to read (nil
-// when there is none), and sbx.
+// when there is none), the root that holds each project's <name>-env/
+// ("" when it is not known), and sbx.
 type host struct {
 	store *state.Store
+	root  string
 	sbx   lister
 }
 
@@ -78,13 +81,17 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 	// sbx is listed once; a failed listing is shown in every block, the
 	// read each block depends on, and counts as one failed read.
 	sandboxes, listErr := h.sbx.List(ctx, sbxdrv.Opts{Step: "status"})
-	failed := 0
+	shared := 0
 	if listErr != nil {
-		failed++
+		shared = 1
 	}
+	failed := shared
 	for _, name := range names {
 		p := Project{Name: name, Generations: []Generation{}, Findings: []Finding{}, Errors: []ReadError{}}
 		src := &source{name: name, recorded: RecordAbsent, sandboxes: sandboxes, listed: listErr == nil}
+		if h.root != "" {
+			src.envDir = filepath.Join(h.root, name+"-env")
+		}
 		if h.store != nil {
 			record, err := h.store.LoadProject(name)
 			switch {
@@ -93,7 +100,6 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 			case !errors.Is(err, fs.ErrNotExist):
 				src.recorded = RecordUnreadable
 				p.Errors = append(p.Errors, readError(readRecord, err))
-				failed++
 			}
 		}
 		if listErr != nil {
@@ -102,6 +108,7 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		for _, s := range sections {
 			s.fill(ctx, src, &p)
 		}
+		failed += len(p.Errors) - shared
 		rep.Projects = append(rep.Projects, p)
 	}
 	if err := write(env, rep); err != nil {

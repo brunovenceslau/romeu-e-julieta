@@ -41,6 +41,9 @@ type Project struct {
 	Name string `json:"name"`
 	// Record is the state of its record: present, absent or unreadable.
 	Record string `json:"record"`
+	// SyncedCommit is the config commit the live render read the spec
+	// at; absent before the first promotion.
+	SyncedCommit string `json:"syncedCommit,omitzero"`
 	// Sandbox is the sandbox's state: what sbx ls --json says (running,
 	// stopped), absent, or unknown when the listing failed.
 	Sandbox string `json:"sandbox"`

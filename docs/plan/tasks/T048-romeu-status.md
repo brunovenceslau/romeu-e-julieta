@@ -11,6 +11,8 @@ owns:
   - internal/state/store.go
   - internal/state/lock.go
   - internal/state/load.go
+  - internal/render/live.go
+  - internal/render/live_test.go
   - internal/cmd/romeu/version/versions.go
   - internal/cmd/romeu/all/import_status.go
   - e2e/status_test.go
@@ -48,9 +50,13 @@ sandbox state and `removal-pending` from `sbx ls`, the failed reads per
 project, and `status-incomplete` (RJ-359, exit 1), a row 04 4.4 lacked
 for a report printed with a failed read (REQ-0329); host state is read
 through `state.OpenRead`, which makes, changes and locks nothing, so a
-mode `doctor` reports stays as found. Slice B: drift, the interrupted
-promotion, spec vs synced commit, recreate needed, and the orphaned
-project and repo dir with their unpushed and salvage-only work. Slice C:
+mode `doctor` reports stays as found. Slice B1 (no git): the synced
+commit of the live render, drift, the interrupted promotion and
+recreate needed, read through `render.ReadLive`, `render.CheckDrift`
+and the record, with the root of the trees injected until slice D.
+Slice B2 (git and the spec): the spec commit against the synced one,
+and the orphaned project and repo dir with their unpushed and
+salvage-only work. Slice C:
 the stale toolchain, `sbx-untested`, and the `versions` object. Slice D:
 the command file, `import_status.go`, the e2e cases, the J10 line and
 the schema `romeu-status.v1` (`formats`), once the report is whole. The
