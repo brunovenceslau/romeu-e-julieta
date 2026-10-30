@@ -33,7 +33,8 @@ func liveToolchain(v sbxdrv.Release) approve.Live {
 }
 
 // acknowledge writes toolchain.json under dir for the live toolchain
-// with sbx sbx.
+// with sbx sbx; the sbx version of liveToolchain is set apart, so its
+// release here is any.
 func acknowledge(t *testing.T, dir, sbx string) {
 	t.Helper()
 	live := liveToolchain(sbxdrv.Release{})
@@ -81,6 +82,11 @@ func TestRunReportsTheToolchain(t *testing.T) {
 			[]Finding{{Slug: "sbx-untested", Message: "sbx 0.50.1 is outside the tested window: 0.49.2"}},
 		},
 		{"never acknowledged", "", recorded, Toolchain{State: ToolchainMissing, Sbx: "0.49.2", Changes: allChanges("0.49.2")}, []Finding{}},
+		{
+			"a prerelease of a recorded version is untested", "0.49.2-rc.1", sbxdrv.Release{Minor: 49, Patch: 2, Pre: "rc.1"},
+			Toolchain{State: ToolchainAcknowledged, Sbx: "0.49.2-rc.1", Changes: []ToolchainChange{}},
+			[]Finding{{Slug: "sbx-untested", Message: "sbx 0.49.2-rc.1 is outside the tested window: 0.49.2"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -89,8 +95,9 @@ func TestRunReportsTheToolchain(t *testing.T) {
 			if tt.ack != "" {
 				acknowledge(t, dir, tt.ack)
 			}
-			out, _, err := toolchainOutput(t, dir, fakeSbx{version: tt.live}, true)
+			out, errOut, err := toolchainOutput(t, dir, fakeSbx{version: tt.live}, true)
 			require.NoError(t, err, "a stale toolchain is reported, never exit 3")
+			assert.Empty(t, errOut, "with --json a warning is in the document only")
 			rep := decode(t, out)
 			require.NotNil(t, rep.Toolchain)
 			assert.Equal(t, tt.want, *rep.Toolchain)
@@ -147,4 +154,106 @@ func TestRunToolchainFailedReads(t *testing.T) {
 		assert.Equal(t, state.RecordUnreadable.ID, rep.Errors[0].ID)
 		assert.Equal(t, "toolchain record", rep.Errors[0].Read)
 	})
+}
+
+// measureFails is a measure of the live toolchain that fails.
+func measureFails(sbxdrv.Release) (approve.Live, error) {
+	return approve.Live{}, errors.New("no catalog")
+}
+
+func TestRunToolchainMeasureFails(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, nil, nil)
+	store, err := state.OpenRead(dir)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, store.Close()) }()
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
+	err = run(t.Context(), env, host{store: store, sbx: fakeSbx{version: sbxdrv.Release{Minor: 50}}, measure: measureFails}, nil)
+	require.Error(t, err)
+	rep := decode(t, out.String())
+	assert.Equal(t, ToolchainUnknown, rep.Toolchain.State)
+	assert.Equal(t, "toolchain measure", rep.Errors[0].Read)
+	assert.Equal(t, "sbx-untested", rep.Warnings[0].Slug, "the window is judged before the measure")
+}
+
+func TestRunToolchainLeftOut(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		measure func(sbxdrv.Release) (approve.Live, error)
+		store   bool
+	}{
+		{"no measure", nil, true},
+		{"no host state", measureFails, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			h := host{sbx: fakeSbx{versionErr: errors.New("sbx version is not read")}, measure: tt.measure}
+			if tt.store {
+				store, err := state.OpenRead(stateDir(t, nil, nil))
+				require.NoError(t, err)
+				defer func() { require.NoError(t, store.Close()) }()
+				h.store = store
+			}
+			var out bytes.Buffer
+			env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
+			require.NoError(t, run(t.Context(), env, h, nil))
+			rep := decode(t, out.String())
+			assert.Nil(t, rep.Toolchain)
+			assert.Empty(t, rep.Errors)
+		})
+	}
+}
+
+func TestRunToolchainTextLines(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		ack  string
+		sbx  fakeSbx
+		want string
+	}{
+		{"acknowledged", "0.49.2", fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, "toolchain: acknowledged\nno projects: run romeu sync\n"},
+		{"missing", "", fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, "toolchain: not acknowledged; run romeu approve --toolchain\nno projects: run romeu sync\n"},
+		{
+			"unknown, with a hostile error kept on its line", "", fakeSbx{versionErr: errors.New("boom\nerror RJ-999 forged\x1b[2J")},
+			"toolchain: unknown, see the error below\nerror RJ-359 status-incomplete (sbx version): boom\\nerror RJ-999 forged\\u001b[2J\nno projects: run romeu sync\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := stateDir(t, nil, nil)
+			if tt.ack != "" {
+				acknowledge(t, dir, tt.ack)
+			}
+			out, _, _ := toolchainOutput(t, dir, tt.sbx, false)
+			assert.Equal(t, tt.want, out)
+		})
+	}
+}
+
+func TestRunGoesOnPastAnUnlistedProjectsDir(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		return // root lists a directory of mode 0300
+	}
+	dir := stateDir(t, world(t), nil)
+	store, err := state.OpenRead(dir)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, store.Close()) }()
+	projects := filepath.Join(dir, "projects")
+	require.NoError(t, os.Chmod(projects, 0o300))
+	t.Cleanup(func() { _ = os.Chmod(projects, state.DirMode) })
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
+	h := host{store: store, sbx: fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, measure: func(v sbxdrv.Release) (approve.Live, error) { return liveToolchain(v), nil }}
+	err = run(t.Context(), env, h, nil)
+	assert.Equal(t, 1, cli.ExitCode(err))
+	rep := decode(t, out.String())
+	require.NotNil(t, rep.Toolchain, "the toolchain read before the failure is still reported")
+	require.Len(t, rep.Errors, 1)
+	assert.Equal(t, "project records", rep.Errors[0].Read)
 }

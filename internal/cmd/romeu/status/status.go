@@ -51,6 +51,7 @@ type host struct {
 // The reads a block names in its errors.
 const (
 	readRecord = "project record"
+	readNames  = "project records"
 	readSbx    = "sbx ls"
 )
 
@@ -66,7 +67,9 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 	}
 	rep := Report{Warnings: []Finding{}, Errors: []ReadError{}, Projects: []Project{}}
 	failed := 0
-	if h.measure != nil {
+	// With no host state there is no record to compare, and the note
+	// says the one thing to run.
+	if h.measure != nil && h.store != nil {
 		failed += readToolchain(ctx, h, &rep)
 	}
 	note := ""
@@ -75,10 +78,13 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		note = "no host state: run romeu init, then romeu sync"
 	case len(names) == 0:
 		var err error
-		if names, err = h.store.ProjectNames(); err != nil {
-			return StatusIncomplete.Wrap(err, "the project records cannot be listed")
-		}
-		if len(names) == 0 {
+		names, err = h.store.ProjectNames()
+		switch {
+		case err != nil:
+			// The report goes on: the toolchain read above is still shown.
+			rep.Errors = append(rep.Errors, readError(readNames, err))
+			failed++
+		case len(names) == 0:
 			note = "no projects: run romeu sync"
 		}
 	}
@@ -152,7 +158,8 @@ func readError(what string, err error) ReadError {
 // line, the report's failed reads, the note (what to run when there is
 // no project), and one block per project, the name on its own line and
 // each section's lines below it, then the findings and the failed
-// reads. A warning goes to stderr as every warning does (04 4.1).
+// reads. A warning of the report goes to stderr, as 04 4.1 prints a
+// warning; a finding is part of its project's block and goes to stdout.
 func write(env *cli.Env, rep Report, note string) error {
 	if env.JSON {
 		b, err := json.Marshal(rep, json.Deterministic(true))
@@ -164,12 +171,15 @@ func write(env *cli.Env, rep Report, note string) error {
 	}
 	for _, w := range rep.Warnings {
 		// Each slug is printed by its literal, which the check of the
-		// warning slugs against 04 4.1 reads (TestWarningSlugs).
+		// warning slugs against 04 4.1 reads (TestWarningSlugs); a slug a
+		// later section adds without its case still prints, never stops.
 		switch w.Slug {
 		case "sbx-untested":
-			cli.Warn(env.Stderr, "sbx-untested", line(w.Message))
+			cli.Warn(env.Stderr, "sbx-untested", w.Message)
 		default:
-			panic("status: a warning with no literal of its own: " + w.Slug)
+			if _, err := fmt.Fprintf(env.Stderr, "warning %s: %s\n", w.Slug, line(w.Message)); err != nil {
+				return err
+			}
 		}
 	}
 	if err := writeToolchain(env.Stdout, rep.Toolchain); err != nil {

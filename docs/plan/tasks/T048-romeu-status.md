@@ -64,7 +64,10 @@ is the machine's and not a project's, whatever REQ-0327 lists per
 project. Slice D: the command file, `import_status.go`, the `versions`
 object of `romeu version --json` (which reads the settings too), the
 e2e cases, the J10 line and the schema `romeu-status.v1` (`formats`),
-once the report is whole. The
+once the report is whole; and the text of REQ-0327, REQ-0329 and the
+RJ-359 row amended for what slice C put at the head of the report (the
+toolchain, its warnings and the failed reads outside a project's
+block). The
 command file reads the host settings through the shared host paths of
 T169 and waits for it, so no third copy of the settings path exists;
 the newest stamp's dirty and stash counts (03 3.10) wait for T174,

@@ -19,9 +19,9 @@ import (
 
 // The reads of the toolchain.
 const (
-	readSbxVersion = "sbx version"
-	readToolchainM = "toolchain measure"
-	readToolchainR = "toolchain record"
+	readSbxVersion       = "sbx version"
+	readToolchainMeasure = "toolchain measure"
+	readToolchainRecord  = "toolchain record"
 )
 
 // readToolchain fills the toolchain of rep, gate 1's comparison
@@ -32,6 +32,8 @@ const (
 func readToolchain(ctx context.Context, h host, rep *Report) int {
 	tc := &Toolchain{State: ToolchainUnknown, Changes: []ToolchainChange{}}
 	rep.Toolchain = tc
+	// A failed sbx version often comes with a failed sbx ls; each is a
+	// read of its own and counts as one.
 	v, err := h.sbx.Version(ctx, sbxdrv.Opts{Step: "status"})
 	if err != nil {
 		rep.Errors = append(rep.Errors, readError(readSbxVersion, err))
@@ -46,13 +48,13 @@ func readToolchain(ctx context.Context, h host, rep *Report) int {
 	}
 	live, err := h.measure(v)
 	if err != nil {
-		rep.Errors = append(rep.Errors, readError(readToolchainM, err))
+		rep.Errors = append(rep.Errors, readError(readToolchainMeasure, err))
 		return 1
 	}
 	var rec *state.Toolchain
 	if h.store != nil {
 		if rec, err = approve.Load(h.store); err != nil {
-			rep.Errors = append(rep.Errors, readError(readToolchainR, err))
+			rep.Errors = append(rep.Errors, readError(readToolchainRecord, err))
 			return 1
 		}
 	}

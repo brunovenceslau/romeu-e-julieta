@@ -65,7 +65,8 @@ type Toolchain struct {
 	// Sbx is the live sbx version; absent when it was not read.
 	Sbx string `json:"sbx,omitzero"`
 	// Changes are the members whose live value differs from the record,
-	// in the order of 03 3.8; every member when none was acknowledged.
+	// in the order of 03 3.8; every member when none was acknowledged,
+	// and an empty list when the record holds the live toolchain.
 	Changes []ToolchainChange `json:"changes"`
 }
 
