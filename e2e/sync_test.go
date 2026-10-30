@@ -6,10 +6,14 @@
 package e2e
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json/v2"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -321,6 +325,157 @@ func (f syncFixture) liveTree(t *testing.T) map[string]romeu.Node {
 		}
 	}
 	return nodes
+}
+
+// hostileEntry is one entry of a tree object writeTree stores.
+type hostileEntry struct{ mode, name, oid string }
+
+// writeTree stores in the repository dir a tree object of the entries,
+// sorted as git sorts them, with hash-object --literally, which checks
+// nothing, so a tree no other git command would write can be built.
+func writeTree(t *testing.T, o *romeu.Origins, dir string, entries []hostileEntry) string {
+	t.Helper()
+	key := func(e hostileEntry) string {
+		if e.mode == "40000" {
+			return e.name + "/"
+		}
+		return e.name
+	}
+	slices.SortFunc(entries, func(a, b hostileEntry) int { return strings.Compare(key(a), key(b)) })
+	var b bytes.Buffer
+	for _, e := range entries {
+		raw, err := hex.DecodeString(e.oid)
+		require.NoError(t, err)
+		b.WriteString(e.mode + " " + e.name)
+		b.WriteByte(0)
+		b.Write(raw)
+	}
+	p := filepath.Join(t.TempDir(), "tree")
+	require.NoError(t, os.WriteFile(p, b.Bytes(), 0o600))
+	return strings.TrimSpace(o.Git(t, dir, "hash-object", "-w", "-t", "tree", "--literally", p))
+}
+
+// readTree returns the entries of the tree rev of the repository dir.
+func readTree(t *testing.T, o *romeu.Origins, dir, rev string) []hostileEntry {
+	t.Helper()
+	var out []hostileEntry
+	for rec := range strings.SplitSeq(strings.TrimSuffix(o.Git(t, dir, "ls-tree", "-z", rev), "\x00"), "\x00") {
+		meta, name, ok := strings.Cut(rec, "\t")
+		require.True(t, ok, rec)
+		f := strings.Fields(meta)
+		require.Len(t, f, 3, rec)
+		// ls-tree prints a tree's mode 040000; a tree object stores
+		// 40000, and fsck refuses the zero-padded form.
+		out = append(out, hostileEntry{strings.TrimPrefix(f[0], "0"), name, f[2]})
+	}
+	return out
+}
+
+// hostileConfig is a work clone of the config repo owner/cfg whose
+// commit main adds the personal kit mine to foo's spec.
+type hostileConfig struct {
+	o    *romeu.Origins
+	work string
+	// base is that commit, and blob a blob of it.
+	base, blob string
+}
+
+// newHostileConfig clones owner/cfg, commits fooWithMine and the
+// descriptor of mine on main, and pushes nothing.
+func newHostileConfig(t *testing.T, o *romeu.Origins) hostileConfig {
+	t.Helper()
+	h := hostileConfig{o: o, work: filepath.Join(t.TempDir(), "cfg")}
+	o.Git(t, filepath.Dir(h.work), "clone", "-q", o.Bare("owner/cfg"), h.work)
+	for p, data := range map[string]string{"projects/foo.yaml": fooWithMine, "kits/mine/mine.yaml": mineKit} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(h.work, p)), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(h.work, p), []byte(data), 0o600))
+	}
+	o.Git(t, h.work, "add", "-A")
+	o.Git(t, h.work, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "mine")
+	h.base = strings.TrimSpace(o.Git(t, h.work, "rev-parse", "HEAD"))
+	h.blob = strings.TrimSpace(o.Git(t, h.work, "rev-parse", "HEAD:kits/mine/mine.yaml"))
+	return h
+}
+
+// commit returns a child of base whose kit mine also holds extra.
+func (h hostileConfig) commit(t *testing.T, extra ...hostileEntry) string {
+	t.Helper()
+	mine := writeTree(t, h.o, h.work, append(readTree(t, h.o, h.work, h.base+":kits/mine"), extra...))
+	kits := writeTree(t, h.o, h.work, []hostileEntry{{"40000", "mine", mine}})
+	var root []hostileEntry
+	for _, e := range readTree(t, h.o, h.work, h.base) {
+		if e.name == "kits" {
+			e.oid = kits
+		}
+		root = append(root, e)
+	}
+	tree := writeTree(t, h.o, h.work, root)
+	return strings.TrimSpace(h.o.Git(t, h.work, "commit-tree", tree, "-p", h.base, "-m", "hostile"))
+}
+
+// TestSyncHostileKit is the E case of I27 for each hostile entry: a
+// config commit whose personal kit mine holds the entry, pushed to a
+// branch of the origin and named with --from, makes sync fail before a
+// file is written outside .romeu/candidates/, with no candidate dir
+// left. The walk of step 6 refuses a symbolic link, a gitlink and the
+// two collisions with kit-refused, and git fsck --strict at step 3 a
+// stored mode 100664, each exit 2. The fetch of step 2 already refuses
+// a .GIT name, a .git with a U+200C inserted after the dot and a ".."
+// name, since gitsafe fetches with fsck on; today that refusal is the
+// error internal (RJ-348), exit 1, and its own id and exit 2 are T188's
+// (decided on 2026-10-30), so those cases assert the refusal and not
+// its exit. The cases share one fixture: each refusal leaves it as the
+// approval did, and each case deletes its branch, since the next one
+// fetches every branch of the origin.
+func TestSyncHostileKit(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+	f.approveFoo(t)
+	h := newHostileConfig(t, f.o)
+	gitlink := func() string {
+		sub := writeTree(t, f.o, h.work, []hostileEntry{{"100644", "a", h.blob}})
+		return strings.TrimSpace(f.o.Git(t, h.work, "commit-tree", sub, "-m", "sub"))
+	}
+	tests := []struct {
+		name  string
+		extra []hostileEntry
+		// code is the exit, 0 for a refusal whose exit is T188's.
+		code int
+		want []string
+	}{
+		{"symbolic link", []hostileEntry{{"120000", "link", h.blob}}, 2, []string{"kit-refused", "symbolic link"}},
+		{"gitlink", []hostileEntry{{"160000", "module", gitlink()}}, 2, []string{"kit-refused", "gitlink"}},
+		{"case collision", []hostileEntry{{"100644", "README", h.blob}, {"100644", "readme", h.blob}}, 2, []string{"kit-refused", "are one path"}},
+		{"normalization collision", []hostileEntry{{"100644", "caf\u00e9", h.blob}, {"100644", "cafe\u0301", h.blob}}, 2, []string{"kit-refused", "are one path"}},
+		{".GIT", []hostileEntry{{"100644", ".GIT", h.blob}}, 0, []string{"fsck error"}},
+		{".git with an HFS-ignorable character", []hostileEntry{{"100644", ".\u200cgit", h.blob}}, 0, []string{"fsck error"}},
+		{"dot dot", []hostileEntry{{"100644", "..", h.blob}}, 0, []string{"fsck error"}},
+		{"mode 100664", []hostileEntry{{"100664", "a", h.blob}}, 2, []string{"fsck"}},
+	}
+	before := f.liveTree(t)
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sha := h.commit(t, tt.extra...)
+			branch := fmt.Sprintf("refs/heads/hostile-%d", i)
+			f.o.Git(t, h.work, "push", "-q", "origin", sha+":"+branch)
+
+			res := f.e.Run(t, []string{"sync", "--from", sha, "foo"})
+
+			if tt.code != 0 {
+				assert.Equal(t, tt.code, res.Code, res.Stderr)
+			} else {
+				assert.NotEqual(t, 0, res.Code, res.Stderr)
+			}
+			for _, w := range tt.want {
+				assert.Contains(t, res.Stderr, w)
+			}
+			assert.Equal(t, before, f.liveTree(t), "nothing is written outside .romeu/candidates/")
+			assert.Empty(t, f.candidates(t))
+			// The next case fetches every branch of the origin, and an
+			// object fsck refuses would stop its fetch.
+			f.o.Git(t, h.work, "push", "-q", "origin", ":"+branch)
+		})
+	}
 }
 
 // TestSyncHostileKitDeliveredByABundle is the bundle case of I27: a
