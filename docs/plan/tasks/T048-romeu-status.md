@@ -70,6 +70,9 @@ needs and names who unifies it.
   10.3).
 - Operator: no.
 - Acceptance:
+  - The report's sections register from their own files through
+    `status/sections.go` (rule 14 of `docs/plan.md`), the seam T066
+    and T080 add a file to.
   - On fixtures of host state, `status --json` reports, without taking
     the lock: drift, an interrupted promotion, a stale toolchain, an
     orphaned project and an orphaned repo dir, the sandbox state, spec

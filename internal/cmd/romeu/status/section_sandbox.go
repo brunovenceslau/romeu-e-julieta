@@ -33,6 +33,8 @@ var _ = register(section{
 		if src.record == nil || len(src.record.Generations) == 0 {
 			return
 		}
+		// A generation that is not closed is the last of the record (the
+		// reader refuses one anywhere else), so a removing one is the last.
 		if g := src.record.Generations[len(src.record.Generations)-1]; g.State == state.GenerationRemoving {
 			p.Findings = append(p.Findings, Finding{
 				Slug:    "removal-pending",

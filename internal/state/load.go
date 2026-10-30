@@ -233,7 +233,8 @@ func (s *Store) GetDescriptor(digest string) (*Descriptor, error) {
 // local kit's entry has no workload and never matches, and neither does
 // an empty workload or platform.
 func (s *Store) FindDescriptor(workload, platform string) (*Descriptor, error) {
-	if workload == "" || platform == "" {
+	if workload == "" || platform == "" || s.descriptors == nil {
+		// A descriptors/ that OpenRead found absent holds no entry.
 		return nil, descriptorAbsent(workload, platform)
 	}
 	dir := filepath.Join(s.dir, descriptorsDir)

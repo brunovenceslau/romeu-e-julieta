@@ -16,6 +16,17 @@ const (
 	SandboxUnknown = "unknown"
 )
 
+// The states of a project's record in host state.
+const (
+	// RecordPresent: the record reads.
+	RecordPresent = "present"
+	// RecordAbsent: no record, so the project was never synced.
+	RecordAbsent = "absent"
+	// RecordUnreadable: the record did not read; the block's errors say
+	// why.
+	RecordUnreadable = "unreadable"
+)
+
 // Report is the document of romeu status --json (04 4.2, REQ-0327): one
 // block per project, in name order. Its schema, romeu-status.v1, is
 // generated once the report is whole (T048, the last slice).
@@ -28,6 +39,8 @@ type Report struct {
 type Project struct {
 	// Name is the project's name.
 	Name string `json:"name"`
+	// Record is the state of its record: present, absent or unreadable.
+	Record string `json:"record"`
 	// Sandbox is the sandbox's state: what sbx ls --json says (running,
 	// stopped), absent, or unknown when the listing failed.
 	Sandbox string `json:"sandbox"`

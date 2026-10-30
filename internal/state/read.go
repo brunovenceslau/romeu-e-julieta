@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -27,7 +28,7 @@ var ErrReadOnly = errors.New("state: the store is open to read; it takes no lock
 func OpenRead(dir string) (*Store, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return nil, fmt.Errorf("state: %w", err)
+		return nil, fmt.Errorf("state: opening %s: %w", dir, err)
 	}
 	s := &Store{dir: dir, root: root, readOnly: true}
 	for _, sub := range []struct {
@@ -40,7 +41,7 @@ func OpenRead(dir string) (*Store, error) {
 		}
 		if err != nil {
 			_ = s.Close()
-			return nil, fmt.Errorf("state: %w", err)
+			return nil, fmt.Errorf("state: opening %s: %w", filepath.Join(dir, sub.name), err)
 		}
 		*sub.into = r
 	}
@@ -48,30 +49,40 @@ func OpenRead(dir string) (*Store, error) {
 }
 
 // ProjectNames returns the name of each project record under projects/,
-// in name order: each regular file <name>.json whose name passes the
-// rule of 03 3.1. A dotfile, such as the temporary file an interrupted
-// atomic write leaves (.shop.json123), any other name and anything but a
-// regular file are left out (T048, decided on 2026-10-22).
+// in name order: each entry <name>.json whose name passes the rule of
+// 03 3.1, whatever its type, so a record damaged into a directory, a
+// pipe or a link keeps its name and LoadProject reports it as
+// record-unreadable (REQ-0329). A dotfile, such as the temporary file
+// an interrupted atomic write leaves (.shop.json123), is left out (T048,
+// decided on 2026-10-22), and so is a name romeu never writes, one the
+// rule of 03 3.1 refuses (Shop.json): no project has it, so no block
+// can hold it.
 func (s *Store) ProjectNames() ([]string, error) {
 	if s.projects == nil {
 		return nil, nil
 	}
+	dir := filepath.Join(s.dir, projectsDir)
 	f, err := s.projects.Open(".")
 	if err != nil {
-		return nil, fmt.Errorf("state: %w", err)
+		return nil, fmt.Errorf("state: listing %s: %w", dir, err)
 	}
 	defer func() { _ = f.Close() }()
 	entries, err := f.ReadDir(-1)
 	if err != nil {
-		return nil, fmt.Errorf("state: %w", err)
+		return nil, fmt.Errorf("state: listing %s: %w", dir, err)
 	}
 	var names []string
 	for _, e := range entries {
 		name, ok := strings.CutSuffix(e.Name(), ".json")
-		if ok && e.Type().IsRegular() && checkName(name) == nil {
+		if ok && checkName(name) == nil {
 			names = append(names, name)
 		}
 	}
 	slices.Sort(names)
 	return names, nil
 }
+
+// CheckName returns an error that wraps ErrInvalidName unless name is a
+// project name by the rule of 03 3.1, the rule a record's file name
+// keeps, so a caller can refuse a name before it reads.
+func CheckName(name string) error { return checkName(name) }

@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,6 +61,10 @@ func TestOpenRead(t *testing.T) {
 		require.ErrorIs(t, err, fs.ErrNotExist)
 		_, err = s.LoadToolchain()
 		require.ErrorIs(t, err, fs.ErrNotExist)
+		_, err = s.GetDescriptor("sha256:" + strings.Repeat("a", 64))
+		require.ErrorIs(t, err, fs.ErrNotExist)
+		_, err = s.FindDescriptor("sha256:"+strings.Repeat("b", 64), "linux/arm64")
+		require.ErrorIs(t, err, fs.ErrNotExist, "an absent descriptors/ holds no descriptor")
 		assert.Equal(t, before, tree(t, dir), "the mode 0755 stays for doctor to report")
 	})
 	t.Run("a store opened to read cannot be locked", func(t *testing.T) {
@@ -107,10 +113,39 @@ func TestStoreProjectNames(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(projects, name), []byte("{}"), FileMode))
 	}
 	require.NoError(t, os.Mkdir(filepath.Join(projects, "dir.json"), DirMode))
+	require.NoError(t, syscall.Mkfifo(filepath.Join(projects, "pipe.json"), uint32(FileMode)))
 	s, err := OpenRead(dir)
 	require.NoError(t, err)
 	defer func() { require.NoError(t, s.Close()) }()
 	names, err := s.ProjectNames()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"blog", "shop"}, names, "dotfiles, other names and directories are left out")
+	assert.Equal(t, []string{"blog", "dir", "pipe", "shop"}, names,
+		"a damaged record keeps its name, so its load reports it; dotfiles and names romeu never writes are left out")
+	for _, name := range []string{"dir", "pipe"} {
+		_, err := s.LoadProject(name)
+		require.ErrorIs(t, err, ErrInvalid, name+" is no regular file and reads as record-unreadable")
+	}
+}
+
+func TestOpenReadOfAnUnreadableProjectsDirectory(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a directory of mode 0300")
+	}
+	dir := t.TempDir()
+	seed(t, dir, "shop")
+	projects := filepath.Join(dir, projectsDir)
+	require.NoError(t, os.Chmod(projects, 0o300))
+	t.Cleanup(func() { _ = os.Chmod(projects, DirMode) })
+	_, err := OpenRead(dir)
+	require.ErrorIs(t, err, fs.ErrPermission)
+	require.ErrorContains(t, err, "state: opening "+projects)
+}
+
+func TestCheckName(t *testing.T) {
+	t.Parallel()
+	require.NoError(t, CheckName("shop"))
+	for _, name := range []string{"", "../x", "Shop", "a/b"} {
+		require.ErrorIs(t, CheckName(name), ErrInvalidName, name)
+	}
 }

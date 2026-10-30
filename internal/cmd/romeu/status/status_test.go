@@ -7,7 +7,10 @@ package status
 
 import (
 	"bytes"
+	"context"
 	"encoding/json/v2"
+	"errors"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,6 +69,7 @@ func TestRunReportsTheHostStateOfEveryProject(t *testing.T) {
 	assert.True(t, blog.Generations[0].Adopted)
 	assert.Equal(t, "closed-lost", blog.Generations[0].State)
 	assert.Equal(t, "lost", blog.Generations[0].Salvage[0].Result)
+	assert.Equal(t, RecordPresent, shop.Record)
 	assert.Equal(t, "running", shop.Sandbox)
 	require.Len(t, shop.Generations, 2)
 	assert.Equal(t, gen2, shop.Generations[1].ID, "generations in record order, the newest last")
@@ -112,8 +116,12 @@ func TestRunProjectWithoutRecord(t *testing.T) {
 	rep := decode(t, out)
 	require.Len(t, rep.Projects, 1)
 	assert.Equal(t, SandboxAbsent, rep.Projects[0].Sandbox)
+	assert.Equal(t, RecordAbsent, rep.Projects[0].Record)
 	assert.Empty(t, rep.Projects[0].Generations)
 	assert.Empty(t, rep.Projects[0].Errors, "a project never synced has no record, which is no failed read")
+	out, _, err = output(t, dir, fakeSbx{}, false, "shop")
+	require.NoError(t, err)
+	assert.Equal(t, "shop\n  record: absent, the project was never synced\n  sandbox: absent\n", out)
 }
 
 func TestRunReportsRemovalPending(t *testing.T) {
@@ -159,6 +167,7 @@ func TestRunGoesOnPastAFailedRead(t *testing.T) {
 			out, _, err := output(t, dir, sbx, tt.jsonOut)
 			require.Error(t, err)
 			assert.Equal(t, StatusIncomplete.ID, cli.Of(err).ID)
+			assert.Contains(t, err.Error(), "2 read(s) failed", "the one listing of sbx counts once, though each block shows it")
 			assert.Equal(t, 1, cli.ExitCode(err), "a failed read exits 1, never 3")
 			if !tt.jsonOut {
 				assert.Contains(t, out, "  error RJ-334 record-unreadable (project record): ")
@@ -169,6 +178,7 @@ func TestRunGoesOnPastAFailedRead(t *testing.T) {
 			rep := decode(t, out)
 			require.Len(t, rep.Projects, 2)
 			blog, shop := rep.Projects[0], rep.Projects[1]
+			assert.Equal(t, RecordUnreadable, blog.Record)
 			require.Len(t, blog.Errors, 2)
 			assert.Equal(t, ReadError{ID: "RJ-334", Slug: "record-unreadable", Read: "project record", Message: blog.Errors[0].Message}, blog.Errors[0])
 			assert.Equal(t, "sbx ls", blog.Errors[1].Read)
@@ -186,4 +196,83 @@ func TestRunNoHostState(t *testing.T) {
 	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out)}
 	require.NoError(t, run(t.Context(), env, host{sbx: fakeSbx{}}, nil))
 	assert.Equal(t, "no host state: run romeu init, then romeu sync\n", out.String())
+}
+
+func TestRunRefusesAName(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, world(t), nil)
+	out, _, err := output(t, dir, fakeSbx{}, false, "shop", "../x")
+	require.Error(t, err)
+	assert.Equal(t, cli.Usage.ID, cli.Of(err).ID)
+	assert.Equal(t, 2, cli.ExitCode(err))
+	assert.Empty(t, out, "a refused argument prints no report")
+}
+
+func TestRunGivesAReadWithNoRowItsOwnID(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, world(t), nil)
+	out, _, err := output(t, dir, fakeSbx{err: errors.New("boom")}, true, "shop")
+	require.Error(t, err)
+	assert.Equal(t, []ReadError{{ID: StatusIncomplete.ID, Slug: StatusIncomplete.Slug, Read: "sbx ls", Message: "boom"}}, decode(t, out).Projects[0].Errors)
+}
+
+func TestRunWritesNothing(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, world(t), map[string]string{"blog": "{"})
+	require.NoError(t, os.Chmod(dir, 0o755))
+	before := snapshot(t, dir)
+	_, _, err := output(t, dir, fakeSbx{list: []sbxdrv.Sandbox{{Name: "shop", Status: "running"}}}, false)
+	require.Error(t, err, "the record of blog does not decode")
+	assert.Equal(t, before, snapshot(t, dir), "no file, mode or lock changes, the mode doctor reports included")
+}
+
+func TestRunKeepsAHostileMessageOnItsLine(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, world(t), nil)
+	sbx := fakeSbx{err: errors.New("boom\n  error RJ-999 forged (x): y\x1b[2J\xff")}
+	t.Run("text", func(t *testing.T) {
+		t.Parallel()
+		out, _, err := output(t, dir, sbx, false, "shop")
+		require.Error(t, err)
+		assert.NotContains(t, out, "\n  error RJ-999", "the line feed is written as two characters")
+		assert.NotContains(t, out, "\x1b", "the writer escapes the escape byte")
+		assert.Contains(t, out, `boom\n  error RJ-999 forged`)
+	})
+	t.Run("json", func(t *testing.T) {
+		t.Parallel()
+		out, _, err := output(t, dir, sbx, true, "shop")
+		assert.Equal(t, 1, cli.ExitCode(err), "a byte that is not UTF-8 loses no report")
+		assert.Contains(t, decode(t, out).Projects[0].Errors[0].Message, "\uFFFD")
+	})
+}
+
+func TestRunNoProjects(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, nil, nil)
+	out, _, err := output(t, dir, fakeSbx{err: errors.New("not called")}, false)
+	require.NoError(t, err, "with no project, sbx is not listed")
+	assert.Equal(t, "no projects: run romeu sync\n", out)
+}
+
+func TestRunNamesWithNoHostState(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
+	require.NoError(t, run(t.Context(), env, host{sbx: fakeSbx{}}, []string{"shop"}))
+	rep := decode(t, out.String())
+	require.Len(t, rep.Projects, 1)
+	assert.Equal(t, RecordAbsent, rep.Projects[0].Record)
+}
+
+func TestRunStopsOnACancelledContext(t *testing.T) {
+	t.Parallel()
+	dir := stateDir(t, world(t), nil)
+	store, err := state.OpenRead(dir)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, store.Close()) }()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out)}
+	require.ErrorIs(t, run(ctx, env, host{store: store, sbx: fakeSbx{}}, nil), context.Canceled)
 }

@@ -56,25 +56,44 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		_, err := fmt.Fprintln(env.Stdout, "no host state: run romeu init, then romeu sync")
 		return err
 	}
+	for _, name := range names {
+		if err := state.CheckName(name); err != nil {
+			return cli.Usage.New(fmt.Sprintf("%q is not a project name (03 3.1)", name))
+		}
+	}
 	if len(names) == 0 {
 		var err error
 		if names, err = h.store.ProjectNames(); err != nil {
 			return StatusIncomplete.Wrap(err, "the project records cannot be listed")
 		}
+		if len(names) == 0 && !env.JSON {
+			_, err := fmt.Fprintln(env.Stdout, "no projects: run romeu sync")
+			return err
+		}
 	}
-	sandboxes, listErr := h.sbx.List(ctx, sbxdrv.Opts{Step: "status"})
 	rep := Report{Projects: []Project{}}
+	if len(names) == 0 {
+		return write(env, rep)
+	}
+	// sbx is listed once; a failed listing is shown in every block, the
+	// read each block depends on, and counts as one failed read.
+	sandboxes, listErr := h.sbx.List(ctx, sbxdrv.Opts{Step: "status"})
 	failed := 0
+	if listErr != nil {
+		failed++
+	}
 	for _, name := range names {
 		p := Project{Name: name, Generations: []Generation{}, Findings: []Finding{}, Errors: []ReadError{}}
-		src := &source{name: name, sandboxes: sandboxes, listed: listErr == nil}
+		src := &source{name: name, recorded: RecordAbsent, sandboxes: sandboxes, listed: listErr == nil}
 		if h.store != nil {
 			record, err := h.store.LoadProject(name)
 			switch {
 			case err == nil:
-				src.record = record
+				src.record, src.recorded = record, RecordPresent
 			case !errors.Is(err, fs.ErrNotExist):
+				src.recorded = RecordUnreadable
 				p.Errors = append(p.Errors, readError(readRecord, err))
+				failed++
 			}
 		}
 		if listErr != nil {
@@ -83,7 +102,6 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		for _, s := range sections {
 			s.fill(ctx, src, &p)
 		}
-		failed += len(p.Errors)
 		rep.Projects = append(rep.Projects, p)
 	}
 	if err := write(env, rep); err != nil {
@@ -96,12 +114,16 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 }
 
 // readError returns the failed read of what by its error: the error's
-// own row, or status-incomplete for an error that carries none.
+// own row, or status-incomplete for an error that carries none. The
+// message is made valid UTF-8, since a byte that is not would stop the
+// JSON encoder and lose the whole report.
 func readError(what string, err error) ReadError {
+	r := ReadError{ID: StatusIncomplete.ID, Slug: StatusIncomplete.Slug, Read: what, Message: err.Error()}
 	if e, ok := errors.AsType[*cli.Error](err); ok {
-		return ReadError{ID: e.ID, Slug: e.Slug, Read: what, Message: e.Error()}
+		r.ID, r.Slug = e.ID, e.Slug
 	}
-	return ReadError{ID: StatusIncomplete.ID, Slug: StatusIncomplete.Slug, Read: what, Message: err.Error()}
+	r.Message = strings.ToValidUTF8(r.Message, "\uFFFD")
+	return r
 }
 
 // write prints rep: one JSON document with env.JSON, else one block per

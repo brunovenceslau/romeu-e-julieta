@@ -8,6 +8,8 @@ package status
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -110,4 +112,23 @@ func output(t *testing.T, dir string, f fakeSbx, jsonOut bool, names ...string) 
 	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut), JSON: jsonOut}
 	err = run(t.Context(), env, host{store: store, sbx: f}, names)
 	return out.String(), errOut.String(), err
+}
+
+// snapshot returns the path, mode and size of every entry below dir, dir
+// included, so a test can show that status changed nothing.
+func snapshot(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	got := map[string]string{}
+	require.NoError(t, filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		got[p] = fmt.Sprintf("%v %d", info.Mode(), info.Size())
+		return nil
+	}))
+	return got
 }
