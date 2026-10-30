@@ -11,6 +11,8 @@ owns:
   - internal/cmd/romeu/sync/step1_lock.go
   - docs/spec/02-layouts.md
   - docs/spec/12-engineering.md
+  - docs/spec/10-testing-style.md
+  - tools/ci/internal/imports/rows.go
 needs:
   - T041
   - T042
@@ -62,6 +64,12 @@ requires of a package under `internal/`. The memory push
 still builds the settings path; the call-site test lists it as
 pending, and its one-line move to `hostpaths.SettingsPath` lands in a
 change of its own.
+
+Re-plan (2026-10-30, scope this repository): the new package needs its
+row in the import table of 10 10.7 (REQ-0972), so T169 also owns the
+REQ-0968 row of `docs/spec/10-testing-style.md`, which T170 owns too,
+and `tools/ci/internal/imports/rows.go` (ask-first `checks`), which
+mirrors that table; the change only adds `hostpaths` to the row.
 
 - Implements: REQ-1277 (04 4.2), REQ-1281 (05 5.2), REQ-1282 (05 5.2).
 - Operator: no.
