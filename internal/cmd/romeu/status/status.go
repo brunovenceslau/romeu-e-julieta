@@ -108,6 +108,8 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		for _, s := range sections {
 			s.fill(ctx, src, &p)
 		}
+		// The listing's error was put in this block before the sections
+		// ran, and is counted once, above.
 		failed += len(p.Errors) - shared
 		rep.Projects = append(rep.Projects, p)
 	}

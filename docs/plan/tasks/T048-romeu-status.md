@@ -12,6 +12,7 @@ owns:
   - internal/state/lock.go
   - internal/state/load.go
   - internal/render/live.go
+  - internal/render/drift.go
   - internal/render/live_test.go
   - internal/cmd/romeu/version/versions.go
   - internal/cmd/romeu/all/import_status.go
@@ -52,8 +53,8 @@ for a report printed with a failed read (REQ-0329); host state is read
 through `state.OpenRead`, which makes, changes and locks nothing, so a
 mode `doctor` reports stays as found. Slice B1 (no git): the synced
 commit of the live render, drift, the interrupted promotion and
-recreate needed, read through `render.ReadLive`, `render.CheckDrift`
-and the record, with the root of the trees injected until slice D.
+recreate needed, read once through `render.ReadLive` and `render.Drift`, which
+open no FIFO and wait on none, with the root of the trees injected until slice D.
 Slice B2 (git and the spec): the spec commit against the synced one,
 and the orphaned project and repo dir with their unpushed and
 salvage-only work. Slice C:
