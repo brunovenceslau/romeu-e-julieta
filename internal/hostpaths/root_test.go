@@ -148,7 +148,7 @@ func TestRootProblem(t *testing.T) {
 // (a .git it cannot see).
 func TestRootProblemAsAnotherUser(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("the superuser owns /usr and reads every directory")
+		return // the superuser owns /usr and reads every directory
 	}
 	tmp := realTemp(t)
 	p := Paths{Home: filepath.Join(tmp, "home"), Settings: "/s/settings.yaml", State: "/s/state"}

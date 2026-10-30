@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/moduleroot"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
 
@@ -134,10 +133,10 @@ var pendingSettingsSites = []string{
 // SettingsPath. A dot import of internal/spec is refused, since its bare
 // names would escape the scan.
 func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
-	wd, err := os.Getwd()
+	// The test runs in internal/hostpaths, two levels below the root.
+	root, err := filepath.Abs(filepath.Join("..", ".."))
 	require.NoError(t, err)
-	root, err := moduleroot.Find(wd)
-	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(root, "go.mod"))
 	specPath := reflect.TypeFor[spec.HostSettings]().PkgPath()
 
 	var found []string
