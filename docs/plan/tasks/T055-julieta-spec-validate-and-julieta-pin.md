@@ -34,7 +34,8 @@ Goal: `julieta spec validate` and `julieta pin`.
 Re-plan (2026-10-12): Kept. It feeds the config repo's `validate.yml`.
 Its J2 step lives in its own file, `e2e/scenarios/j2/step1_*.go`, in the
 directory T043 owns, so this task comes `after` T043 (rule 1 of
-`docs/plan.md`).
+`docs/plan.md`). Since 2026-10-30 T043 is in `needs` instead
+(the re-plan below).
 
 Re-plan (2026-10-22): Changed, decided by the maintainer. This task
 takes from T021 the example workflow

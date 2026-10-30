@@ -425,8 +425,8 @@ func (h hostileConfig) commit(t *testing.T, extra ...hostileEntry) string {
 // error internal (RJ-348), exit 1, and its own id and exit 2 are T188's
 // (decided on 2026-10-30), so those cases assert the refusal and not
 // its exit. The cases share one fixture: each refusal leaves it as the
-// approval did, and each case deletes its branch, since the next one
-// fetches every branch of the origin.
+// approval did, and each case deletes its branch from the origin,
+// since the next one fetches every branch of it.
 func TestSyncHostileKit(t *testing.T) {
 	t.Parallel()
 	f := newSyncFixture(t)
@@ -450,7 +450,7 @@ func TestSyncHostileKit(t *testing.T) {
 		{".GIT", []hostileEntry{{"100644", ".GIT", h.blob}}, 0, []string{"fsck error"}},
 		{".git with an HFS-ignorable character", []hostileEntry{{"100644", ".\u200cgit", h.blob}}, 0, []string{"fsck error"}},
 		{"dot dot", []hostileEntry{{"100644", "..", h.blob}}, 0, []string{"fsck error"}},
-		{"mode 100664", []hostileEntry{{"100664", "a", h.blob}}, 2, []string{"fsck"}},
+		{"mode 100664", []hostileEntry{{"100664", "a", h.blob}}, 2, []string{"spec-commit-unsafe", "badFilemode"}},
 	}
 	before := f.liveTree(t)
 	for i, tt := range tests {
@@ -458,6 +458,11 @@ func TestSyncHostileKit(t *testing.T) {
 			sha := h.commit(t, tt.extra...)
 			branch := fmt.Sprintf("refs/heads/hostile-%d", i)
 			f.o.Git(t, h.work, "push", "-q", "origin", sha+":"+branch)
+			// The next case fetches every branch of the origin, and an
+			// object fsck refuses would stop its fetch, so the branch
+			// goes even when the case fails; the clone keeps its copy
+			// under refs/romeu/origin/, which no later case reads.
+			defer f.o.Git(t, h.work, "push", "-q", "origin", ":"+branch)
 
 			res := f.e.Run(t, []string{"sync", "--from", sha, "foo"})
 
@@ -471,9 +476,6 @@ func TestSyncHostileKit(t *testing.T) {
 			}
 			assert.Equal(t, before, f.liveTree(t), "nothing is written outside .romeu/candidates/")
 			assert.Empty(t, f.candidates(t))
-			// The next case fetches every branch of the origin, and an
-			// object fsck refuses would stop its fetch.
-			f.o.Git(t, h.work, "push", "-q", "origin", ":"+branch)
 		})
 	}
 }

@@ -231,7 +231,8 @@ sibling clauses.
     is T174's).
   - A personal kit with each hostile entry of I27 fails `sync` before a
     file is written outside `.romeu/candidates/`, on the macOS runners
-    too, selected by the runner table of 10 10.2; a hostile tree
+    too, selected by the runner table of 10 10.2 (the macOS run moved
+    to T170 on 2026-10-30); a hostile tree
     delivered by a bundle is refused as `--from <sha>`, and refused by
     the walk when made reachable (I27); adding a capability to a kit
     flips gate 2 (I28).
@@ -247,10 +248,11 @@ sibling clauses.
     of `internal/manifest` (T135); a spec that sets `julietaBin` is a
     sync error naming the key.
   - `sync` warns `julieta-pin-mismatch` when `validate.yml` pins another
-    julieta.
+    julieta: moved to T055 on 2026-10-30.
   - A romeu built with plain `go build` exits 2 with
     `julieta-not-embedded` on `sync` and `run`, and `status`, `doctor`
-    and `version` work.
+    and `version` work: `sync` and `version` here, `run`, `status` and
+    `doctor` moved to T066, T048 and T049 on 2026-10-30.
   - The e2e harness builds romeu through the host-native embedded
     build of `tools/release`, and a J2 `sync` passes step 1 with the
     julieta it embeds.
