@@ -99,9 +99,12 @@ func TestRunReportsTheTree(t *testing.T) {
 			findings: []Finding{},
 		},
 		{
-			name:     "a tree that matches its render",
-			records:  live(false),
-			setup:    func(t *testing.T, root string) { tree(t, root, created, nil) },
+			name:    "a tree that matches its render",
+			records: live(false),
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+				tree(t, root, created, nil)
+			},
 			commit:   specCommit,
 			findings: []Finding{},
 		},
@@ -109,6 +112,7 @@ func TestRunReportsTheTree(t *testing.T) {
 			name:    "a drifted live file",
 			records: live(false),
 			setup: func(t *testing.T, root string) {
+				t.Helper()
 				env := tree(t, root, created, nil)
 				require.NoError(t, os.WriteFile(filepath.Join(env, render.LiveEnvFile), []byte("edited\n"), 0o600))
 			},
@@ -120,6 +124,7 @@ func TestRunReportsTheTree(t *testing.T) {
 			name:    "an interrupted promotion, which no drift is read for",
 			records: live(false),
 			setup: func(t *testing.T, root string) {
+				t.Helper()
 				env := tree(t, root, created, func(r *render.Record) {
 					r.Promoting = &render.Promoting{CandidateID: id(t, slv1), FilesDigest: canon.Sum[canon.CandidateFilesKind]{4}, PreviousFiles: map[string]string{}}
 				})
@@ -129,16 +134,22 @@ func TestRunReportsTheTree(t *testing.T) {
 			findings: []Finding{{Slug: "interrupted-promotion", Message: "the promotion of candidate " + slv1 + " was interrupted; the next romeu sync shop recovers it"}},
 		},
 		{
-			name:     "a live render the open generation was not created with",
-			records:  live(false),
-			setup:    func(t *testing.T, root string) { tree(t, root, other, nil) },
+			name:    "a live render the open generation was not created with",
+			records: live(false),
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+				tree(t, root, other, nil)
+			},
 			commit:   specCommit,
 			findings: []Finding{{Slug: "recreate-needed", Message: "generation " + gen2 + " was created with another recreate digest than the live render's; run romeu recreate shop"}},
 		},
 		{
-			name:     "an adopted generation is not compared",
-			records:  live(true),
-			setup:    func(t *testing.T, root string) { tree(t, root, other, nil) },
+			name:    "an adopted generation is not compared",
+			records: live(true),
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+				tree(t, root, other, nil)
+			},
 			commit:   specCommit,
 			findings: []Finding{},
 		},
