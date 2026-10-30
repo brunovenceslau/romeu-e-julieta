@@ -24,60 +24,85 @@ import (
 	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/approve"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
-// lister lists the sandboxes of the host: sbxdrv.Runner.List.
-type lister interface {
+// sbxReader is what status asks sbx: the sandboxes of the host and the
+// live version, sbxdrv.Runner's List and Version.
+type sbxReader interface {
 	List(ctx context.Context, o sbxdrv.Opts) ([]sbxdrv.Sandbox, error)
+	Version(ctx context.Context, o sbxdrv.Opts) (sbxdrv.Release, error)
 }
 
 // host is what status reads: the state directory, open to read (nil
 // when there is none), the root that holds each project's <name>-env/
-// ("" when it is not known), and sbx.
+// ("" when it is not known), sbx, and the measure of the live toolchain
+// for a given sbx version, approve.Measure with this build's version
+// (nil leaves the toolchain out of the report).
 type host struct {
-	store *state.Store
-	root  string
-	sbx   lister
+	store   *state.Store
+	root    string
+	sbx     sbxReader
+	measure func(sbxdrv.Release) (approve.Live, error)
 }
 
 // The reads a block names in its errors.
 const (
 	readRecord = "project record"
+	readNames  = "project records"
 	readSbx    = "sbx ls"
 )
 
 // run prints the report of the projects names, or of every project with
 // a record when names is empty, to env.Stdout, as text or with env.JSON
-// as one document, and returns status-incomplete when a read failed.
+// as one document, and returns status-incomplete when a read failed. The
+// toolchain heads the report, being the machine's and not a project's.
 func run(ctx context.Context, env *cli.Env, h host, names []string) error {
-	if h.store == nil && len(names) == 0 {
-		if env.JSON {
-			return write(env, Report{Projects: []Project{}})
-		}
-		_, err := fmt.Fprintln(env.Stdout, "no host state: run romeu init, then romeu sync")
-		return err
-	}
 	for _, name := range names {
 		if err := state.CheckName(name); err != nil {
 			return cli.Usage.New(fmt.Sprintf("%q is not a project name (03 3.1)", name))
 		}
 	}
-	if len(names) == 0 {
+	rep := Report{Warnings: []Finding{}, Errors: []ReadError{}, Projects: []Project{}}
+	failed := 0
+	// With no host state there is no record to compare, and the note
+	// says the one thing to run.
+	if h.measure != nil && h.store != nil {
+		failed += readToolchain(ctx, h, &rep)
+	}
+	note := ""
+	switch {
+	case h.store == nil && len(names) == 0:
+		note = "no host state: run romeu init, then romeu sync"
+	case len(names) == 0:
 		var err error
-		if names, err = h.store.ProjectNames(); err != nil {
-			return StatusIncomplete.Wrap(err, "the project records cannot be listed")
-		}
-		if len(names) == 0 && !env.JSON {
-			_, err := fmt.Fprintln(env.Stdout, "no projects: run romeu sync")
-			return err
+		names, err = h.store.ProjectNames()
+		switch {
+		case err != nil:
+			// The report goes on: the toolchain read above is still shown.
+			rep.Errors = append(rep.Errors, readError(readNames, err))
+			failed++
+		case len(names) == 0:
+			note = "no projects: run romeu sync"
 		}
 	}
-	rep := Report{Projects: []Project{}}
-	if len(names) == 0 {
-		return write(env, rep)
+	if len(names) > 0 {
+		failed += readProjects(ctx, h, names, &rep)
 	}
+	if err := write(env, rep, note); err != nil {
+		return err
+	}
+	if failed > 0 {
+		return StatusIncomplete.New(fmt.Sprintf("%d read(s) failed; each is printed in the report", failed))
+	}
+	return ctx.Err()
+}
+
+// readProjects fills one block per project of names into rep and
+// returns how many reads failed.
+func readProjects(ctx context.Context, h host, names []string, rep *Report) int {
 	// sbx is listed once; a failed listing is shown in every block, the
 	// read each block depends on, and counts as one failed read.
 	sandboxes, listErr := h.sbx.List(ctx, sbxdrv.Opts{Step: "status"})
@@ -113,13 +138,7 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		failed += len(p.Errors) - shared
 		rep.Projects = append(rep.Projects, p)
 	}
-	if err := write(env, rep); err != nil {
-		return err
-	}
-	if failed > 0 {
-		return StatusIncomplete.New(fmt.Sprintf("%d read(s) failed; each is printed in its project's block", failed))
-	}
-	return ctx.Err()
+	return failed
 }
 
 // readError returns the failed read of what by its error: the error's
@@ -135,10 +154,13 @@ func readError(what string, err error) ReadError {
 	return r
 }
 
-// write prints rep: one JSON document with env.JSON, else one block per
-// project, the name on its own line and each section's lines below it,
-// then the findings and the failed reads.
-func write(env *cli.Env, rep Report) error {
+// write prints rep: one JSON document with env.JSON; else the toolchain
+// line, the report's failed reads, the note (what to run when there is
+// no project), and one block per project, the name on its own line and
+// each section's lines below it, then the findings and the failed
+// reads. A warning of the report goes to stderr, as 04 4.1 prints a
+// warning; a finding is part of its project's block and goes to stdout.
+func write(env *cli.Env, rep Report, note string) error {
 	if env.JSON {
 		b, err := json.Marshal(rep, json.Deterministic(true))
 		if err != nil {
@@ -146,6 +168,32 @@ func write(env *cli.Env, rep Report) error {
 		}
 		_, err = env.Stdout.Write(append(b, '\n'))
 		return err
+	}
+	for _, w := range rep.Warnings {
+		// Each slug is printed by its literal, which the check of the
+		// warning slugs against 04 4.1 reads (TestWarningSlugs); a slug a
+		// later section adds without its case still prints, never stops.
+		switch w.Slug {
+		case "sbx-untested":
+			cli.Warn(env.Stderr, "sbx-untested", w.Message)
+		default:
+			if _, err := fmt.Fprintf(env.Stderr, "warning %s: %s\n", w.Slug, line(w.Message)); err != nil {
+				return err
+			}
+		}
+	}
+	if err := writeToolchain(env.Stdout, rep.Toolchain); err != nil {
+		return err
+	}
+	for _, e := range rep.Errors {
+		if _, err := fmt.Fprintf(env.Stdout, "error %s %s (%s): %s\n", e.ID, e.Slug, e.Read, line(e.Message)); err != nil {
+			return err
+		}
+	}
+	if note != "" {
+		if _, err := fmt.Fprintln(env.Stdout, note); err != nil {
+			return err
+		}
 	}
 	for i := range rep.Projects {
 		p := &rep.Projects[i]
