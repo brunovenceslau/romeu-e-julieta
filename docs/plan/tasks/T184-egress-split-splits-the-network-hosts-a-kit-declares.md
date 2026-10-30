@@ -3,7 +3,7 @@ id: T184
 title: "egress.Split splits the network hosts a kit declares"
 milestone: M3
 module: egress
-fate: new
+fate: merged
 owns:
   - internal/egress/split*.go
   - docs/spec/07-mise-egress.md
@@ -12,6 +12,8 @@ after: []
 ask_first:
   - catalog
 sitting: none
+merged: 2026-10-29
+pr: 347
 ---
 
 # T184 - egress.Split splits the network hosts a kit declares

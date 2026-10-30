@@ -3,7 +3,7 @@ id: T183
 title: "gitsafe fetches the remote HEAD and lists the refs/romeu/origin namespace"
 milestone: M3
 module: gitsafe
-fate: new
+fate: merged
 owns:
   - internal/gitsafe/refs*.go
   - internal/gitsafe/fetch*.go
@@ -14,6 +14,8 @@ after: []
 ask_first:
   - gitsafe
 sitting: none
+merged: 2026-10-29
+pr: 342
 ---
 
 # T183 - gitsafe fetches the remote HEAD and lists the refs/romeu/origin namespace
