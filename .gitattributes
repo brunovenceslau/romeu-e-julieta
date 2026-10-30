@@ -42,6 +42,8 @@ docs/reference/julieta/memory/show.md -text
 docs/reference/julieta/salvage.md -text
 docs/reference/julieta/setup.md -text
 docs/reference/julieta/snapshot.md -text
+docs/reference/julieta/spec.md -text
+docs/reference/julieta/spec/validate.md -text
 docs/reference/julieta/status.md -text
 docs/reference/julieta/version.md -text
 docs/reference/manifest.md -text

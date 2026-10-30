@@ -38,6 +38,7 @@ julieta <command> [flags]
 * [julieta salvage](julieta/salvage.md) - capture every repo's unpushed work into its memory dir before the sandbox goes
 * [julieta setup](julieta/setup.md) - prepare the sandbox: the PATH link, the repos and their default branches
 * [julieta snapshot](julieta/snapshot.md) - bundle the unpushed work of a repo into its memory dir's snapshot/
+* [julieta spec](julieta/spec.md) - the spec commands
 * [julieta status](julieta/status.md) - print the state of the repos, the manifest, the recorded hook failures and julieta's warnings
 * [julieta version](julieta/version.md) - print the version of julieta
 

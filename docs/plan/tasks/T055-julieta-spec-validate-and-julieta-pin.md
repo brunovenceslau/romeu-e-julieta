@@ -54,6 +54,25 @@ it owns `step10_report.go` of `sync` and its test for it, and T043
 moves from `after` to `needs`. Decided by the operator on 2026-10-30,
 scope this repository.
 
+Re-plan (2026-10-30): built in slices, scope this repository. Slice A
+is `julieta spec validate` (`internal/cmd/julieta/spec/`,
+`import_spec.go`, `e2e/julieta_spec_test.go`): the first acceptance
+line, without `--json`, whose schema registration in `tools/ci` is
+outside this file set. A file under `projects/` that is not `*.yaml` is
+found by reading the directory of each file given in `projects/`,
+since the glob of the config repo's CI never names one. The manifest of
+the size check is built from the spec alone with stand-ins, the root
+`/` among them, a lower bound that sync measures again. `--catalog`
+reads each lock through a full clone with gitsafe, which has no
+shallow fetch yet. The other lines wait on files outside `owns`: `pin
+workload` and the "behind" of `pin check` on a tag-to-digest read
+through the guarded client of `internal/oci`; the reader of
+`validate.yml` that `romeu sync` calls on a package both binaries may
+link (10 10.7); `examples/.github/workflows/validate.yml` on a rule of
+`tools/ci schema` for a workflow under `examples/`; and the J2 step on
+a world of `e2e/internal/romeu` that runs a julieta line, at the hybrid
+level of 10 10.1.
+
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03
   3.1), REQ-0178 (03 3.1), REQ-0211 (03 3.5), REQ-0420 (04 4.3),
