@@ -72,10 +72,13 @@ does not have before this task (decided on 2026-10-29).
    error naming the member, and `stamp` and `memory index --hook` warn
    `shared-memory-missing` and exit 0 (REQ-1302). A `handoff/` of
    before is admitted as the warning `handoff-legacy` until migrated
-   (REQ-0645), never refused. `memory add|list|show|edit --shared` act on
-   it; the index line shows `shared`.
+   (REQ-0645), never refused. `memory add --shared` files in it and
+   `list --shared` reads it (`show` and `edit` take no target, item 6);
+   the index line shows `shared`.
 2. The `handoff` type (REQ-1296 to REQ-1299, REQ-0676 to REQ-0679).
-   Always shared; `--repo` with it is a usage error. `memstore/write`
+   Always shared; its target, `--repo` or `-C`, names the repo the
+   narrative is about, and `--shared` with it is a usage error (item
+   6). `memstore/write`
    validates the headings, and the sixth for `tombstone`, and refuses
    `tombstone` on another type; it refuses a supplied `stamp`, measures
    one at `add`, closes the open `handoff` of the dir under the store
@@ -183,14 +186,15 @@ already waits on T043.
     `entries/`, `stamps/`, and refuses `stamps/` in a repo dir and
     `snapshot/` in the shared one; a repo dir with a `handoff/` of
     before warns `handoff-legacy` in `memory check` and is not refused;
-    `--shared --repo x` exits 2.
-  - `add --tag handoff --body-file -` with the five headings in order
+    `--shared --repo a` exits 2 (two targets, item 6).
+  - `add --tag handoff --repo a --body-file -` with the five headings in order
     writes the entry in the shared dir, with a `stamp` whose repos are
     the manifest's and whose generation is the manifest's; a body
     missing a heading, or with the headings out of order, exits 2
     naming the first wrong one; `--tag tombstone` requires the sixth;
-    `--tag project --tag tombstone` exits 2; `--repo x` with `handoff`
-    exits 2; a front matter `stamp` in the body file is refused.
+    `--tag project --tag tombstone` exits 2; `--shared` with `handoff`
+    exits 2, and `--repo x` with `x` in no manifest repo exits 2 as
+    `memory-target`; a front matter `stamp` in the body file is refused.
   - A second `add --tag handoff` leaves the first `done` and the second
     `open`, under the lock (two concurrent adds leave exactly one
     open); a duplicate of the open handoff prints its id and closes
