@@ -22,6 +22,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hostpaths"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memgit"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -236,12 +237,9 @@ const maxSettings = 1 << 20
 // loadMemoryHost reads the host settings at env.SettingsPath, or at the
 // path 03 3.4 names, and makes the runner of git they configure.
 func loadMemoryHost(env *cli.Env) (*memoryHost, error) {
-	settings := env.SettingsPath
-	if settings == "" {
-		var err error
-		if settings, err = spec.SettingsPath(getenv); err != nil {
-			return nil, err
-		}
+	settings, err := hostpaths.SettingsPath(env, getenv)
+	if err != nil {
+		return nil, err
 	}
 	data, err := readCapped(settings, maxSettings)
 	if err != nil {

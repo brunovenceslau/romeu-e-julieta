@@ -152,9 +152,16 @@ func existingDirProblem(p string) string {
 // directory or a link created in between is caught.
 func DirProblem(lstat func(string) (fs.FileInfo, error), p string) string {
 	fi, err := lstat(p)
-	switch {
-	case err != nil:
+	if err != nil {
 		return "cannot be read: " + err.Error()
+	}
+	return InfoProblem(fi)
+}
+
+// InfoProblem holds fi, the lstat of a directory of the host tree or
+// the stat of a handle open on one, to the rules of DirProblem.
+func InfoProblem(fi fs.FileInfo) string {
+	switch {
 	case fi.Mode()&fs.ModeSymlink != 0:
 		return "is a symbolic link"
 	case !fi.IsDir():

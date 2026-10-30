@@ -39,6 +39,10 @@ var (
 	lookPath   = procgroup.LookPath
 	defaultRef = "main"
 
+	// openRoot opens the root; a test replaces it to swap the root
+	// between its check and its open.
+	openRoot = os.OpenRoot
+
 	// cloneRepo is the hardened clone of the config repo, with the
 	// credential helper for its host only when helper is not empty; a
 	// unit test replaces it with a fixture, since the e2e covers the
@@ -398,12 +402,32 @@ func openTree(root, envName string) (*os.Root, string, made, error) {
 	} else if !errors.Is(err, fs.ErrExist) {
 		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
-	if why := hostpaths.DirProblem(os.Lstat, root); why != "" {
+	before, err := os.Lstat(root)
+	if err != nil {
+		return nil, "", m, RootUnsafe.New("the root cannot be read: " + err.Error())
+	}
+	if why := hostpaths.InfoProblem(before); why != "" {
 		return nil, "", m, RootUnsafe.New("the root " + why)
 	}
-	rt, err := os.OpenRoot(root)
+	rt, err := openRoot(root)
 	if err != nil {
 		return nil, "", m, fmt.Errorf("init: the root: %w", err)
+	}
+	// The root is checked again through the handle, before anything is
+	// written under it: a root swapped between the Lstat and the open, for
+	// another directory or a link to one, is refused.
+	opened, err := rt.Lstat(".")
+	if err != nil {
+		_ = rt.Close()
+		return nil, "", m, fmt.Errorf("init: the root: %w", err)
+	}
+	if why := hostpaths.InfoProblem(opened); why != "" {
+		_ = rt.Close()
+		return nil, "", m, RootUnsafe.New("the root " + why)
+	}
+	if !os.SameFile(before, opened) {
+		_ = rt.Close()
+		return nil, "", m, RootUnsafe.New("the root was replaced while init opened it")
 	}
 	if err := rt.Mkdir(envName, dirMode); err == nil {
 		m.env = true
