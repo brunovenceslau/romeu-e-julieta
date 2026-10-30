@@ -3,7 +3,7 @@ id: T043
 title: "`romeu sync`: render, gate, promote, and no terminal"
 milestone: M3
 module: romeu-cli
-fate: kept
+fate: merged
 owns:
   - internal/cmd/romeu/sync/**
   - internal/cmd/romeu/all/import_sync.go
@@ -42,6 +42,8 @@ ask_first:
   - release
   - spec
 sitting: none
+merged: 2026-10-30
+pr: 353
 ---
 
 # T043 - `romeu sync`: render, gate, promote, and no terminal
