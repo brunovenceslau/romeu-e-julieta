@@ -257,7 +257,8 @@ func absent(settings string) error {
 }
 
 // build returns the settings the flags describe, with the root made
-// real (hostpaths.RealPath); tools fills the rest and validates it by the rules of 03 3.4.
+// real (hostpaths.RealPath); tools fills the rest and validates it by
+// the rules of 03 3.4.
 func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error) {
 	var zero spec.HostSettings
 	if err := gitsafe.CheckURL(o.configURL); err != nil {
@@ -381,10 +382,10 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // the root and the path of the env dir. A root or an env dir that is a
 // symbolic link, not a directory, not owned by the user or writable by
 // its group or others is root-unsafe: it is checked after it is made,
-// not only before (hostpaths.RootProblem), so a directory or a link created in
-// between is caught. A directory init made is 0700; one that was there
-// is chmod'ed through the handle only when the checks passed, and never
-// followed out of the root.
+// not only before (hostpaths.RootProblem), so a directory or a link
+// created in between is caught. A directory init made is 0700; one that
+// was there is chmod'ed through the handle only when the checks passed,
+// and never followed out of the root.
 func openTree(root, envName string) (*os.Root, string, made, error) {
 	var m made
 	// The levels above the root are made as they are needed and stay;

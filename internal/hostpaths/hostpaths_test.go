@@ -46,6 +46,8 @@ func TestSettingsPath(t *testing.T) {
 		{"the environment", &cli.Env{}, getenv, "/x/romeu/settings.yaml", false},
 		{"no cli.Env", nil, getenv, "/x/romeu/settings.yaml", false},
 		{"no path at all", &cli.Env{}, envOf(nil), "", true},
+		{"a relative path of cli.Env", &cli.Env{SettingsPath: "s.yaml"}, getenv, "", true},
+		{"a path of cli.Env made clean", &cli.Env{SettingsPath: "/e/./s.yaml"}, getenv, "/e/s.yaml", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := SettingsPath(tc.env, tc.getenv)
@@ -117,21 +119,37 @@ func TestLoadSettings(t *testing.T) {
 	})
 }
 
-// pendingSettingsSites are the files outside this task's file set that
-// still build the settings path themselves: each moves to SettingsPath
-// in a change of its own, and the test fails once one no longer does,
-// so the list only shrinks.
-var pendingSettingsSites = []string{
-	// The memory push of romeu (T175), outside the file set of T169.
-	"internal/cmd/romeu/all/memory_push.go",
+// settingsFile is the name of the host settings file, which only
+// internal/spec, internal/state and this package spell out.
+const settingsFile = "settings.yaml"
+
+// allowedSettingsSites are the findings of the call-site test that are
+// not a copy of the settings path, by file, each with its reason. The
+// test fails once one is no longer found, so the list only shrinks.
+var allowedSettingsSites = map[string]map[string]string{
+	"internal/preflight/check_trust.go": {
+		`"XDG_CONFIG_HOME"`: "the config directory of mise, which the auto-trust check scans (04 4.2), not romeu's settings",
+	},
+	"e2e/internal/romeu/env.go": {
+		`"settings.yaml"`: "the e2e harness names the settings path on its own, to check romeu's from outside",
+	},
+	// Pending: the memory push of romeu (T175), outside the file set of
+	// T169, still builds the settings path; it moves to SettingsPath in a
+	// change of its own.
+	"internal/cmd/romeu/all/memory_push.go": {
+		"spec.SettingsPath": "pending: moves to hostpaths.SettingsPath",
+	},
 }
 
 // TestNoOtherPackageBuildsTheSettingsPath: outside internal/spec, which
 // builds the path, and this package, no Go file of the module (tests
-// aside) refers to spec.SettingsPath or spec.SettingsEnv or holds the
-// string "ROMEU_SETTINGS", so every command takes the settings path from
-// SettingsPath. A dot import of internal/spec is refused, since its bare
-// names would escape the scan.
+// aside) refers to spec.SettingsPath or spec.SettingsEnv, or holds the
+// string "ROMEU_SETTINGS" or "XDG_CONFIG_HOME", and outside those two
+// and internal/state none holds "settings.yaml", so every command takes
+// the settings path from SettingsPath and a copy built by hand from the
+// environment is caught. allowedSettingsSites holds the exceptions. A dot
+// import of internal/spec is refused, since its bare names would escape
+// the scan.
 func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 	// The test runs in internal/hostpaths, two levels below the root.
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -139,7 +157,7 @@ func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 	require.FileExists(t, filepath.Join(root, "go.mod"))
 	specPath := reflect.TypeFor[spec.HostSettings]().PkgPath()
 
-	var found []string
+	found := map[string][]string{}
 	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -159,32 +177,42 @@ func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if rel == "internal/spec/settings_path.go" || strings.HasPrefix(rel, "internal/hostpaths/") {
+		if strings.HasPrefix(rel, "internal/spec/") || strings.HasPrefix(rel, "internal/hostpaths/") {
 			return nil
 		}
-		if settingsSite(t, p, specPath) {
-			found = append(found, rel)
+		for _, hit := range settingsSites(t, p, specPath) {
+			if hit == strconv.Quote(settingsFile) && strings.HasPrefix(rel, "internal/state/") {
+				continue
+			}
+			found[rel] = append(found[rel], hit)
 		}
 		return nil
 	})
 	require.NoError(t, err)
 
-	for _, f := range found {
-		assert.Contains(t, pendingSettingsSites, f, "%s builds the settings path; take it from hostpaths.SettingsPath", f)
+	for f, hits := range found {
+		for _, hit := range hits {
+			_, ok := allowedSettingsSites[f][hit]
+			assert.True(t, ok, "%s: %s builds the settings path by hand; take it from hostpaths.SettingsPath", f, hit)
+		}
 	}
-	for _, f := range pendingSettingsSites {
-		assert.True(t, slices.Contains(found, f), "%s no longer builds the settings path: remove it from pendingSettingsSites", f)
+	for f, hits := range allowedSettingsSites {
+		for hit := range hits {
+			assert.Contains(t, found[f], hit, "%s no longer holds %s: remove it from allowedSettingsSites", f, hit)
+		}
 	}
 }
 
-// settingsSite reports whether the Go file at p refers to the settings
-// path of internal/spec (the package at specPath) or holds the string
-// "ROMEU_SETTINGS".
-func settingsSite(t *testing.T, p, specPath string) bool {
+// settingsSites returns what the Go file at p holds of the settings
+// path: a reference to spec.SettingsPath or spec.SettingsEnv of
+// internal/spec (the package at specPath), a dot import of it, and the
+// strings "ROMEU_SETTINGS", "XDG_CONFIG_HOME" and "settings.yaml",
+// quoted.
+func settingsSites(t *testing.T, p, specPath string) []string {
 	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.SkipObjectResolution)
 	require.NoError(t, err, p)
-	var names []string
+	var names, hits []string
 	for _, im := range f.Imports {
 		path, err := strconv.Unquote(im.Path.Value)
 		require.NoError(t, err)
@@ -195,26 +223,26 @@ func settingsSite(t *testing.T, p, specPath string) bool {
 		case im.Name == nil:
 			names = append(names, "spec")
 		case im.Name.Name == ".":
-			return true
+			hits = append(hits, "a dot import of internal/spec")
 		default:
 			names = append(names, im.Name.Name)
 		}
 	}
-	hit := false
+	literals := []string{spec.SettingsEnv, "XDG_CONFIG_HOME", settingsFile}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch n := n.(type) {
 		case *ast.SelectorExpr:
 			if x, ok := n.X.(*ast.Ident); ok && slices.Contains(names, x.Name) && (n.Sel.Name == "SettingsPath" || n.Sel.Name == "SettingsEnv") {
-				hit = true
+				hits = append(hits, "spec."+n.Sel.Name)
 			}
 		case *ast.BasicLit:
 			if n.Kind == token.STRING {
-				if s, err := strconv.Unquote(n.Value); err == nil && s == spec.SettingsEnv {
-					hit = true
+				if s, err := strconv.Unquote(n.Value); err == nil && slices.Contains(literals, s) {
+					hits = append(hits, strconv.Quote(s))
 				}
 			}
 		}
-		return !hit
+		return true
 	})
-	return hit
+	return hits
 }

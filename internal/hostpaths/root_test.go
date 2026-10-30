@@ -143,9 +143,10 @@ func TestRootProblem(t *testing.T) {
 
 // TestRootProblemAsAnotherUser holds the rules that need a directory the
 // user cannot own or read, which the superuser can: a root the user does
-// not own, and a parent the root's path cannot be searched in, which is
-// unsafe and not taken for an absent root with no repository above it
-// (a .git it cannot see).
+// not own, a parent the root's path cannot be searched in, which is
+// unsafe and not taken for an absent root with no repository above it,
+// and a root the user can read but not search, whose .git cannot be
+// looked for (the error branch of the git rule).
 func TestRootProblemAsAnotherUser(t *testing.T) {
 	if os.Geteuid() == 0 {
 		return // the superuser owns /usr and reads every directory
@@ -159,6 +160,11 @@ func TestRootProblemAsAnotherUser(t *testing.T) {
 
 	assert.Equal(t, "the root is not owned by the user", RootProblem("/usr", "", p))
 	assert.Contains(t, RootProblem(filepath.Join(locked, "dev"), "", p), "the root cannot be read")
+	unsearchable := filepath.Join(tmp, "unsearchable")
+	require.NoError(t, os.Mkdir(unsearchable, 0o700))
+	require.NoError(t, os.Chmod(unsearchable, 0o600))
+	t.Cleanup(func() { _ = os.Chmod(unsearchable, 0o700) })
+	assert.Contains(t, RootProblem(unsearchable, "", p), "the root cannot be checked for a git repository: ")
 }
 
 // TestDirProblem names each fault of a directory of the tree.

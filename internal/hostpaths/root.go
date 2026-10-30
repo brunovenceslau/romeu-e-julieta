@@ -70,7 +70,10 @@ func RealPath(p string) (string, error) {
 // project's env dir under it, or "" to leave that directory out. The
 // rules, in the order they are checked:
 //
-//   - the root is not an absolute, clean path;
+//   - the root is not an absolute, clean path: 04 4.2 says absolute,
+//     and 03 3.4 stores the root as its real path, which is clean, so a
+//     root that is not clean is not one the settings can hold (init
+//     cleans the flag's value before it resolves and checks it);
 //   - the root is $HOME;
 //   - the root holds the host settings or the host state directory;
 //   - the root is inside the host settings directory or the host state
