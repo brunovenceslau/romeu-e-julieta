@@ -6,12 +6,15 @@
 package sync
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -410,6 +413,85 @@ func TestRenderCandidatesFlipsGate2OnARef(t *testing.T) {
 	assert.NotEqual(t, before, f.r.candidates[0].widening)
 }
 
+// miseFiles are a mise.toml and its mise.lock, whose one tool is
+// downloaded from host, so the derived egress gates host as a lock
+// host (07 7.5).
+func miseFiles(host string) map[string]string {
+	return map[string]string{
+		"mise.toml": "[tools]\ngo = \"1.27.3\"\n",
+		"mise.lock": "lockfile_version = 3\n\n[[tools.\"go\"]]\nversion = \"1.27.3\"\nbackend = \"core:go\"\n\n" +
+			"[tools.\"go\".\"platforms.linux-x64\"]\nchecksum = \"sha256:" + strings.Repeat("a", 64) + "\"\nurl = \"https://" + host + "/go.tar.gz\"\n",
+	}
+}
+
+// TestRenderCandidatesKeepsTheEgressOfThePinnedCommit: the egress is
+// read from the commit of refs/romeu/origin/<dir>/<ref> alone (I9). A
+// lock change left uncommitted in the clone's work tree, a commit on
+// another branch of the origin and a commit on another branch of the
+// clone each leave the egress commit, the derived egress and the
+// widening digest as they were; the same lock committed on the ref's
+// branch of the origin changes all three, so the cases do not pass for
+// want of a lock that reaches the digest.
+func TestRenderCandidatesKeepsTheEgressOfThePinnedCommit(t *testing.T) {
+	tests := []struct {
+		name string
+		// change makes the change in the clone or the origin of
+		// shop-api.
+		change func(t *testing.T, clone, origin string)
+		moves  bool
+	}{
+		{"an uncommitted lock change", func(t *testing.T, clone, _ string) {
+			t.Helper()
+			for p, data := range miseFiles("changed.example.com") {
+				require.NoError(t, os.WriteFile(filepath.Join(clone, p), []byte(data), 0o600))
+			}
+		}, false},
+		{"a commit on another branch of the origin", func(t *testing.T, _, origin string) {
+			t.Helper()
+			gitIn(t, origin, "checkout", "-q", "-b", "release")
+			commitFiles(t, origin, miseFiles("changed.example.com"))
+			gitIn(t, origin, "checkout", "-q", "main")
+		}, false},
+		{"a commit on another branch of the clone", func(t *testing.T, clone, _ string) {
+			t.Helper()
+			gitIn(t, clone, "checkout", "-q", "-b", "mine")
+			commitFiles(t, clone, miseFiles("changed.example.com"))
+		}, false},
+		{"control: a commit on the ref's branch of the origin", func(t *testing.T, _, origin string) {
+			t.Helper()
+			commitFiles(t, origin, miseFiles("changed.example.com"))
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := renderRunOf(t, func(h *hostTree) {
+				commitFiles(t, h.origins[apiURL], miseFiles("pinned.example.com"))
+			})
+			require.NoError(t, renderCandidates(t.Context(), f.r))
+			commit := f.r.trees[0].repos[0].egressCommit
+			c := f.r.candidates[0]
+			require.Contains(t, c.egress.Effective(), "pinned.example.com", "the pinned lock reaches the egress")
+			tt.change(t, f.in("shop-api"), f.origins[apiURL])
+			f.r.trees = nil
+			require.NoError(t, makeTree(t.Context(), f.r))
+			f.again()
+
+			require.NoError(t, renderCandidates(t.Context(), f.r))
+
+			got := f.r.candidates[0]
+			if tt.moves {
+				assert.NotEqual(t, commit, f.r.trees[0].repos[0].egressCommit)
+				assert.Contains(t, got.egress.Effective(), "changed.example.com")
+				assert.NotEqual(t, c.widening, got.widening)
+				return
+			}
+			assert.Equal(t, commit, f.r.trees[0].repos[0].egressCommit)
+			assert.Equal(t, c.egress, got.egress)
+			assert.Equal(t, c.widening, got.widening)
+		})
+	}
+}
+
 // TestRenderCandidatesFlipsGate2OnAPersonalKitCapability: a personal
 // kit read from the config commit's tree, and the same kit at a later
 // commit whose descriptor adds a capability a personal kit may hold:
@@ -429,34 +511,113 @@ func TestRenderCandidatesFlipsGate2OnAPersonalKitCapability(t *testing.T) {
 	assert.Contains(t, f.r.candidates[0].side.KitFiles, "personal:mine")
 }
 
+// treeEntry is one entry of a tree object rawTree writes.
+type treeEntry struct{ mode, name, oid string }
+
+// rawTree stores in the repository dir a tree object of the entries,
+// sorted as git sorts them, with hash-object --literally, which checks
+// nothing, so a tree no other git command would write can be built.
+func rawTree(t *testing.T, dir string, entries ...treeEntry) string {
+	t.Helper()
+	key := func(e treeEntry) string {
+		if e.mode == "40000" {
+			return e.name + "/"
+		}
+		return e.name
+	}
+	slices.SortFunc(entries, func(a, b treeEntry) int { return strings.Compare(key(a), key(b)) })
+	var b bytes.Buffer
+	for _, e := range entries {
+		raw, err := hex.DecodeString(e.oid)
+		require.NoError(t, err)
+		b.WriteString(e.mode + " " + e.name)
+		b.WriteByte(0)
+		b.Write(raw)
+	}
+	p := filepath.Join(t.TempDir(), "tree")
+	require.NoError(t, os.WriteFile(p, b.Bytes(), 0o600))
+	return gitIn(t, dir, "hash-object", "-w", "-t", "tree", "--literally", p)
+}
+
+// hostileCommit commits, in the config clone cfg, a tree that holds
+// the personal kit mine alone: its descriptor and the entries extra
+// makes from a blob of cfg.
+func hostileCommit(t *testing.T, cfg string, extra func(blob string) []treeEntry) string {
+	t.Helper()
+	write := func(data string) string {
+		p := filepath.Join(t.TempDir(), "blob")
+		require.NoError(t, os.WriteFile(p, []byte(data), 0o600))
+		return gitIn(t, cfg, "hash-object", "-w", p)
+	}
+	blob := write("x\n")
+	kit := rawTree(t, cfg, append(extra(blob), treeEntry{"100644", "mine.yaml", write(plainKit)})...)
+	root := rawTree(t, cfg, treeEntry{"40000", "kits", rawTree(t, cfg, treeEntry{"40000", "mine", kit})})
+	return gitIn(t, cfg, "commit-tree", root, "-m", "hostile")
+}
+
 // TestRenderCandidatesRefusesAHostilePersonalKit: a personal kit whose
-// tree holds a hostile entry of I27, a symbolic link or a network
-// capability (I28), fails the sync, exit 2, before a file is written
-// outside .romeu/candidates/. The table of every hostile entry is
-// render's and T024's.
+// tree holds each hostile entry of I27, or a network capability
+// (I28), fails the sync, exit 2 with kit-refused, before a file is
+// written outside .romeu/candidates/, the product kit before it in the
+// spec included. git fsck --strict refuses a .GIT name, a .git with a
+// U+200C inserted after the dot, a ".." name and a stored mode 100664,
+// and the walk the rest, which fsck passes. The case table of the walk
+// itself is render's and gitsafe's (T024, T038); this one runs them
+// through step 6. It runs in the race job on every runner of ci.yml,
+// macos-26 among them.
 func TestRenderCandidatesRefusesAHostilePersonalKit(t *testing.T) {
+	entry := func(mode, name string) func(t *testing.T, cfg string) string {
+		return func(t *testing.T, cfg string) string {
+			t.Helper()
+			return hostileCommit(t, cfg, func(blob string) []treeEntry { return []treeEntry{{mode, name, blob}} })
+		}
+	}
 	tests := []struct {
-		name  string
-		plant func(t *testing.T, cfg string)
-		want  string
+		name string
+		// commit returns the config commit that holds the kit mine.
+		commit func(t *testing.T, cfg string) string
+		want   string
 	}{
-		{"symbolic link", func(t *testing.T, cfg string) {
+		{"symbolic link", func(t *testing.T, cfg string) string {
 			t.Helper()
+			require.NoError(t, os.MkdirAll(filepath.Join(cfg, "kits", "mine"), 0o700))
+			require.NoError(t, os.WriteFile(filepath.Join(cfg, "kits", "mine", "mine.yaml"), []byte(plainKit), 0o600))
 			require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(cfg, "kits", "mine", "link")))
+			return commitFiles(t, cfg, nil)
 		}, "symbolic link"},
-		{"network capability", func(t *testing.T, cfg string) {
+		{"gitlink", func(t *testing.T, cfg string) string {
 			t.Helper()
-			require.NoError(t, os.WriteFile(filepath.Join(cfg, "kits", "mine", "mine.yaml"),
-				[]byte(plainKit+"capabilities:\n  - type: com.docker.sandbox/network-policy@2\n    config:\n      runtime: {allow: [a.example]}\n"), 0o600))
+			return hostileCommit(t, cfg, func(blob string) []treeEntry {
+				sub := gitIn(t, cfg, "commit-tree", rawTree(t, cfg, treeEntry{"100644", "a", blob}), "-m", "sub")
+				return []treeEntry{{"160000", "module", sub}}
+			})
+		}, "gitlink"},
+		{"case collision", func(t *testing.T, cfg string) string {
+			t.Helper()
+			return hostileCommit(t, cfg, func(blob string) []treeEntry {
+				return []treeEntry{{"100644", "README", blob}, {"100644", "readme", blob}}
+			})
+		}, "are one path"},
+		{"normalization collision", func(t *testing.T, cfg string) string {
+			t.Helper()
+			return hostileCommit(t, cfg, func(blob string) []treeEntry {
+				return []treeEntry{{"100644", "caf\u00e9", blob}, {"100644", "cafe\u0301", blob}}
+			})
+		}, "are one path"},
+		{".GIT", entry("100644", ".GIT"), "fsck"},
+		{".git with an HFS-ignorable character", entry("100644", ".\u200cgit"), "fsck"},
+		{"dot dot", entry("100644", ".."), "fsck"},
+		{"mode 100664", entry("100664", "a"), "fsck"},
+		{"network capability", func(t *testing.T, cfg string) string {
+			t.Helper()
+			return commitFiles(t, cfg, map[string]string{"kits/mine/mine.yaml": plainKit +
+				"capabilities:\n  - type: com.docker.sandbox/network-policy@2\n    config:\n      runtime: {allow: [a.example]}\n"})
 		}, "network"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := renderRun(t)
-			require.NoError(t, os.MkdirAll(filepath.Join(f.cfg, "kits", "mine"), 0o700))
-			require.NoError(t, os.WriteFile(filepath.Join(f.cfg, "kits", "mine", "mine.yaml"), []byte(plainKit), 0o600))
-			tt.plant(t, f.cfg)
-			f.r.specCommit = commitFiles(t, f.cfg, nil)
+			f.r.specCommit = tt.commit(t, f.cfg)
 			f.r.targets[0].Kits = []spec.Kit{{Product: "plain"}, {Personal: "mine"}}
 			before := f.outsideCandidates(t)
 

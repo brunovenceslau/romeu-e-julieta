@@ -69,6 +69,9 @@ directory and its `projects/` and `descriptors/` subdirectories.
     file `internal/cmd/romeu/version/versions.go`.
   - The fields that come from julieta land with T066, in a file of its
     own under this package.
+  - A romeu built with plain `go build`, which embeds no julieta, runs
+    `status` as the embedded build does, and never stops with
+    `julieta-not-embedded` (from T043, 2026-10-30; 04 4.2).
 - Verify: `go test -tags e2e ./e2e/... -run '^TestStatus' -v`. The
   pattern names the `TestStatus*` functions this task adds, and the
   reviewer reads them in the `-v` output (10 10.8).
