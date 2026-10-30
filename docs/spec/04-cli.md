@@ -588,6 +588,7 @@ its own: it is an invalid document, exit 2, named by the rule's slug
 | `RJ-357` | `memory-remote-missing` | 2 | `sync`, for a project spec without `memory.remote` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store), REQ-1305); `memory: {remote: none}` opts out; hint: `decide: add memory: {remote: <url of a private repository>} to the spec, or memory: {remote: none} to keep memory on this machine only` |
 | `RJ-358` | `candidate-declined` | 1 | `sync` step 8 (4.2), on a TTY, when the answer to gate 2 is anything but `y` ([01 1.6](01-system-model.md#candidate)); the candidate dir is deleted and the live files are unchanged; the targets after it still meet gate 2, and the message names every declined project; hint: `romeu sync <name>` |
 | `RJ-359` | `status-incomplete` | 1 | `status` (4.2), when a read of its report failed (REQ-0329): the report is printed with each failed read in its project's block, by its own id, or by this one when it carries none, and the command exits 1, never 3; hint: follow the hint of each failed read, then run `romeu status` again |
+| `RJ-360` | `doctor-incomplete` | 1 | `doctor` (4.2), when a check could not run (REQ-0331): the report is printed with each such check as `error`, by its own id, or by this one when it carries none, and every failed check, and the command exits 1, never 6; hint: follow the hint of each check marked `error`, then run `romeu doctor` again |
 
 ### `fingerprint-unstable` (`RJ-338`)
 
