@@ -30,6 +30,9 @@ import (
 // github.com/gofrs/flock adds (Windows, shared locks) romeu does not
 // need.
 func (s *Store) Lock() (*Lock, error) {
+	if s.readOnly {
+		return nil, ErrReadOnly
+	}
 	lf, err := s.root.OpenFile(lockName, os.O_RDWR|os.O_CREATE, FileMode)
 	if err != nil {
 		return nil, fmt.Errorf("state: %w", err)

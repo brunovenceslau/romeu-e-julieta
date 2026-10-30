@@ -6,6 +6,11 @@ module: romeu-cli
 fate: kept
 owns:
   - internal/cmd/romeu/status/**
+  - internal/state/read.go
+  - internal/state/read_test.go
+  - internal/state/store.go
+  - internal/state/lock.go
+  - internal/state/load.go
   - internal/cmd/romeu/version/versions.go
   - internal/cmd/romeu/all/import_status.go
   - e2e/status_test.go
@@ -13,7 +18,10 @@ needs:
   - T043
   - T103
 after: []
-ask_first: []
+ask_first:
+  - gates
+  - contracts
+  - formats
 sitting: none
 ---
 
@@ -33,6 +41,28 @@ directory (the dotfiles an interrupted atomic write leaves, such as
 `.shop.json123`) is deferred. `status` ignores dotfiles in the state
 directory and its `projects/` and `descriptors/` subdirectories.
 
+Re-plan (2026-10-30): built in slices, each its own pull request.
+Slice A: the report, its sections registry (`status/sections.go`, the
+seam of T066 and T080), the generations and salvage records, the
+sandbox state and `removal-pending` from `sbx ls`, the failed reads per
+project, and `status-incomplete` (RJ-359, exit 1), a row 04 4.4 lacked
+for a report printed with a failed read (REQ-0329); host state is read
+through `state.OpenRead`, which makes, changes and locks nothing, so a
+mode `doctor` reports stays as found. Slice B: drift, the interrupted
+promotion, spec vs synced commit, recreate needed, and the orphaned
+project and repo dir with their unpushed and salvage-only work. Slice C:
+the stale toolchain, `sbx-untested`, and the `versions` object. Slice D:
+the command file, `import_status.go`, the e2e cases, the J10 line and
+the schema `romeu-status.v1` (`formats`), once the report is whole. The
+command file reads the host settings through the shared host paths of
+T169 and waits for it, so no third copy of the settings path exists;
+the newest stamp's dirty and stash counts (03 3.10) wait for T174,
+which writes the stamps; julieta's fields, `fetch-failed` and the
+compatibility check before julieta's read are T066's
+(`status/julieta_fields.go`). The orphan scan and `envDirs` of `sync`
+sit in files T055 and T169 own, so slice B copies the small part it
+needs and names who unifies it.
+
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4),
   REQ-0065 (01 1.4), REQ-0087 (01 1.6), REQ-0107 (01 1.6), REQ-0327 (04
   4.2), REQ-0328 (04 4.2), REQ-0329 (04 4.2), REQ-0334 (04 4.2),
@@ -40,6 +70,9 @@ directory and its `projects/` and `descriptors/` subdirectories.
   10.3).
 - Operator: no.
 - Acceptance:
+  - The report's sections register from their own files through
+    `status/sections.go` (rule 14 of `docs/plan.md`), the seam T066
+    and T080 add a file to.
   - On fixtures of host state, `status --json` reports, without taking
     the lock: drift, an interrupted promotion, a stale toolchain, an
     orphaned project and an orphaned repo dir, the sandbox state, spec
