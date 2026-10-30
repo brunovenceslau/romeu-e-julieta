@@ -10,6 +10,7 @@ owns:
   - internal/cmd/romeu/doctor/sbx_allowed_sources*.go
   - internal/gitsafe/host_config*.go
   - internal/sbxdrv/settings_ls*.go
+  - e2e/testdata/sbx/0.49.2/secrets-settings.jsonl
 needs:
   - T049
 after: []
