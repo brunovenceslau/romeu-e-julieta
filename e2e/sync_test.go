@@ -78,6 +78,9 @@ func TestSyncRefusesABuildWithoutJulieta(t *testing.T) {
 	assert.Empty(t, e.SbxCalls(t), "no sbx call")
 	assert.NoDirExists(t, e.StateDir(), "no state is written")
 	assert.NoDirExists(t, e.Root, "nothing is written under the root")
+	res = e.Run(t, []string{"version"})
+	assert.Equal(t, 0, res.Code, "version works on the same build: %s", res.Stderr)
+	assert.Contains(t, res.Stdout, "protocol")
 }
 
 // TestSyncStopsAtGate1: the romeu of the embedded build passes the
@@ -294,6 +297,95 @@ func TestSyncJ11Step5(t *testing.T) {
 	rec, err = os.ReadFile(f.env(".romeu/render.json"))
 	require.NoError(t, err)
 	assert.Contains(t, string(rec), "api.example.com", "the approved egress is promoted")
+}
+
+// The personal kit mine of the hostile and capability cases: its
+// descriptor, the same with a capability a personal kit may hold, and
+// foo's spec with the kit added.
+const (
+	mineKit     = "schemaVersion: \"3\"\nkind: mixin\ndisplayName: mine\ndescription: a personal kit\n"
+	mineWithCap = mineKit + "capabilities:\n  - type: com.docker.sandbox/privileged@1\n"
+)
+
+// fooWithMine is fooSpec with the personal kit mine after julieta.
+var fooWithMine = strings.Replace(fooSpec, "  - product: julieta\n", "  - product: julieta\n  - personal: mine\n", 1)
+
+// liveTree returns the snapshot of foo-env/ without what is below
+// .romeu/candidates/.
+func (f syncFixture) liveTree(t *testing.T) map[string]romeu.Node {
+	t.Helper()
+	nodes := romeu.Snapshot(t, f.env(""))
+	for p := range nodes {
+		if strings.HasPrefix(p, ".romeu/candidates/") {
+			delete(nodes, p)
+		}
+	}
+	return nodes
+}
+
+// TestSyncHostileKitDeliveredByABundle is the bundle case of I27: a
+// config commit whose personal kit holds a symbolic link, which git
+// fsck --strict passes, reaches the config repo's clone by a bundle
+// fetched into refs/heads/, outside refs/romeu/origin/. sync --from
+// <sha> refuses it at step 2 with from-unreachable; once the commit is
+// pushed to a branch of the origin, step 2 takes it and the walk of
+// step 6 refuses the kit with kit-refused. Either way sync exits 2,
+// leaves no candidate dir, and nothing of foo-env/ outside
+// .romeu/candidates/ changes from what the approval left.
+func TestSyncHostileKitDeliveredByABundle(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+	f.approveFoo(t)
+	work := filepath.Join(t.TempDir(), "cfg")
+	f.o.Git(t, filepath.Dir(work), "clone", "-q", f.o.Bare("owner/cfg"), work)
+	for p, data := range map[string]string{"projects/foo.yaml": fooWithMine, "kits/mine/mine.yaml": mineKit} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(work, p)), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(work, p), []byte(data), 0o600))
+	}
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(work, "kits", "mine", "link")))
+	f.o.Git(t, work, "add", "-A")
+	f.o.Git(t, work, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "hostile")
+	sha := strings.TrimSpace(f.o.Git(t, work, "rev-parse", "HEAD"))
+	bundle := filepath.Join(t.TempDir(), "hostile.bundle")
+	f.o.Git(t, work, "bundle", "create", "-q", bundle, "main")
+	clone := filepath.Join(f.e.Root, "cfg-env", "cfg")
+	f.o.Git(t, clone, "fetch", "-q", bundle, "main:refs/heads/delivered")
+	before := f.liveTree(t)
+
+	res := f.e.Run(t, []string{"sync", "--from", sha, "foo"})
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "from-unreachable")
+	assert.Contains(t, res.Stderr, "is not reachable from", "the clone holds the commit")
+	assert.Equal(t, before, f.liveTree(t))
+	assert.Empty(t, f.candidates(t))
+
+	f.o.Git(t, work, "push", "-q", "origin", "HEAD:refs/heads/hostile")
+	res = f.e.Run(t, []string{"sync", "--from", sha, "foo"})
+
+	assert.Equal(t, 2, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "kit-refused")
+	assert.Contains(t, res.Stderr, "symbolic link")
+	assert.Equal(t, before, f.liveTree(t), "nothing is written outside .romeu/candidates/")
+	assert.Empty(t, f.candidates(t))
+}
+
+// TestSyncFlipsGate2OnAKitCapability is the E case of I28: once foo
+// with its personal kit mine is approved, a commit that adds a
+// capability to the kit's descriptor makes a sync without a terminal
+// stop at gate 2, exit 3 with project-approval-required.
+func TestSyncFlipsGate2OnAKitCapability(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t)
+	f.o.Push(t, "owner/cfg", "main", map[string]string{"projects/foo.yaml": fooWithMine, "kits/mine/mine.yaml": mineKit})
+	f.approveFoo(t)
+	f.o.Push(t, "owner/cfg", "main", map[string]string{"kits/mine/mine.yaml": mineWithCap})
+
+	res := f.e.Run(t, []string{"sync", "foo"})
+
+	assert.Equal(t, 3, res.Code, res.Stderr)
+	assert.Contains(t, res.Stderr, "project-approval-required")
+	assert.Empty(t, f.candidates(t))
 }
 
 // idempotencyRows is the idempotency meta-test of 10 10.1 (REQ-0277): a
