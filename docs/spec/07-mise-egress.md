@@ -124,7 +124,8 @@ via shims and `mise exec -C`.
 
 ## 7.5 Egress derivation (`internal/egress`)
 
-Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets.
+Input per repo: `(url, egressCommit)`. Output: `auto` and `gated` sets,
+and the rules romeu applies for them, each a domain and a port.
 
 1. `REQ-0628` Read `mise.lock` (and `mise.toml` for presence) at `egressCommit`,
    the commit of `refs/romeu/origin/<dir>/<ref>`, via `git cat-file`,
