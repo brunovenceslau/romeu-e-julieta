@@ -84,8 +84,8 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 			note = "no projects: run romeu sync"
 		}
 	}
-	// With no host state there is no record to compare, and the note
-	// says the one thing to run.
+	// The toolchain is read with a measure and a record to compare; with
+	// no host state the note alone says the one thing to run.
 	toolchain := h.measure != nil && h.store != nil
 	// The sbx floor check runs once, before any other sbx call, as the
 	// driver requires of every command (sbxdrv.Runner.RequireFloor); its

@@ -8,6 +8,7 @@ package status
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
@@ -29,7 +30,8 @@ var _ = register(section{
 			p.Sandbox = SandboxAbsent
 			return
 		}
-		p.Sandbox = sb.Status
+		// Any text sbx prints; made valid UTF-8 so the JSON report holds.
+		p.Sandbox = strings.ToValidUTF8(sb.Status, "\uFFFD")
 		if src.record == nil || len(src.record.Generations) == 0 {
 			return
 		}

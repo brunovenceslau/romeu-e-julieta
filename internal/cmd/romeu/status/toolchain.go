@@ -34,6 +34,10 @@ func readToolchain(h host, rep *Report, v sbxdrv.Release, floorErr error) int {
 	tc := &Toolchain{State: ToolchainUnknown, Changes: []ToolchainChange{}}
 	rep.Toolchain = tc
 	if floorErr != nil {
+		// A version below the floor was read: show it beside the error.
+		if v != (sbxdrv.Release{}) {
+			tc.Sbx = v.String()
+		}
 		rep.Errors = append(rep.Errors, readError(readSbxVersion, floorErr))
 		return 0
 	}

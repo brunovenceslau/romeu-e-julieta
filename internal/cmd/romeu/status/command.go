@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
 
 	"github.com/spf13/cobra"
 
@@ -19,9 +21,6 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
-
-// getenv reads the environment; a test replaces it.
-var getenv = os.Getenv
 
 // The command romeu status (04 4.2): read only, so it runs no
 // preflight, takes no lock, appends nothing and takes no snapshot
@@ -65,15 +64,17 @@ func usage(slug, message string) error {
 // and the measure of this build's toolchain. The returned function
 // closes the store.
 func newHost(env *cli.Env) (host, func(), error) {
-	settings, err := hostpaths.LoadSettings(env, getenv, usage)
+	settings, err := hostpaths.LoadSettings(env, os.Getenv, usage)
 	if err != nil {
 		return host{}, nil, err
 	}
-	home := getenv("HOME")
-	if !filepath.IsAbs(home) {
-		return host{}, nil, usage("home", "HOME is not an absolute path")
+	// sbx gets HOME as it is; the driver takes a clean path with no
+	// control character, so anything else is refused here, as usage.
+	home := os.Getenv("HOME")
+	if !filepath.IsAbs(home) || filepath.Clean(home) != home || strings.ContainsFunc(home, unicode.IsControl) {
+		return host{}, nil, usage("home", "HOME is not a clean absolute path")
 	}
-	dir, err := hostpaths.StateDir(getenv)
+	dir, err := hostpaths.StateDir(os.Getenv)
 	if err != nil {
 		return host{}, nil, usage("state", err.Error())
 	}
@@ -87,7 +88,7 @@ func newHost(env *cli.Env) (host, func(), error) {
 	case errors.Is(err, fs.ErrNotExist):
 		return h, func() {}, nil
 	case err != nil:
-		return host{}, nil, StatusIncomplete.Wrap(err, "the host state cannot be opened")
+		return host{}, nil, StatusIncomplete.Wrap(err, "the host state directory cannot be opened, so no report was printed")
 	}
 	h.store = store
 	return h, func() { _ = store.Close() }, nil

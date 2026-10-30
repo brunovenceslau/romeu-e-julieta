@@ -128,3 +128,29 @@ func TestStatusRefusesItsArguments(t *testing.T) {
 		assert.Contains(t, res.Stderr, "error RJ-349 usage: ")
 	}
 }
+
+// TestStatusStopsBeforeAReport: a state directory that cannot be opened
+// fails with status-incomplete, exit 1, and no report; host settings
+// that are absent are usage, exit 2.
+func TestStatusStopsBeforeAReport(t *testing.T) {
+	t.Parallel()
+	t.Run("a state directory that is a file", func(t *testing.T) {
+		t.Parallel()
+		e := syncSetup(t, false)
+		require.NoError(t, os.MkdirAll(filepath.Dir(e.StateDir()), 0o700))
+		require.NoError(t, os.WriteFile(e.StateDir(), nil, 0o600))
+		res := e.Run(t, []string{"status"})
+		assert.Equal(t, 1, res.Code, res.Stderr)
+		assert.Empty(t, res.Stdout)
+		assert.Contains(t, res.Stderr, "error RJ-359 status-incomplete: the host state directory cannot be opened")
+	})
+	t.Run("no host settings", func(t *testing.T) {
+		t.Parallel()
+		e := syncSetup(t, false)
+		require.NoError(t, os.Remove(e.Settings()))
+		res := e.Run(t, []string{"status"})
+		assert.Equal(t, 2, res.Code, res.Stderr)
+		assert.Empty(t, res.Stdout)
+		assert.Contains(t, res.Stderr, "error RJ-349 usage: settings-missing: ")
+	})
+}
