@@ -62,7 +62,7 @@ list of paths, and no check: no slug of 04 4.1 names them.
 
 Re-plan (2026-10-30, decided by the operator, scope this repository):
 (A) the rows `host-git-config`, `sbx-remember-commands` and
-`sbx-allowed-sources` move to T192 with their acceptance and requirement
+`sbx-allowed-sources` move to T191 with their acceptance and requirement
 ids: the first waits for a gitsafe verb that reads the host global git
 config, the other two for an sbx settings read in `sbxdrv`, whose argv
 probe A1 records (11 11.1). (B) `romeu doctor --json` has its schema
@@ -109,7 +109,7 @@ Code (trigger: a first SQLite reader, or T134).
     (the check function of T042, called from here), the root rules
     (I20), the file modes, the secret bindings and the tree rows. The
     host global git config, `env.rememberHostCommands` and
-    `kit.allowedSources` are T192's (2026-10-30).
+    `kit.allowedSources` are T191's (2026-10-30).
   - The rows marked **pre** are the functions of T046, called from here
     (I22, I23). The two I22 rows fail, and `doctor` exits 6 with
     `check-findings`, on each synthesized fixture of T046, and pass on

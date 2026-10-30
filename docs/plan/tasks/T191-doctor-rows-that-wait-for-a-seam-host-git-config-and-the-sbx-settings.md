@@ -1,5 +1,5 @@
 ---
-id: T192
+id: T191
 title: "Doctor rows that wait for a seam: host git config and the sbx settings"
 milestone: M3
 module: romeu-cli
@@ -17,7 +17,7 @@ ask_first:
 sitting: O3
 ---
 
-# T192 - Doctor rows that wait for a seam: host git config and the sbx settings
+# T191 - Doctor rows that wait for a seam: host git config and the sbx settings
 
 Goal: the three rows of `romeu doctor` that T049 did not build, each a
 file of its own registered through `doctor/rows.go` (rule 14 of
