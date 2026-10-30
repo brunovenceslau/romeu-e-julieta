@@ -84,7 +84,7 @@ renames the entry files of before.
 
 - Implements: REQ-1319 (03 3.12), REQ-1320 (03 3.12), REQ-0258
   (03 3.12), REQ-0241 (03 3.9), REQ-0226 (03 3.7), REQ-0235 (03 3.8),
-  REQ-0656 (08 8.1), REQ-0333 (04 4.1), REQ-0411 (04 4.3).
+  REQ-0656 (08 8.1), REQ-0333 (04 4.2), REQ-0411 (04 4.3).
 - Operator: approves `digests` (the id type lands in `internal/canon`),
   `gates` (`internal/state` records and the candidate dir) and
   `formats` (the `id` and `candidateId` members change their written
