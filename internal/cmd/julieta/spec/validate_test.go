@@ -227,7 +227,7 @@ func TestSpecValidateJSON(t *testing.T) {
 	var rep Report
 	require.NoError(t, json.Unmarshal([]byte(stdout), &rep, json.RejectUnknownMembers(true)), stdout)
 	assert.Equal(t, Report{
-		Files:      []string{"projects/shop.yaml", "projects/notes.txt"},
+		Files: []string{"projects/shop.yaml", "projects/notes.txt"},
 		Findings: []Finding{{File: "projects/notes.txt", Message: "is a file under projects/ that is not *.yaml", Path: "the file",
 			Rule: "projects-yaml-only"}},
 		NotChecked: []string{"config-project", "repo-url-host", "workload-repository"},
