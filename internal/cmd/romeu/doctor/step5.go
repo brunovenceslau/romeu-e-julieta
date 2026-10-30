@@ -62,9 +62,14 @@ func (h *host) hostFindings(ctx context.Context) stepFive {
 // preCheck returns the result of the pre check slug: fail with the error
 // of its own row, error with any other error, which kept the check from
 // running (an sbx read that failed, upstream-shape), and pass otherwise.
+// A slug step 5 does not run is an error, never a pass: a row that lands
+// before its check in the preflight (T080's signing row) checks nothing.
 func (h *host) preCheck(ctx context.Context, slug string) Check {
 	if h.baseErr != nil {
 		return errorOf(slug, h.baseErr)
+	}
+	if !slices.Contains(h.preSlugs(), slug) {
+		return errorOf(slug, errors.New("step 5 of the preflight runs no check "+slug+", so it was not checked"))
 	}
 	err, found := h.hostFindings(ctx).found[slug]
 	switch {

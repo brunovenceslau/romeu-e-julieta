@@ -8,10 +8,20 @@
         "additionalProperties": false,
         "properties": {
           "error": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "slug"
+            ],
+            "type": "object"
           },
           "message": {
             "type": "string"

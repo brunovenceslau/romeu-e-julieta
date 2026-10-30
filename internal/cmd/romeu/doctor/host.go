@@ -49,6 +49,9 @@ type seams struct {
 	gitFloor func(h *spec.HostSettings, home string) func(ctx context.Context) error
 	// preflight runs the host checks of step 5: preflight.HostFindings.
 	preflight func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string)
+	// preSlugs are the slugs of the checks step 5 runs:
+	// preflight.HostSlugs.
+	preSlugs func() []string
 	// secret runs one secret argv with exactly HOME and
 	// PATH=/usr/bin:/bin and says whether it printed anything on its
 	// standard output, which it never keeps (I25).

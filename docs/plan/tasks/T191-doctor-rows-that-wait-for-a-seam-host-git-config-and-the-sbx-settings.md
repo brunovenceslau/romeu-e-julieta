@@ -8,6 +8,8 @@ owns:
   - internal/cmd/romeu/doctor/host_git_config*.go
   - internal/cmd/romeu/doctor/sbx_remember_commands*.go
   - internal/cmd/romeu/doctor/sbx_allowed_sources*.go
+  - internal/gitsafe/host_config*.go
+  - internal/sbxdrv/settings_ls*.go
 needs:
   - T049
 after: []
@@ -24,17 +26,23 @@ file of its own registered through `doctor/rows.go` (rule 14 of
 `docs/plan.md`).
 
 Re-plan (2026-10-30, decided by the operator, scope this repository):
-split from T049, which built every other row of its list. Each row
-waits for a read that has no seam yet. `host-git-config` needs a verb of
+split from T049, which built every other row of its list. Each row waits
+for a read that has no seam yet. `host-git-config` needs a verb of
 `internal/gitsafe` that reads the host global git config for the keys of
 its one Go slice (`gitsafe.NeutralizedKeys`); a parser of the config by
 hand is ADR 0038's question. `sbx-remember-commands` and
 `sbx-allowed-sources` need an sbx settings read in `internal/sbxdrv`: a
 builder, a parser and a session, whose argv and output probe A1 records
 at sitting O3 (11 11.1); until then a session written by hand and marked
-`synthetic: true` stands in (rule 10 of `docs/plan.md`). The verb and the
-builder are in packages of other tasks' surfaces, so this task's pull
-request names them, with their approval lines, beside the row files.
+`synthetic: true` stands in (rule 10 of `docs/plan.md`). This task owns
+the verb, `internal/gitsafe/host_config*.go`, and the builder with its
+parser, `internal/sbxdrv/settings_ls*.go`, named the way those packages
+name a verb and a builder (`global.go`, `secret_ls.go`); both are
+ask-first (`gitsafe`, `sbxdrv`), so each carries its approval line. The
+session of the settings read is a line of the session file of the
+secrets and settings calls,
+`e2e/testdata/sbx/0.49.2/secrets-settings.jsonl`, which the builder's
+test holds (T029's rule: a builder has a session).
 
 - Implements: REQ-0370 (04 4.2), REQ-0373 (04 4.2), REQ-0374 (04 4.2).
 - Operator: no.

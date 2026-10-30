@@ -52,6 +52,6 @@ func TestDoctorToolchain(t *testing.T) {
 
 		rep, out, _ := f.output(t)
 
-		assert.Equal(t, "record-unreadable", check(t, rep, "toolchain-approval-required").Error, out)
+		assert.Equal(t, "record-unreadable", check(t, rep, "toolchain-approval-required").Error.Slug, out)
 	})
 }

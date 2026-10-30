@@ -44,12 +44,20 @@ type Check struct {
 	Slug string `json:"slug"`
 	// Result is pass, warn, fail or error.
 	Result string `json:"result"`
-	// ID and Error are, for the result error, the id and the slug of the
-	// error that kept the check from running (04 4.4).
-	ID    string `json:"id,omitzero"`
-	Error string `json:"error,omitzero"`
+	// Error is, for the result error alone, the error that kept the
+	// check from running (04 4.4).
+	Error *ErrorRef `json:"error,omitzero"`
 	// Message says what the check found, or why it could not run.
 	Message string `json:"message,omitzero"`
+}
+
+// ErrorRef names an error of the table of 04 4.4 by its id and slug, as
+// the reports of the other commands do.
+type ErrorRef struct {
+	// ID is the error id, such as RJ-343.
+	ID string `json:"id"`
+	// Slug is the error's slug.
+	Slug string `json:"slug"`
 }
 
 // run runs every registered check over h, prints the report to
@@ -63,13 +71,15 @@ func run(ctx context.Context, env *cli.Env, h *host) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		c := r.run(ctx, h)
-		// A byte that is not UTF-8 would stop the JSON encoder and lose
-		// the whole report.
-		c.Message = strings.ToValidUTF8(c.Message, "�")
-		rep.Checks = append(rep.Checks, c)
+		rep.Checks = append(rep.Checks, r.run(ctx, h))
 	}
 	rep.Checks = append(rep.Checks, h.unplaced(ctx)...)
+	for i := range rep.Checks {
+		// A byte that is not UTF-8 would stop the JSON encoder and lose
+		// the whole report, so every check is cleaned, an unplaced one of
+		// step 5 included.
+		rep.Checks[i].Message = strings.ToValidUTF8(rep.Checks[i].Message, "\uFFFD")
+	}
 	if err := write(env, rep); err != nil {
 		return err
 	}
@@ -77,7 +87,7 @@ func run(ctx context.Context, env *cli.Env, h *host) error {
 	for _, c := range rep.Checks {
 		switch c.Result {
 		case resultError:
-			errored = append(errored, cli.Detail{Key: c.Slug, Value: c.ID + " " + c.Error})
+			errored = append(errored, cli.Detail{Key: c.Slug, Value: c.Error.ID + " " + c.Error.Slug})
 		case resultFail:
 			failed = append(failed, cli.Detail{Key: c.Slug, Value: line(c.Message)})
 		}
@@ -108,7 +118,7 @@ func write(env *cli.Env, rep Report) error {
 	for _, c := range rep.Checks {
 		fmt.Fprintf(&b, "%-5s %s", c.Result, c.Slug)
 		if c.Result == resultError {
-			fmt.Fprintf(&b, " (%s %s)", c.ID, c.Error)
+			fmt.Fprintf(&b, " (%s %s)", c.Error.ID, c.Error.Slug)
 		}
 		if c.Message != "" {
 			fmt.Fprintf(&b, ": %s", line(c.Message))

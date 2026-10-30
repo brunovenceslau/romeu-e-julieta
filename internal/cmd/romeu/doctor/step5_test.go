@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -83,7 +84,8 @@ func TestDoctorI22Rows(t *testing.T) {
 				c := check(t, rep, slug)
 				assert.Equal(t, result, c.Result, "%s: %s", slug, c.Message)
 				if result == resultError {
-					assert.Equal(t, "upstream-shape", c.Error, slug)
+					require.NotNil(t, c.Error, slug)
+					assert.Equal(t, "upstream-shape", c.Error.Slug, slug)
 				}
 			}
 		})
@@ -102,7 +104,7 @@ func TestDoctorI22RowsPlaceAShapeError(t *testing.T) {
 	rep, out, err := f.output(t)
 
 	assert.Equal(t, 1, exitOf(err), out)
-	assert.Equal(t, "upstream-shape", check(t, rep, slugGlobalSecret).Error)
+	assert.Equal(t, "upstream-shape", check(t, rep, slugGlobalSecret).Error.Slug)
 	assert.Equal(t, resultFail, check(t, rep, slugBroadAllow).Result)
 }
 
@@ -187,4 +189,38 @@ func TestDoctorKeepsAFindingWithNoRow(t *testing.T) {
 	c := check(t, rep, "signing-socket")
 	assert.Equal(t, resultError, c.Result)
 	assert.Contains(t, c.Message, "the socket answers no key")
+}
+
+// TestDoctorCleansAFindingWithNoRow: a finding of step 5 with no row in
+// doctor whose message holds a byte that is not UTF-8 is cleaned like
+// every other check, so the JSON report is still written whole.
+func TestDoctorCleansAFindingWithNoRow(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.hostFindings = func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string) {
+		findings, unchecked := preflight.HostFindings(ctx, d, in)
+		return append(findings, preflight.Finding{Slug: "signing-socket", Err: errors.New("a byte \xff that is not UTF-8")}), unchecked
+	}
+
+	rep, out, err := f.output(t)
+
+	assert.Equal(t, 1, exitOf(err), out)
+	assert.Contains(t, check(t, rep, "signing-socket").Message, "\uFFFD")
+}
+
+// TestDoctorErrsOnARowStep5DoesNotRun: a pre row whose check step 5 does
+// not run is an error, never a pass, and doctor exits 1.
+func TestDoctorErrsOnARowStep5DoesNotRun(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.preSlugs = func() []string {
+		return slices.DeleteFunc(preflight.HostSlugs(), func(s string) bool { return s == slugAutoTrust })
+	}
+
+	rep, out, err := f.output(t)
+
+	assert.Equal(t, 1, exitOf(err), out)
+	c := check(t, rep, slugAutoTrust)
+	assert.Equal(t, resultError, c.Result)
+	assert.Contains(t, c.Message, "runs no check")
 }

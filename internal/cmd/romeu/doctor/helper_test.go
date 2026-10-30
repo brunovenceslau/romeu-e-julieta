@@ -61,6 +61,8 @@ type fixture struct {
 	env                                    map[string]string
 	// hostFindings is the preflight's step 5 doctor calls.
 	hostFindings func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string)
+	// preSlugs are the slugs of the checks step 5 runs.
+	preSlugs func() []string
 	// noSettings leaves the host settings unwritten.
 	noSettings bool
 	// settingsMode, when set, is the mode the settings file is given.
@@ -89,6 +91,7 @@ func newFixture(t *testing.T) *fixture {
 		},
 		acknowledged: true,
 		hostFindings: preflight.HostFindings,
+		preSlugs:     preflight.HostSlugs,
 	}
 	f.root = filepath.Join(f.home, "Developer")
 	for _, d := range []string{f.home, f.configHome, f.stateHome, f.root, filepath.Join(tmp, "bin")} {
@@ -192,6 +195,7 @@ func (f *fixture) output(t *testing.T) (Report, string, error) {
 			return func(context.Context) error { return f.gitErr }
 		},
 		preflight: f.hostFindings,
+		preSlugs:  f.preSlugs,
 		secret:    runSecretArgv,
 	})
 	defer h.close()

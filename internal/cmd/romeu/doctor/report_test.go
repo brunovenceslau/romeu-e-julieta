@@ -67,7 +67,7 @@ func TestDoctorExitsBySeverity(t *testing.T) {
 		rep, out, err := f.output(t)
 
 		assert.Equal(t, 1, exitOf(err), out)
-		assert.Equal(t, DoctorIncomplete.Slug, check(t, rep, "generation-sandbox").Error)
+		assert.Equal(t, DoctorIncomplete.Slug, check(t, rep, "generation-sandbox").Error.Slug)
 		assert.Equal(t, resultError, check(t, rep, "generation-sandbox").Result)
 		assert.Equal(t, resultFail, check(t, rep, "root-unsafe").Result)
 		assert.Contains(t, out, "root-unsafe")
@@ -130,7 +130,8 @@ func TestDoctorWithoutUsableSettings(t *testing.T) {
 					continue
 				}
 				assert.Equal(t, resultError, c.Result, c.Slug)
-				assert.Equal(t, "usage", c.Error, c.Slug)
+				require.NotNil(t, c.Error, c.Slug)
+				assert.Equal(t, "usage", c.Error.Slug, c.Slug)
 			}
 		})
 	}
@@ -153,7 +154,8 @@ func TestDoctorBelowTheSbxFloor(t *testing.T) {
 	for _, slug := range []string{"toolchain-approval-required", slugGlobalSecret, slugBroadAllow, "generation-sandbox", "removal-pending"} {
 		c := check(t, rep, slug)
 		assert.Equal(t, resultError, c.Result, slug)
-		assert.Equal(t, sbxdrv.SbxFloor.ID, c.ID, slug)
+		require.NotNil(t, c.Error, slug)
+		assert.Equal(t, sbxdrv.SbxFloor.ID, c.Error.ID, slug)
 	}
 }
 

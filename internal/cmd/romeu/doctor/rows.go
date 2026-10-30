@@ -77,9 +77,9 @@ func failOf(slug string, err error) Check {
 // because of err: the error's own id and slug, or doctor-incomplete's
 // for an error that carries none of the table.
 func errorOf(slug string, err error) Check {
-	c := Check{Slug: slug, Result: resultError, ID: DoctorIncomplete.ID, Error: DoctorIncomplete.Slug, Message: err.Error()}
+	c := Check{Slug: slug, Result: resultError, Error: &ErrorRef{ID: DoctorIncomplete.ID, Slug: DoctorIncomplete.Slug}, Message: err.Error()}
 	if e, ok := errors.AsType[*cli.Error](err); ok && e != nil {
-		c.ID, c.Error = e.ID, e.Slug
+		c.Error = &ErrorRef{ID: e.ID, Slug: e.Slug}
 	}
 	return c
 }

@@ -79,6 +79,7 @@ func hostSeams() seams {
 			}
 		},
 		preflight: preflight.HostFindings,
+		preSlugs:  preflight.HostSlugs,
 		secret:    runSecretArgv,
 	}
 }

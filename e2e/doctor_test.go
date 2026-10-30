@@ -27,10 +27,12 @@ import (
 // reads it.
 type doctorReport struct {
 	Checks []struct {
-		Slug    string `json:"slug"`
-		Result  string `json:"result"`
-		ID      string `json:"id"`
-		Error   string `json:"error"`
+		Slug   string `json:"slug"`
+		Result string `json:"result"`
+		Error  *struct {
+			ID   string `json:"id"`
+			Slug string `json:"slug"`
+		} `json:"error"`
 		Message string `json:"message"`
 	} `json:"checks"`
 	Leftovers []string `json:"leftovers"`
@@ -41,7 +43,10 @@ func (r doctorReport) result(t *testing.T, slug string) (string, string) {
 	t.Helper()
 	for _, c := range r.Checks {
 		if c.Slug == slug {
-			return c.Result, c.Error
+			if c.Error == nil {
+				return c.Result, ""
+			}
+			return c.Result, c.Error.Slug
 		}
 	}
 	t.Fatalf("no check %s in the report", slug)
@@ -194,7 +199,7 @@ func TestDoctorOnAPlainBuild(t *testing.T) {
 
 	assert.NotContains(t, res.Stdout+res.Stderr, "julieta-not-embedded")
 	for _, c := range rep.Checks {
-		assert.NotEqual(t, "error", c.Result, "%s: %s %s", c.Slug, c.Error, c.Message)
+		assert.NotEqual(t, "error", c.Result, "%s: %v %s", c.Slug, c.Error, c.Message)
 	}
 	assert.Equal(t, 6, res.Code, "the fresh machine has no acknowledged toolchain: %s", res.Stderr)
 	assert.NoDirExists(t, e.StateDir(), "doctor makes no state directory")
