@@ -21,6 +21,7 @@ after:
   - T165
   - T043
 ask_first:
+  - checks
   - contracts
 sitting: none
 ---
@@ -69,7 +70,8 @@ Re-plan (2026-10-30, scope this repository): the new package needs its
 row in the import table of 10 10.7 (REQ-0972), so T169 also owns the
 REQ-0968 row of `docs/spec/10-testing-style.md`, which T170 owns too,
 and `tools/ci/internal/imports/rows.go` (ask-first `checks`), which
-mirrors that table; the change only adds `hostpaths` to the row.
+mirrors that table; the change only adds `hostpaths` to the row. T170
+now comes `after` T169 for that file.
 
 - Implements: REQ-1277 (04 4.2), REQ-1281 (05 5.2), REQ-1282 (05 5.2).
 - Operator: no.
