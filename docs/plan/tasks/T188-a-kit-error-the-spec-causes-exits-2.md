@@ -10,6 +10,9 @@ owns:
   - internal/cmd/romeu/sync/step6_render.go
   - internal/cmd/romeu/sync/step6_render_test.go
   - internal/cmd/romeu/sync/errors.go
+  - internal/cmd/romeu/sync/step2_fetch.go
+  - internal/cmd/romeu/sync/step2_fetch_test.go
+  - e2e/sync_test.go
   - docs/spec/04-cli.md
 needs:
   - T038
@@ -51,6 +54,13 @@ that links `sync` into the binary, since it edits step 6 and
 3. A kit error that is none of these, such as a file read that fails
    on the host, stays exit 1 and names the file.
 
+Re-plan (2026-10-30): takes from T043 the exit of a config origin
+whose objects the hardened fetch of step 2 refuses, found by the e2e of
+I27 in T043's last slice; it owns `step2_fetch.go` of `sync`, its test
+and `e2e/sync_test.go` for it, and stays `after` T185, which edits
+`step2_fetch.go` too. Proposed in that slice on 2026-10-30, for the
+operator to confirm at review; scope this repository.
+
 - Implements: none: the exit of the kit errors of REQ-0573 and REQ-0574
   (06 6.1), which T038 and T043 implement.
 - Operator: no.
@@ -63,6 +73,11 @@ that links `sync` into the binary, since it edits step 6 and
   - The causes `kit-refused` carries today (a refused personal kind or
     capability, a descriptor the grammar refuses, a git read gitsafe
     refuses) still exit 2, now with the row's id.
+  - A config origin that sends an object `transfer.fsckObjects` refuses
+    (a `.GIT`, `.git` with a U+200C or `..` name) makes step 2 exit 2
+    with an id that names the refusal, in place of the error `internal`
+    (`RJ-348`), exit 1, of today; the cases of `TestSyncHostileKit`
+    assert that exit (from T043, 2026-10-30).
   - A kit file whose read fails on the host for another reason exits 1
     naming the file.
   - The row of `kit-refused` in 04 4.4 has an id, the contract test of

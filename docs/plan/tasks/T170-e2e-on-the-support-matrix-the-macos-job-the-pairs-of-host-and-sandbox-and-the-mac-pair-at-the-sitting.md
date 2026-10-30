@@ -76,6 +76,10 @@ measured by this task, not taken from the documentation.
     and the date, as the probes of 11 record theirs.
   - The Linux pairs: arm64 with arm64 on every pull request, amd64 with
     amd64 in `x64.yml`, at the hybrid level.
+  - The I27 E cases of `e2e/sync_test.go` (a personal kit with each
+    hostile entry, and the hostile tree delivered by a bundle) run and
+    pass on `macos-26` (case-insensitive APFS), as 05 5.2 I27 and
+    REQ-0737 say (from T043, 2026-10-30).
 - Verify: the run of `ci.yml` on the pull request shows `e2e on
   macos-26`; `go run ./tools/ci workflows` passes and fails on a copy of
   `ci.yml` without the macOS leg.

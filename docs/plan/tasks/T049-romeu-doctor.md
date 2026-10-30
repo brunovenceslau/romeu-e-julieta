@@ -94,6 +94,9 @@ to clean up, and deletes none.
     printed; 6 when every check ran and any failed; `--json` carries one
     object per check with `result` in `pass`, `warn`, `fail` or `error`
     and the error id for `error`.
+  - A romeu built with plain `go build`, which embeds no julieta, runs
+    `doctor` as the embedded build does, and never stops with
+    `julieta-not-embedded` (from T043, 2026-10-30; 04 4.2).
 - Verify: `go test ./internal/... -run '^TestDoctor'`, which lists the
   row tests by name; `go test -tags e2e ./e2e/... -run '^TestDoctor' -v`
   for the A9 rows. The pattern names the `TestDoctor*` functions this

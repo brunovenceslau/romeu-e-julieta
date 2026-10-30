@@ -118,6 +118,37 @@ dirs and the manifest of `RJ-313` sized with it are T174's, which owns
 has no member for the dir (decided on 2026-10-29, in place of the
 member and the mount this note gave this task).
 
+Re-plan (2026-10-30): closed by slice E3, decided by the operator on
+2026-10-30, scope this repository. What is this task's is proven, and
+what belongs to a later task moves there with its acceptance line. I9
+is held by `TestRenderCandidatesKeepsTheEgressOfThePinnedCommit` (an
+uncommitted lock change, a commit on another branch of the origin and
+one of the clone, with a control that moves the egress), beside
+`TestMakeTreeMovesNoRefOfAClone` and
+`TestRenderCandidatesFlipsGate2OnARef`. I27 runs as e2e on Linux in
+`TestSyncHostileKit` (each hostile entry, through `--from`) and
+`TestSyncHostileKitDeliveredByABundle`, and through step 6 in
+`TestRenderCandidatesRefusesAHostilePersonalKit`, a unit test that the
+race job runs on `macos-26` too; I28 in
+`TestSyncFlipsGate2OnAKitCapability`. Moved, each to the task that
+owns what it needs:
+- the run of the I27 E cases on `macos-26` (case-insensitive APFS), the
+  macOS part of the I27 line: to T170, which makes `ci.yml` run the e2e
+  of git and the fake sbx on `macos-26`; the cases build for darwin
+  (`GOOS=darwin go vet -tags e2e ./e2e/...`);
+- the fetch of step 2 refuses a hostile name that fsck refuses on
+  transfer (`.GIT`, `.git` with a U+200C, `..`), which `sync` reports
+  as the error `internal` (`RJ-348`), exit 1; its id and exit 2: to
+  T188, which gives the kit errors the config commit causes theirs;
+- the warning `julieta-pin-mismatch`: to T055, which defines the pin of
+  `validate.yml` and its reader;
+- a plain `go build` with `run`, `status` and `doctor`: to T066, T048
+  and T049; `sync` exits 2 with `julieta-not-embedded` and `version`
+  works on that build (`TestSyncRefusesABuildWithoutJulieta`).
+The step 3 line's "(J2 step 3)" names the journey step where `sync`
+runs, not a level: its cases are unit (`TestReadSpecs`), as are its
+sibling clauses.
+
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
   REQ-0048 (01 1.2), REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01
   1.3), REQ-0059 (01 1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6),
