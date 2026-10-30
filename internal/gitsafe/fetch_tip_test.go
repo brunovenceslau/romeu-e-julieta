@@ -261,7 +261,7 @@ func TestRemoteDefaultRefusedName(t *testing.T) {
 		r := remoteAnswering(t, "ref: "+target+"\tHEAD\n"+strings.Repeat("a", 40)+"\tHEAD\n")
 		_, err := r.remoteDefault(t.Context(), stubRepo, "https://example.com/o/r", "https://example.com/o/r")
 		require.ErrorIs(t, err, ErrNoDefaultBranch, target)
-		assert.NotErrorIs(t, err, ErrRefused, target)
+		require.NotErrorIs(t, err, ErrRefused, target)
 	}
 	r := remoteAnswering(t, "ref: refs/heads/trunk\tHEAD\n"+strings.Repeat("a", 40)+"\tHEAD\n")
 	branch, err := r.remoteDefault(t.Context(), stubRepo, "https://example.com/o/r", "https://example.com/o/r")
@@ -278,6 +278,6 @@ func TestRemoteDefaultOversize(t *testing.T) {
 	_, err := r.remoteDefault(t.Context(), stubRepo, "https://example.com/o/r", "https://example.com/o/r")
 
 	require.ErrorIs(t, err, ErrNoDefaultBranch)
-	assert.NotErrorIs(t, err, ErrRefused)
+	require.NotErrorIs(t, err, ErrRefused)
 	assert.Contains(t, err.Error(), "advertises more than")
 }
