@@ -163,7 +163,14 @@ func write(env *cli.Env, rep Report, note string) error {
 		return err
 	}
 	for _, w := range rep.Warnings {
-		cli.Warn(env.Stderr, w.Slug, line(w.Message))
+		// Each slug is printed by its literal, which the check of the
+		// warning slugs against 04 4.1 reads (TestWarningSlugs).
+		switch w.Slug {
+		case "sbx-untested":
+			cli.Warn(env.Stderr, "sbx-untested", line(w.Message))
+		default:
+			panic("status: a warning with no literal of its own: " + w.Slug)
+		}
 	}
 	if err := writeToolchain(env.Stdout, rep.Toolchain); err != nil {
 		return err
