@@ -732,6 +732,10 @@ func TestRenderCandidatesRendersEveryProductKit(t *testing.T) {
 	productKits = kits.FS
 	entries, err := fs.ReadDir(kits.FS, ".")
 	require.NoError(t, err)
+	// git-ssh-sign renders only with its one key in the signing socket
+	// (the rule signing-socket, T080).
+	socket, keys := signingAgent(t, 1)
+	f.r.settings.Signing = &spec.Signing{AgentSocket: socket}
 	var all []spec.Kit
 	for _, e := range entries {
 		if !e.IsDir() {
@@ -739,7 +743,7 @@ func TestRenderCandidatesRendersEveryProductKit(t *testing.T) {
 		}
 		k := spec.Kit{Product: e.Name()}
 		if e.Name() == "git-ssh-sign" {
-			k.Args = map[string]string{"signingKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHk1a3Rlc3RrZXlmb3J0aGVmaXh0dXJlb25seTAwMDA="}
+			k.Args = map[string]string{"signingKey": keys[0]}
 		}
 		all = append(all, k)
 	}
