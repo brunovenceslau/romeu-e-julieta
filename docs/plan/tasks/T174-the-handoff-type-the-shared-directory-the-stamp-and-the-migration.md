@@ -35,7 +35,7 @@ after:
   - T166
   - T043
   - T178
-  - T191
+  - T192
 ask_first:
   - contracts
   - formats
@@ -112,7 +112,7 @@ does not have before this task (decided on 2026-10-29).
    newest migrated narrative is open; a ULID that already exists is
    skipped, so a run cut short resumes; each `entries/<ulid>.md` of
    before is renamed to its typed name, `mem_<ulid>.md` or
-   `hof_<ulid>.md` (03 3.14, after T191); a file that does not parse or
+   `hof_<ulid>.md` (03 3.14, after T192); a file that does not parse or
    fails the heading rule stays and is warned `handoff-legacy`; the
    directory is removed only once empty. A second run finds nothing.
    Under the store lock of both dirs.

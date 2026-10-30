@@ -1,5 +1,5 @@
 ---
-id: T191
+id: T192
 title: "a typed prefix on every id the product writes: `<kind>_<ulid>` and the closed table of id kinds"
 milestone: M2
 module: canon
@@ -34,7 +34,7 @@ ask_first:
 sitting: none
 ---
 
-# T191 - a typed prefix on every id the product writes: `<kind>_<ulid>` and the closed table of id kinds
+# T192 - a typed prefix on every id the product writes: `<kind>_<ulid>` and the closed table of id kinds
 
 Goal: an id read outside its context says which kind it is. A bare
 lowercase ULID of 26 characters names a memory entry, a handoff, a
@@ -81,6 +81,11 @@ renames the entry files of before.
    (`spool/spl_<ulid>.json`, 13 13.3) are written by T174 and T064
    (left v1); this task fixes their kinds in the table only, and the
    spool layout admits the typed name alone (a hostile input, I32).
+
+Renumbered (2026-10-30 23:10 UTC, scope this repository): this task was
+T191 until the doctor rows that wait for a seam took that id in #358
+(T049), which sits on the M3 critical path; it is T192 from then on, and
+T174 waits for T192.
 
 - Implements: REQ-1319 (03 3.14), REQ-1320 (03 3.14), REQ-0258
   (03 3.12), REQ-0241 (03 3.9), REQ-0226 (03 3.7), REQ-0235 (03 3.8),
