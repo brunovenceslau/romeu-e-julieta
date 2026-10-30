@@ -4,7 +4,9 @@
 package egress_test
 
 import (
+	"cmp"
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -467,6 +469,97 @@ func TestDeriveEmptyIsNotNil(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, got.Auto)
 	assert.NotNil(t, got.Gated)
+	assert.NotNil(t, got.Rules)
 	assert.Empty(t, got.Auto)
 	assert.Empty(t, got.Gated)
+	assert.Empty(t, got.Rules)
+}
+
+// TestDeriveRules is the table of the rules romeu applies (07 7.5,
+// REQ-0634, REQ-1316): every domain a source of romeu produced has a
+// rule at its port, 443 for the catalog and the spec and the port of
+// the scheme for a lock host, and a domain that only a kit declared has
+// none, auto or gated, though it stays in the effective set.
+func TestDeriveRules(t *testing.T) {
+	r := func(domain string, port int) egress.Rule { return egress.Rule{Domain: domain, Port: port} }
+	base := []egress.Rule{r("api.github.com", 443), r("github.com", 443), r("mise-versions.jdx.dev", 443), r("tuf-repo-cdn.sigstore.dev", 443)}
+	with := func(extra ...egress.Rule) []egress.Rule {
+		out := append(append([]egress.Rule(nil), base...), extra...)
+		slices.SortFunc(out, func(a, b egress.Rule) int {
+			return cmp.Or(strings.Compare(a.Domain, b.Domain), cmp.Compare(a.Port, b.Port))
+		})
+		return out
+	}
+	goLock := func(url string) map[string]string {
+		return map[string]string{"mise.toml": toml, "mise.lock": lockOf([3]string{"go", "core:go", url})}
+	}
+	tests := []struct {
+		name      string
+		files     map[string]string
+		spec      *spec.Egress
+		kit       []string
+		rules     []egress.Rule
+		effective []string // domains that must stay in the effective set
+	}{
+		{
+			name:      "a domain only a kit declared and the catalog allows has no rule",
+			kit:       []string{"proxy.golang.org"},
+			rules:     base,
+			effective: []string{"proxy.golang.org"},
+		},
+		{
+			name:      "a domain only a kit declared that is gated has no rule",
+			kit:       []string{"kit.acme.dev", "storage.googleapis.com"},
+			rules:     base,
+			effective: []string{"kit.acme.dev", "storage.googleapis.com"},
+		},
+		{
+			name:  "a kit domain the catalog also produced has the rule of the catalog",
+			files: goLock(""),
+			kit:   []string{"proxy.golang.org"},
+			rules: with(r("dl.google.com", 443), r("proxy.golang.org", 443), r("storage.googleapis.com", 443)),
+		},
+		{
+			name:  "a kit domain a lock also names has the rule of the lock host",
+			files: goLock("https://mirror.acme.dev/go.tar.gz"),
+			kit:   []string{"mirror.acme.dev"},
+			rules: with(r("dl.google.com", 443), r("mirror.acme.dev", 443), r("proxy.golang.org", 443), r("storage.googleapis.com", 443)),
+		},
+		{
+			name:  "a kit domain egress.extra repeats has the rule of the spec",
+			spec:  &spec.Egress{Extra: []string{"x.example"}},
+			kit:   []string{"x.example"},
+			rules: with(r("x.example", 443)),
+		},
+		{
+			name: "an egress.tools domain has a rule at 443",
+			files: map[string]string{"mise.toml": "[tools]\nx = \"1\"\n",
+				"mise.lock": lockOf([3]string{"x", "aqua:acme/tool", ""})},
+			spec:  &spec.Egress{Tools: map[string][]string{"aqua:acme/tool": {"dl.acme.dev"}}},
+			rules: with(r("dl.acme.dev", 443)),
+		},
+		{
+			name:  "a lock host on http has a rule at 80",
+			files: goLock("http://mirror.acme.dev/go.tar.gz"),
+			rules: with(r("dl.google.com", 443), r("mirror.acme.dev", 80), r("proxy.golang.org", 443), r("storage.googleapis.com", 443)),
+		},
+		{
+			name:  "a catalog domain a lock reaches on http has both rules",
+			files: goLock("http://dl.google.com/go.tar.gz"),
+			rules: with(r("dl.google.com", 80), r("dl.google.com", 443), r("proxy.golang.org", 443), r("storage.googleapis.com", 443)),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(strings.ReplaceAll(tt.name, " ", "_"), func(t *testing.T) {
+			got, err := egress.Derive(t.Context(), egress.Input{Repos: []egress.Repo{repoOf("api", tt.files)}, Spec: tt.spec, Kit: tt.kit, Catalog: testCatalog(t)})
+			require.NoError(t, err)
+			assert.Equal(t, tt.rules, got.Rules)
+			for _, dom := range tt.effective {
+				assert.Contains(t, got.Effective(), dom)
+			}
+			for _, rule := range got.Rules {
+				assert.Contains(t, got.Effective(), rule.Domain, "a rule is for a derived domain")
+			}
+		})
+	}
 }

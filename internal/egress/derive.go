@@ -4,6 +4,7 @@
 package egress
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -114,11 +115,35 @@ type Gate struct {
 	Reason Reason
 }
 
+// HTTPSPort is the port of a rule for a domain the catalog, the base or
+// meta set, egress.extra or egress.tools produced, and for a lock host
+// on https (07 7.5, REQ-0634).
+const HTTPSPort = 443
+
+// HTTPPort is the port of a rule for a lock host on http.
+const HTTPPort = 80
+
+// Rule is a network rule romeu applies to a sandbox: one domain and one
+// port, never every port of the domain (07 7.5, REQ-0634).
+type Rule struct {
+	Domain string
+	Port   int
+}
+
 // Result is the derived egress: the domains that are allowed at once and
-// the domains that wait for an approval, each sorted, and disjoint.
+// the domains that wait for an approval, each sorted, and disjoint, and
+// the rules romeu applies for them.
 type Result struct {
 	Auto  []string
 	Gated []Gate
+	// Rules are the rules of the domains of Auto and Gated that a source
+	// of romeu produced (steps 2 to 5), sorted by domain then port; the
+	// caller applies those of Auto and of the approved Gated (REQ-0634).
+	// A domain only the descriptors declared (step 6) has no rule: sbx
+	// applies it from the descriptor with its port, and romeu does not
+	// apply, remove or check it (REQ-1316). It stays in Auto or Gated for
+	// the gate's upload flag, the digest and the manifest's applied set.
+	Rules []Rule
 }
 
 // Effective returns the sorted union of Auto and Gated, the input of the
@@ -167,7 +192,7 @@ func (r Result) Digest() (canon.Sum[canon.EgressKind], error) {
 // the install error names it (REQ-0637). It never allows more than the
 // lock names.
 func Derive(ctx context.Context, in Input) (Result, error) {
-	d := derivation{in: in, auto: map[string]bool{}, produced: map[string]bool{}, kit: map[string]bool{}, gated: map[string]Reason{}}
+	d := derivation{in: in, auto: map[string]bool{}, produced: map[string]bool{}, kit: map[string]bool{}, gated: map[string]Reason{}, rules: map[Rule]bool{}}
 	for _, repo := range in.Repos {
 		if err := d.repo(ctx, repo); err != nil {
 			return Result{}, err
@@ -208,12 +233,14 @@ type derivation struct {
 	kit      map[string]bool   // domains a kit declared
 	gated    map[string]Reason // domains gated by their source
 	hosts    []string          // lock hosts, judged once every repo is read
+	rules    map[Rule]bool     // the rules of the domains romeu produced
 }
 
 // produce adds a domain the catalog produced.
 func (d *derivation) produce(dom string) {
 	d.auto[dom] = true
 	d.produced[dom] = true
+	d.rules[Rule{Domain: dom, Port: HTTPSPort}] = true
 }
 
 // gate adds a domain of the spec to the gated set.
@@ -222,6 +249,7 @@ func (d *derivation) gate(dom string, r Reason) error {
 		return err
 	}
 	d.gated[dom] = firstReason(d.gated[dom], r)
+	d.rules[Rule{Domain: dom, Port: HTTPSPort}] = true
 	return nil
 }
 
@@ -240,7 +268,7 @@ func firstReason(a, b Reason) Reason {
 // result applies step 7 and sorts.
 func (d *derivation) result() Result {
 	gated := map[string]Reason{}
-	res := Result{Auto: []string{}, Gated: []Gate{}}
+	res := Result{Auto: []string{}, Gated: []Gate{}, Rules: slices.AppendSeq([]Rule{}, maps.Keys(d.rules))}
 	for dom := range d.auto {
 		switch {
 		case d.in.Catalog.Gated(dom) && d.kit[dom] && !d.produced[dom]:
@@ -267,6 +295,9 @@ func (d *derivation) result() Result {
 		res.Gated = append(res.Gated, Gate{Domain: dom, Reason: r})
 	}
 	slices.SortFunc(res.Gated, func(a, b Gate) int { return strings.Compare(a.Domain, b.Domain) })
+	slices.SortFunc(res.Rules, func(a, b Rule) int {
+		return cmp.Or(strings.Compare(a.Domain, b.Domain), cmp.Compare(a.Port, b.Port))
+	})
 	return res
 }
 
@@ -324,7 +355,7 @@ func (d *derivation) repo(ctx context.Context, repo Repo) error {
 	for _, key := range slices.Sorted(maps.Keys(lock.Tools)) {
 		for _, e := range lock.Tools[key] {
 			for _, platform := range e.PlatformNames() {
-				host, err := hostOf(e.URLs[platform])
+				host, port, err := hostOf(e.URLs[platform])
 				if err != nil {
 					e := LockHostInvalid.Wrap(errors.New(termsafe.Escape(err.Error())),
 						fmt.Sprintf("the mise.lock of %s (%s) records an artifact host for the tool %q, version %s, platform %s, that is not an egress domain",
@@ -333,6 +364,7 @@ func (d *derivation) repo(ctx context.Context, repo Repo) error {
 					return e
 				}
 				d.hosts = append(d.hosts, host)
+				d.rules[Rule{Domain: host, Port: port}] = true
 			}
 		}
 	}
@@ -371,26 +403,33 @@ func unknownTools(dir string, unknown []string) error {
 }
 
 // hostOf returns the host of an artifact URL of a lock, which must pass
-// the egress domain rule of 03 3.1. The URL is judged as written: only
+// the egress domain rule of 03 3.1, and the port of its scheme: 443 for
+// https and 80 for http. A URL that writes a port fails the domain rule.
+// The URL is judged as written: only
 // printable ASCII without a backslash, since a backslash is a path
 // separator to some parsers and not to Go's, and no user information, so
 // the host Derive allows is the one every parser reads.
-func hostOf(raw string) (string, error) {
+func hostOf(raw string) (string, int, error) {
 	if i := strings.IndexFunc(raw, func(r rune) bool { return r <= ' ' || r >= 0x7f || r == '\\' }); i >= 0 {
-		return "", fmt.Errorf("the url holds a character that is not printable ASCII, or a backslash, at byte %d", i)
+		return "", 0, fmt.Errorf("the url holds a character that is not printable ASCII, or a backslash, at byte %d", i)
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", errors.New("the url does not parse")
+		return "", 0, errors.New("the url does not parse")
 	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return "", fmt.Errorf("the url scheme is %q, not https or http", u.Scheme)
+	port := HTTPSPort
+	switch u.Scheme {
+	case "https":
+	case "http":
+		port = HTTPPort
+	default:
+		return "", 0, fmt.Errorf("the url scheme is %q, not https or http", u.Scheme)
 	}
 	if u.User != nil {
-		return "", errors.New("the url holds user information")
+		return "", 0, errors.New("the url holds user information")
 	}
 	if err := spec.ValidDomain(u.Host); err != nil {
-		return "", err
+		return "", 0, err
 	}
-	return u.Host, nil
+	return u.Host, port, nil
 }
