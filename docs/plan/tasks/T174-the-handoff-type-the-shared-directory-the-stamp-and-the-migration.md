@@ -51,7 +51,7 @@ project's shared directory, the stamp of 03 3.10 replaces the handoff
 file, and the handoff files of before are migrated once. Decided on
 2026-10-28, with the specification amended in the same pull request as
 T171: 03 3.6 (`sharedMemory`), 03 3.9 (REQ-1295 to REQ-1299), 03 3.10
-(REQ-0244, REQ-1300), 03 3.14 (REQ-0259), 04 4.3 (REQ-0411, REQ-0413,
+(REQ-0244, REQ-1300), 03 3.12 (REQ-0259), 04 4.3 (REQ-0411, REQ-0413,
 REQ-1301), 08 8.1 (REQ-0642, REQ-0645, REQ-0646, REQ-0648 to REQ-0650)
 and 08 8.3 (REQ-0676 to REQ-0680, REQ-0683, REQ-0685). `schemas/` is
 owned by T166 and the `_shared/` creation of `sync` by T043; this task
