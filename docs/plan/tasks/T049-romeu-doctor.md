@@ -15,7 +15,9 @@ needs:
   - T103
   - T169
 after: []
-ask_first: []
+ask_first:
+  - contracts
+  - checks
 sitting: none
 ---
 
@@ -41,6 +43,25 @@ Re-plan (2026-10-22): the sweep of leftover temporary files in the state
 directory is deferred to this task: `doctor` lists the leftover temporary
 files (the dotfiles an interrupted atomic write leaves) for the operator
 to clean up, and deletes none.
+
+Re-plan (2026-10-30, scope this repository): built without three rows
+whose read has no seam yet; each stays in this task's list and lands
+with its seam. `host-git-config` waits for a gitsafe verb that reads
+the host global git config (`gitsafe` is ask-first; a parser of the
+config by hand is ADR 0038's question). `sbx-remember-commands` and
+`sbx-allowed-sources` wait for an sbx settings read in `sbxdrv`, a
+builder and a synthetic session (ask-first `sbxdrv`), whose argv probe
+A1 records (11 11.1). `secret-argv` is built here, since the sentinel
+case runs the secret argv; `secret-unknown-project` stays T134's. The
+exit 1 of an incomplete report is the error `doctor-incomplete`
+(`RJ-360`), a row added to 04 4.4 as `status-incomplete` was for T048,
+and declared in `doctor/errors.go` (ask-first `contracts`). The secret
+argv run joins the admitted call sites of
+`tools/ci/internal/callsites/table.go` by one line (ask-first
+`checks`). The leftover temporary files are a member of the report,
+`leftovers`, and no check: no slug of 04 4.1 names them. The schema
+`schemas/romeu-doctor.v1.json` is deferred to T134, which owns
+`doctor --json`; its trigger is that task reopening.
 
 - Implements: REQ-0056 (01 1.3), REQ-0057 (01 1.3), REQ-0059 (01 1.4),
   REQ-0062 (01 1.4), REQ-0136 (02 2.3), REQ-0141 (02 2.3), REQ-0148 (02
