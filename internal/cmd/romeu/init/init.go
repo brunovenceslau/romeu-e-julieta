@@ -26,6 +26,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hostpaths"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
@@ -124,12 +125,9 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 	if !filepath.IsAbs(home) {
 		return usage(cmd, "HOME is not an absolute path")
 	}
-	settings := env.SettingsPath
-	if settings == "" {
-		var err error
-		if settings, err = spec.SettingsPath(getenv); err != nil {
-			return usage(cmd, err.Error())
-		}
+	settings, err := hostpaths.SettingsPath(env, getenv)
+	if err != nil {
+		return usage(cmd, err.Error())
 	}
 	h, err := build(cmd, o, home)
 	if err != nil {
@@ -141,23 +139,15 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 
 	// The root check comes before anything is written, the state
 	// directory included (REQ-0309, I20).
-	rs, err := realPath(settings)
-	if err != nil {
-		return usage(cmd, "the settings path: "+err.Error())
-	}
-	stateDir, err := state.DefaultDir(getenv)
+	stateDir, err := hostpaths.StateDir(getenv)
 	if err != nil {
 		return usage(cmd, err.Error())
 	}
-	rstate, err := realPath(stateDir)
+	paths, err := hostpaths.RealPaths(home, settings, stateDir)
 	if err != nil {
-		return usage(cmd, "the state path: "+err.Error())
+		return usage(cmd, err.Error())
 	}
-	rhome, err := realPath(home)
-	if err != nil {
-		return usage(cmd, "HOME: "+err.Error())
-	}
-	if why := rootProblem(h.Root, rhome, rs, rstate); why != "" {
+	if why := hostpaths.RootProblem(h.Root, h.Config.Project+"-env", paths); why != "" {
 		return RootUnsafe.New(why)
 	}
 
@@ -267,7 +257,7 @@ func absent(settings string) error {
 }
 
 // build returns the settings the flags describe, with the root made
-// real; tools fills the rest and validates it by the rules of 03 3.4.
+// real (hostpaths.RealPath); tools fills the rest and validates it by the rules of 03 3.4.
 func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error) {
 	var zero spec.HostSettings
 	if err := gitsafe.CheckURL(o.configURL); err != nil {
@@ -283,11 +273,9 @@ func build(cmd *cobra.Command, o options, home string) (spec.HostSettings, error
 	if o.root == "" {
 		o.root = filepath.Join(home, "Developer")
 	}
-	o.root = filepath.Clean(o.root) // a trailing slash is no fault
-	if !filepath.IsAbs(o.root) {
-		return zero, RootUnsafe.New("the root is not an absolute, clean path")
-	}
-	root, err := realPath(o.root)
+	// A trailing slash is no fault; a relative root is kept as it is, for
+	// the root check to refuse.
+	root, err := hostpaths.RealPath(filepath.Clean(o.root))
 	if err != nil {
 		return zero, usage(cmd, "--root: "+err.Error())
 	}
@@ -393,7 +381,7 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // the root and the path of the env dir. A root or an env dir that is a
 // symbolic link, not a directory, not owned by the user or writable by
 // its group or others is root-unsafe: it is checked after it is made,
-// not only before (rootProblem), so a directory or a link created in
+// not only before (hostpaths.RootProblem), so a directory or a link created in
 // between is caught. A directory init made is 0700; one that was there
 // is chmod'ed through the handle only when the checks passed, and never
 // followed out of the root.
@@ -409,7 +397,7 @@ func openTree(root, envName string) (*os.Root, string, made, error) {
 	} else if !errors.Is(err, fs.ErrExist) {
 		return nil, "", m, fmt.Errorf("init: the root: %w", err)
 	}
-	if why := dirProblem(os.Lstat, root); why != "" {
+	if why := hostpaths.DirProblem(os.Lstat, root); why != "" {
 		return nil, "", m, RootUnsafe.New("the root " + why)
 	}
 	rt, err := os.OpenRoot(root)
@@ -422,7 +410,7 @@ func openTree(root, envName string) (*os.Root, string, made, error) {
 		_ = rt.Close()
 		return nil, "", m, fmt.Errorf("init: %w", err)
 	}
-	if why := dirProblem(rt.Lstat, envName); why != "" {
+	if why := hostpaths.DirProblem(rt.Lstat, envName); why != "" {
 		_ = rt.Close()
 		return nil, "", m, RootUnsafe.New(envName + " " + why)
 	}
