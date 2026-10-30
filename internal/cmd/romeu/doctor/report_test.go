@@ -33,7 +33,7 @@ func TestDoctorPassesAWellKeptHost(t *testing.T) {
 
 // TestDoctorExitsBySeverity: every failed check is printed whatever the
 // exit; a check that could not run makes the exit 1 (doctor-incomplete,
-// RJ-360) with the failed checks still printed, and failed checks alone
+// RJ-361) with the failed checks still printed, and failed checks alone
 // make it 6 (check-findings, RJ-328); a warning changes no exit
 // (REQ-0331).
 func TestDoctorExitsBySeverity(t *testing.T) {

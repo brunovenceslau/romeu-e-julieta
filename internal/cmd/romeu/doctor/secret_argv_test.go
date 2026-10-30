@@ -111,7 +111,7 @@ func TestDoctorSecretArgv(t *testing.T) {
 		b, err := os.ReadFile(envFile)
 		require.NoError(t, err)
 		var names []string
-		for _, kv := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for kv := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
 			name, value, _ := strings.Cut(kv, "=")
 			switch name {
 			case "PWD", "SHLVL", "OLDPWD", "_":
