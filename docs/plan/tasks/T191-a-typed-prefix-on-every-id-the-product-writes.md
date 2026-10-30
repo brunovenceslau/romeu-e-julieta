@@ -45,7 +45,7 @@ for another. Decided on 2026-10-28 (the pending note
 the examples in memory 01m62641frppzgbjd7w19ccxs1), its three open
 points on 2026-10-30: the file name carries the prefix too, a bare
 ULID is accepted in silence for good, and every ULID the product
-writes gets a kind. The rule and the table of kinds are in 03 3.12
+writes gets a kind. The rule and the table of kinds are in 03 3.14
 (REQ-1319, REQ-1320), written with this task; the file-name lines of
 03 3.7, 3.8, 3.9, 3.10, 08 8.1 and 13 13.3 follow. This task is
 ordered before T174, which writes the handoff type and the stamp files
@@ -82,8 +82,8 @@ renames the entry files of before.
    (left v1); this task fixes their kinds in the table only, and the
    spool layout admits the typed name alone (a hostile input, I32).
 
-- Implements: REQ-1319 (03 3.12), REQ-1320 (03 3.12), REQ-0258
-  (03 3.12), REQ-0241 (03 3.9), REQ-0226 (03 3.7), REQ-0235 (03 3.8),
+- Implements: REQ-1319 (03 3.14), REQ-1320 (03 3.14), REQ-0258
+  (03 3.14), REQ-0241 (03 3.9), REQ-0226 (03 3.7), REQ-0235 (03 3.8),
   REQ-0656 (08 8.1), REQ-0333 (04 4.2), REQ-0411 (04 4.3).
 - Operator: approves `digests` (the id type lands in `internal/canon`),
   `gates` (`internal/state` records and the candidate dir) and

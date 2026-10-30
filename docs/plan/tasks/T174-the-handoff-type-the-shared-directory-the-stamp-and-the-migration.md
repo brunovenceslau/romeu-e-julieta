@@ -51,7 +51,7 @@ project's shared directory, the stamp of 03 3.10 replaces the handoff
 file, and the handoff files of before are migrated once. Decided on
 2026-10-28, with the specification amended in the same pull request as
 T171: 03 3.6 (`sharedMemory`), 03 3.9 (REQ-1295 to REQ-1299), 03 3.10
-(REQ-0244, REQ-1300), 03 3.12 (REQ-0259), 04 4.3 (REQ-0411, REQ-0413,
+(REQ-0244, REQ-1300), 03 3.14 (REQ-0259), 04 4.3 (REQ-0411, REQ-0413,
 REQ-1301), 08 8.1 (REQ-0642, REQ-0645, REQ-0646, REQ-0648 to REQ-0650)
 and 08 8.3 (REQ-0676 to REQ-0680, REQ-0683, REQ-0685). `schemas/` is
 owned by T166 and the `_shared/` creation of `sync` by T043; this task
@@ -112,7 +112,7 @@ does not have before this task (decided on 2026-10-29).
    newest migrated narrative is open; a ULID that already exists is
    skipped, so a run cut short resumes; each `entries/<ulid>.md` of
    before is renamed to its typed name, `mem_<ulid>.md` or
-   `hof_<ulid>.md` (03 3.12, after T191); a file that does not parse or
+   `hof_<ulid>.md` (03 3.14, after T191); a file that does not parse or
    fails the heading rule stays and is warned `handoff-legacy`; the
    directory is removed only once empty. A second run finds nothing.
    Under the store lock of both dirs.
@@ -162,7 +162,7 @@ already waits on T043.
 - Implements: REQ-0140 (02 2.3), REQ-0177 (03 3.1), REQ-1317 (03 3.6),
   REQ-1295 (03 3.9), REQ-1318 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
   REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-1302 (03 3.9), REQ-0237 (03 3.8), REQ-0244 (03 3.10), REQ-1300
-  (03 3.10), REQ-0259 (03 3.12), REQ-0411 (04 4.3), REQ-0413 (04 4.3),
+  (03 3.10), REQ-0259 (03 3.14), REQ-0411 (04 4.3), REQ-0413 (04 4.3),
   REQ-1290 (04 4.3), REQ-1301 (04 4.3), REQ-0642 (08 8.1), REQ-0645
   (08 8.1), REQ-0648 (08 8.1), REQ-0649 (08 8.1), REQ-0650 (08 8.1),
   REQ-0660 (08 8.1), REQ-0668 (08 8.2),

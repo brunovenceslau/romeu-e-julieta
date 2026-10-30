@@ -552,7 +552,7 @@ julieta accepts manifests, is described in
 `REQ-0226` `promoting` is omitted except inside a promotion commit
 ([01 1.6](01-system-model.md#promotion-commit)), when it is
 `{"candidateId": "cnd_<ulid>", "filesDigest": "<hex>", "previousFiles": {...}}`
-(the id typed, 3.12).
+(the id typed, 3.14).
 `REQ-1273` A member that has no value is omitted and never written as
 `null`: `promoting` outside a promotion commit, and `lockSha256` of a
 repo with no `mise.lock`. The schema generator admits no `null` for a
@@ -618,7 +618,7 @@ both forms.
 | `generations[].state` | `REQ-0232` `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
 | `generations[].createdWith` | `REQ-0233` the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
 | `salvage[].manifestSha256` | `REQ-0234` plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
-| `salvage[].id` | `REQ-0235` a typed id, `slv_<ulid>` (3.12), as the generation's `gen_<ulid>` is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
+| `salvage[].id` | `REQ-0235` a typed id, `slv_<ulid>` (3.14), as the generation's `gen_<ulid>` is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
 | `salvage[].fingerprint` | `REQ-0236` `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the `fingerprint` digest (3.12) of the values the list **Fingerprint** after this table names, not read again at that write. That list is the one home of what a fingerprint is; the pages that compare one cite it. A field of the state format, under the version rule of the opening of this page |
 | `salvage[].result` | `REQ-0237` `complete`, `incomplete`, `lost`; `reasons[]` lists each skipped item, `sandbox-half-failed`, or `sandbox-lost`, and for a generation `run` closed as lost, `dirty-at-last-stamp:<n>` and `stashes-at-last-stamp:<n>` from the newest stamp (03 3.10; [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), run step 2); `acceptedLoss[]` lists the reasons `--accept-loss` named |
 
@@ -663,7 +663,7 @@ index.
 ## 3.9 Memory entry (schema `memory-entry.v1`)
 
 `REQ-0241` One file per entry: `memory/<dir>/entries/<id>.md`, the id
-typed (`mem_<ulid>`, or `hof_<ulid>` for a `handoff` entry, 3.12), a
+typed (`mem_<ulid>`, or `hof_<ulid>` for a `handoff` entry, 3.14), a
 bare name of before still read. julieta stamps
 `id`, `createdAt` and `updatedAt` on `add` and `edit`; the agent
 supplies only `title`, `body`, `tags` and `status` (a supplied id or
@@ -767,7 +767,7 @@ count defined below and the stashes, with the project, the generation,
 the agent and the time. `REQ-1300` It is written in two places by the
 same code: inside a `handoff` entry, under the `stamp` key of its front
 matter, when the entry is added (3.9), and as a file
-`memory/_shared/stamps/stp_<ulid>.yaml` (3.12) by `julieta stamp`, the SessionEnd
+`memory/_shared/stamps/stp_<ulid>.yaml` (3.14) by `julieta stamp`, the SessionEnd
 hook (08 8.2), so the newest file says where the trees were when the
 last session ended and the entry says where they were when the
 narrative was written; the gap between the two is the resume line of
@@ -879,46 +879,6 @@ decoders refuse uppercase.
 | `memory-content` | `REQ-0259` an entry's `title`, `body`, `tags` and `status`, never its `stamp` | `julieta memory add` duplicate rule (04 4.1) |
 | `fingerprint` | `REQ-0260` the fingerprint object of 3.8 | the `removing` write and its rerun |
 
-`REQ-1319` Every id the product writes as text, a file or directory
-name, a printed line or a member of a record, is `<kind>_<ulid>`: the
-kind one word of the table below, lowercase ASCII letters, one
-underscore, then the 26 characters of REQ-0258, so the whole id is one
-shell word and one click, and a reader outside its context (a chat
-line, a pull request body, a note) knows which kind it names. A reader
-of a place takes the typed form and the bare 26 characters alike,
-without a warning and for good, since ids written before this rule
-live in notes, records and file names, and refuses a kind the place
-does not hold (`julieta memory show` holds `mem` and `hof`); the
-product writes a bare id nowhere after this rule. The file or
-directory an id names carries the typed form (`entries/mem_<ulid>.md`
-of 3.9, `stamps/stp_<ulid>.yaml` of 3.10, the candidate dir of
-[01 1.6](01-system-model.md#generation), `spool/spl_<ulid>.json` of
-[13 13.3](13-runtime-ledger.md#133-spool)); a reader admits the bare
-name where files of before exist (entries, candidate dirs), and the
-spool layout, a hostile input, admits the typed name alone. The
-temporary name `.tmp-<ULID>` of [08 8.1](08-memory-handoff-salvage.md#81-memory-store)
-is no id the product shows and keeps its grammar. A ULID among the
-inputs of a digest of the table above is digested in its bare form, so
-this rule changes no digest. Decided on 2026-10-28, its three open
-points (the file name, the bare form, the kinds) on 2026-10-30; scope
-every adopter of the product, written here and read by the section of
-each kind.
-
-`REQ-1320` The table of id kinds is closed for v1, as the digest kinds
-are, and a new kind is a change to this table first; one type in
-`internal/canon`, next to the ULID, carries the kind and decodes both
-forms, and every place that prints or takes an id uses it.
-
-| Kind | Names | Section |
-|---|---|---|
-| `mem` | a memory entry | 3.9, 08 8.2 |
-| `hof` | a `handoff` entry | 3.9, 08 8.3 |
-| `stp` | a stamp file | 3.10 |
-| `gen` | a generation | 01 1.6, 3.8 |
-| `slv` | a salvage | 3.8, 3.11 |
-| `cnd` | a candidate | 3.7, 01 1.6 |
-| `spl` | a spool event | 13 13.3 |
-
 ## 3.13 Other schemas
 
 `probe-result.v1` is defined in [11](11-host-probes.md#113-probe-result-format);
@@ -939,3 +899,45 @@ Formats without a schema, each with its reason:
 | `tools/ci/denylist.yaml`, `prose.yaml`, `headings.yaml` | `REQ-0264` read by `tools/ci` alone, each pinned by its step's test |
 | `docs/reference/vocabulary.yaml` | `REQ-0265` generated from 01 1.7 and read by `tools/ci vocabulary` |
 | `e2e/testdata/sbx/<version>/*.jsonl` | `REQ-0266` written by the recorder and read by the fake sbx, pinned by their tests (10 10.3) |
+
+## 3.14 Ids (`internal/canon`)
+
+`REQ-1319` Every id the product writes as text, a file or directory
+name, a printed line or a member of a record, is `<kind>_<ulid>`: the
+kind one word of the table below, lowercase ASCII letters, one
+underscore, then the 26 characters of REQ-0258, so the whole id is one
+shell word and one click, and a reader outside its context (a chat
+line, a pull request body, a note) knows which kind it names. A reader
+of a place takes the typed form and the bare 26 characters alike,
+without a warning and for good, since ids written before this rule
+live in notes, records and file names, and refuses a kind the place
+does not hold (`julieta memory show` holds `mem` and `hof`); the
+product writes a bare id nowhere after this rule. The file or
+directory an id names carries the typed form (`entries/mem_<ulid>.md`
+of 3.9, `stamps/stp_<ulid>.yaml` of 3.10, the candidate dir of
+[01 1.6](01-system-model.md#generation), `spool/spl_<ulid>.json` of
+[13 13.3](13-runtime-ledger.md#133-spool)); a reader admits the bare
+name where files of before exist (entries, candidate dirs), and the
+spool layout, a hostile input, admits the typed name alone. The
+temporary name `.tmp-<ULID>` of [08 8.1](08-memory-handoff-salvage.md#81-memory-store)
+is no id the product shows and keeps its grammar. A ULID among the
+inputs of a digest of 3.12 is digested in its bare form, so
+this rule changes no digest. Decided on 2026-10-28, its three open
+points (the file name, the bare form, the kinds) on 2026-10-30; scope
+every adopter of the product, written here and read by the section of
+each kind.
+
+`REQ-1320` The table of id kinds is closed for v1, as the digest kinds
+of 3.12 are, and a new kind is a change to this table first; one type in
+`internal/canon`, next to the ULID, carries the kind and decodes both
+forms, and every place that prints or takes an id uses it.
+
+| Kind | Names | Section |
+|---|---|---|
+| `mem` | a memory entry | 3.9, 08 8.2 |
+| `hof` | a `handoff` entry | 3.9, 08 8.3 |
+| `stp` | a stamp file | 3.10 |
+| `gen` | a generation | 01 1.6, 3.8 |
+| `slv` | a salvage | 3.8, 3.11 |
+| `cnd` | a candidate | 3.7, 01 1.6 |
+| `spl` | a spool event | 13 13.3 |
