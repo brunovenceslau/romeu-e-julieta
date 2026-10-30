@@ -83,7 +83,7 @@ renames the entry files of before.
    spool layout admits the typed name alone (a hostile input, I32).
 
 - Implements: REQ-1319 (03 3.14), REQ-1320 (03 3.14), REQ-0258
-  (03 3.14), REQ-0241 (03 3.9), REQ-0226 (03 3.7), REQ-0235 (03 3.8),
+  (03 3.12), REQ-0241 (03 3.9), REQ-0226 (03 3.7), REQ-0235 (03 3.8),
   REQ-0656 (08 8.1), REQ-0333 (04 4.2), REQ-0411 (04 4.3).
 - Operator: approves `digests` (the id type lands in `internal/canon`),
   `gates` (`internal/state` records and the candidate dir) and
