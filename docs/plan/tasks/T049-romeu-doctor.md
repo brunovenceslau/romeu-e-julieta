@@ -3,7 +3,7 @@ id: T049
 title: "`romeu doctor`"
 milestone: M3
 module: romeu-cli
-fate: kept
+fate: merged
 owns:
   - internal/cmd/romeu/doctor/**
   - internal/cmd/romeu/all/import_doctor.go
@@ -24,6 +24,8 @@ ask_first:
   - formats
   - gates
 sitting: none
+merged: 2026-10-30
+pr: 358
 ---
 
 # T049 - `romeu doctor`
