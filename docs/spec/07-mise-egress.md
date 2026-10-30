@@ -203,15 +203,34 @@ blob; `mise.toml` short names need mise's registry to resolve, which
 would mean running mise on the host.
 
 `REQ-0634` Application (romeu): per-sandbox rules via
-`sbx policy allow network --sandbox <name> <domain>` for `auto` plus
-approved `gated`; removal via `sbx policy rm network --sandbox <name>
---resource <domain>` for domains romeu applied earlier and that left the set;
-verification with `sbx policy check network --sandbox <name> <domain>`
-(exact argv from the block A recordings). `REQ-1316` The domains that
-only the descriptors declared (step 6) are not applied, removed or
-checked by romeu: sbx applies them from the descriptor, and a rule
-romeu added for one would widen it, since a rule with no port opens
-every port of the domain (measured on 2026-10-29, sbx v0.50.1).
+`sbx policy allow network --sandbox <name> <domain>:<port>` for `auto`
+plus approved `gated`; removal via `sbx policy rm network --sandbox
+<name> --resource <domain>:<port>` for rules romeu applied earlier and
+that left the set; verification with `sbx policy check network
+--sandbox <name> <domain>:<port>` (exact argv from the block A
+recordings). Each rule carries one port, never none, since a rule with
+no port opens every port of the domain (measured on 2026-10-29, sbx
+v0.50.1: ports 80, 8080 and 2222 of one host answered). The port of a
+rule follows the source of its domain: 443 for a domain of the catalog,
+of the `meta` and `base` sets, of `egress.tools` and of `egress.extra`,
+and for a lock host the port of the scheme of its URL, 443 for `https`
+and 80 for `http` (a URL that writes a port is `lock-host-invalid`,
+step 3). A domain two sources produce has the rule of each, so a host
+a lock reaches over `http` that the catalog also lists has both. The
+result of the derivation carries these rules beside `auto` and
+`gated`. In v1 no catalog or `egress.extra` entry names another port:
+each is a domain by the rule of 03 3.1 and gets 443. A host a project
+needs on another port is declared with its port in the runtime phase
+of a kit, which sbx applies with that port (step 6). Reopened by the
+first catalog or `egress.extra` entry that needs a port other than 443
+(decided on 2026-10-30, scope this repository). The argument
+`<domain>:<port>` is the form `sbx policy ls --json` reports for a
+resource (the probe of 2026-10-29); romeu passes it once the block A
+recording of `allow`, `rm` and `check` with that form is read.
+`REQ-1316` The domains that only the
+descriptors declared (step 6) have no rule and are not applied,
+removed or checked by romeu: sbx applies them from the descriptor with
+their ports, and a rule romeu added for one would widen it.
 `REQ-0635` Applied on create (before `julieta setup`), on every `run` (re-applies
 after an `sbx reset`), and on `sync` for a running sandbox. `REQ-0636` The
 manifest carries the applied set
