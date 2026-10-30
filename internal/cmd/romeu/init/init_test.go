@@ -465,3 +465,49 @@ func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
 		})
 	}
 }
+
+// TestInitRefusesARootSwappedBeforeItIsOpened: a root replaced between
+// its check and its open, by a directory its group can write or by a
+// link to another directory, is refused through the handle (root-unsafe,
+// exit 2) before anything is written under it.
+func TestInitRefusesARootSwappedBeforeItIsOpened(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		swap func(t *testing.T, root string) string // returns the directory the open reaches
+		want string
+	}{
+		{"by a directory its group can write", func(t *testing.T, root string) string {
+			require.NoError(t, os.Mkdir(root, 0o700))
+			require.NoError(t, os.Chmod(root, 0o770))
+			return root
+		}, "the root is writable by its group or others"},
+		{"by a link to another directory", func(t *testing.T, root string) string {
+			other := root + ".other"
+			require.NoError(t, os.Mkdir(other, 0o700))
+			require.NoError(t, os.Symlink(other, root))
+			return other
+		}, "the root was replaced while init opened it"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			old := openRoot
+			t.Cleanup(func() { openRoot = old })
+			var reached string
+			openRoot = func(root string) (*os.Root, error) {
+				require.NoError(t, os.Rename(root, root+".old"))
+				reached = tc.swap(t, root)
+				return old(root)
+			}
+
+			code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
+
+			assert.Equal(t, 2, code, stderr)
+			assert.Contains(t, stderr, "RJ-352")
+			assert.Contains(t, stderr, tc.want)
+			assert.NoFileExists(t, m.settings())
+			entries, err := os.ReadDir(reached)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "nothing is written under the swapped root")
+		})
+	}
+}
