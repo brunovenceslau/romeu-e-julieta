@@ -3,4 +3,9 @@
 
 package all
 
-import _ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/spec"
+import "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/spec"
+
+// SpecReport is the --json document of julieta spec validate, the
+// format julieta-spec.v1, here so that tools/ci, which reaches a command
+// package through this one only (REQ-0971), registers its schema.
+type SpecReport = spec.Report

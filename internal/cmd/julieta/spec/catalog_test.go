@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -112,7 +113,7 @@ func TestSpecValidateCatalogKnownTools(t *testing.T) {
 // TestSpecValidateCatalogUnknownTool: a backend:tool neither the catalog
 // nor egress.tools of the spec has is a finding, exit 6, the case sync
 // refuses with catalog-unknown-tool (07 7.5, step 2); the host of its
-// artifacts is a note, which changes no exit code (step 3).
+// artifacts is the warning lock-host-gated, on stderr (step 3).
 func TestSpecValidateCatalogUnknownTool(t *testing.T) {
 	configRepo(t, map[string]string{"shop.yaml": shopSpec})
 	o := &fakeOrigins{locks: map[string]string{"https://github.com/example/shop-web": acmeLock}}
@@ -122,13 +123,15 @@ func TestSpecValidateCatalogUnknownTool(t *testing.T) {
 	assert.Equal(t, 6, code, stderr)
 	assert.Contains(t, stderr, "RJ-328")
 	assert.Contains(t, stdout, "finding catalog-unknown-tool projects/shop.yaml: aqua:acme/tool in the mise.lock of https://github.com/example/shop-web ")
-	assert.Contains(t, stdout, "gated projects/shop.yaml dl.acme.example: ")
+	assert.Contains(t, stderr, "warning lock-host-gated: projects/shop.yaml: dl.acme.example is an artifact host ")
+	assert.NotContains(t, stdout, "dl.acme.example")
 	assert.Contains(t, stdout, "spec validate 1 files 1 findings\n")
 }
 
 // TestSpecValidateCatalogSpecTool: a tool egress.tools of the spec
 // declares is no finding, and a lock host the catalog does not produce
-// is a note only, exit 0.
+// is the warning lock-host-gated (04 4.1, Warnings), which changes no
+// exit code.
 func TestSpecValidateCatalogSpecTool(t *testing.T) {
 	configRepo(t, map[string]string{"shop.yaml": shopSpec + "  tools:\n    \"aqua:acme/tool\": [dl.acme.example]\n"})
 	o := &fakeOrigins{locks: map[string]string{"https://github.com/example/shop-web": acmeLock}}
@@ -136,12 +139,14 @@ func TestSpecValidateCatalogSpecTool(t *testing.T) {
 	code, stdout, stderr := validate(t, o, "projects/shop.yaml")
 
 	require.Equal(t, 0, code, stderr)
-	assert.Equal(t, "gated projects/shop.yaml dl.acme.example: a host of a mise.lock that the embedded egress catalog does not produce; romeu sync gates it\n"+
-		notCheckedLine+"spec validate 1 files 0 findings\n", stdout)
+	assert.Equal(t, notCheckedLine+"spec validate 1 files 0 findings\n", stdout)
+	assert.Equal(t, "warning lock-host-gated: projects/shop.yaml: dl.acme.example is an artifact host of a mise.lock "+
+		"that the embedded egress catalog does not produce; romeu sync gates it\n", stderr)
 }
 
 // TestSpecValidateCatalogUnparsedLock: a lock that does not parse with
-// the pinned layout is a finding, exit 6, so no unknown tool hides in it.
+// the pinned layout, or one gitsafe refuses to read, is the finding
+// lock-unparsed, exit 6, so no unknown tool hides in it.
 func TestSpecValidateCatalogUnparsedLock(t *testing.T) {
 	configRepo(t, map[string]string{"shop.yaml": shopSpec})
 	o := &fakeOrigins{locks: map[string]string{"https://github.com/example/shop-api": "lockfile_version = 2\n"}}
@@ -150,10 +155,19 @@ func TestSpecValidateCatalogUnparsedLock(t *testing.T) {
 
 	assert.Equal(t, 6, code, stderr)
 	assert.Contains(t, stdout, "finding lock-unparsed projects/shop.yaml: the mise.lock of https://github.com/example/shop-api does not parse: ")
+
+	refused := func(context.Context, string, string) ([]byte, bool, error) {
+		return nil, false, fmt.Errorf("%w: a link", gitsafe.ErrFileRefused)
+	}
+	var out, errOut bytes.Buffer
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
+	assert.Equal(t, 6, cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, refused)))
+	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: the mise.lock of https://github.com/example/shop-api cannot be read: ")
 }
 
 // TestSpecValidateCatalogFetchFails: an origin that cannot be read stops
-// the command with exit 1, never a pass.
+// the command with fetch-failed (RJ-360), exit 1, never a pass, and the
+// details name the URL and the ref.
 func TestSpecValidateCatalogFetchFails(t *testing.T) {
 	configRepo(t, map[string]string{"shop.yaml": strings.Replace(shopSpec, "shop-web", "fail", 1)})
 	o := &fakeOrigins{}
@@ -161,6 +175,9 @@ func TestSpecValidateCatalogFetchFails(t *testing.T) {
 	code, stdout, stderr := validate(t, o, "projects/shop.yaml")
 
 	assert.Equal(t, 1, code, stderr)
+	assert.Equal(t, "RJ-360", errorID(t, stderr), stderr)
+	assert.Contains(t, stderr, "fix: decide: check the network and the origin URL, then run the command again\n")
+	assert.Contains(t, stderr, "url: https://github.com/example/fail\n")
 	assert.Contains(t, stderr, "could not read the mise.lock of https://github.com/example/fail at its default branch from origin")
 	assert.Empty(t, stdout)
 }

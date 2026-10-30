@@ -19,7 +19,7 @@ check project specs without the host settings
 
 ### Synopsis
 
-Decodes each project spec strictly and checks it against the schema and the name and path rules of 03 3.1, each file alone and the files together, and prints one line naming the rules only romeu checks, since they read host settings. A file under projects/ that is not *.yaml, and a spec whose manifest would pass 32 KiB, are findings too. With --catalog it also reads each repo's mise.lock at its ref from origin and reports each backend:tool the embedded egress catalog and the spec's egress.tools lack, a finding, and each lock host the catalog does not produce, which sync gates. Any finding is exit 6; a file that cannot be read is exit 2.
+Decodes each project spec strictly and checks it against the schema and the name and path rules of 03 3.1, each file alone and the files together, and prints one line naming the rules only romeu checks, since they read host settings. A file under projects/ that is not *.yaml, and a spec whose manifest would pass 32 KiB, are findings too. With --catalog it also reads each repo's mise.lock at its ref from origin and reports each backend:tool the embedded egress catalog and the spec's egress.tools lack, a finding, and warns lock-host-gated for each lock host the catalog does not produce, which sync gates; an origin it cannot read is fetch-failed, exit 1. Any finding is exit 6; a file that cannot be read is exit 2. With --json it prints one document of the format julieta-spec.v1.
 
 ```
 julieta spec validate <file>... [flags]
@@ -37,6 +37,7 @@ julieta spec validate --catalog projects/*.yaml
 ```
       --catalog   also read each repo's mise.lock at its ref and look its tools up in the embedded egress catalog
   -h, --help      help for validate
+      --json      print one JSON document
 ```
 
 ### SEE ALSO

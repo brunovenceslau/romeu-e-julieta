@@ -35,7 +35,7 @@ var _ = cli.Register(func() cli.Command {
 	// validate reads the files it is given and, with --catalog, the
 	// origins of their repos; it writes nothing but a temporary clone.
 	c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
-	c.Binary, c.Name, c.Sub = "julieta", "spec", "validate"
+	c.Binary, c.Name, c.Sub, c.JSON = "julieta", "spec", "validate", true
 	c.New = func(env *cli.Env) *cobra.Command {
 		var withCatalog bool
 		cmd := &cobra.Command{
@@ -47,8 +47,9 @@ var _ = cli.Register(func() cli.Command {
 				"each file alone and the files together, and prints one line naming the rules only romeu checks, since they read host settings. " +
 				"A file under projects/ that is not *.yaml, and a spec whose manifest would pass 32 KiB, are findings too. " +
 				"With --catalog it also reads each repo's mise.lock at its ref from origin and reports each backend:tool the embedded egress catalog " +
-				"and the spec's egress.tools lack, a finding, and each lock host the catalog does not produce, which sync gates. " +
-				"Any finding is exit 6; a file that cannot be read is exit 2.",
+				"and the spec's egress.tools lack, a finding, and warns lock-host-gated for each lock host the catalog does not produce, which sync gates; " +
+				"an origin it cannot read is fetch-failed, exit 1. Any finding is exit 6; a file that cannot be read is exit 2. " +
+				"With --json it prints one document of the format julieta-spec.v1.",
 			Args: cobra.MinimumNArgs(1),
 			RunE: func(c *cobra.Command, args []string) error {
 				var fetch lockFetcher
@@ -85,7 +86,7 @@ type finding struct {
 // run validates the files of args; fetch, when it is not nil, reads the
 // mise.lock of a repo for --catalog.
 func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) error {
-	files, err := readFiles(args)
+	files, added, err := readFiles(args)
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 	if err != nil {
 		return fmt.Errorf("the embedded egress catalog: %w", err)
 	}
-	var notes []string
+	var warnings []setup.Warning
 	for _, f := range files {
 		if path.Ext(f.Path) != ".yaml" {
 			continue
@@ -119,7 +120,7 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 				return err
 			}
 			findings = append(findings, found...)
-			notes = append(notes, gated...)
+			warnings = append(warnings, gated...)
 		}
 		size, err := manifestFinding(f.Path, p, eg)
 		if err != nil {
@@ -127,30 +128,46 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 		}
 		findings = append(findings, size...)
 	}
-	return report(env, len(files), findings, notes)
-}
-
-// report prints each finding, each note of --catalog and the line of
-// the rules not checked on stdout, then a summary line; any finding is
-// check-findings (RJ-328), exit 6, whose details list each by its slug
-// (REQ-0435).
-func report(env *cli.Env, files int, findings []finding, notes []string) error {
-	for _, f := range findings {
-		if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.rule, termsafe.Escape(f.text)); err != nil {
+	rep := newReport(files, findings, warnings)
+	if env.JSON {
+		if err := writeJSON(env, rep); err != nil {
 			return err
 		}
+	} else if err := writeText(env, rep, added); err != nil {
+		return err
 	}
-	for _, n := range notes {
-		if _, err := fmt.Fprintln(env.Stdout, n); err != nil {
+	return findingsError(findings)
+}
+
+// writeText prints each warning on stderr, then each finding, the line
+// of the rules not checked and a summary line on stdout. The summary
+// counts the files judged, and among them the entries of projects/ the
+// command added (REQ-0423).
+func writeText(env *cli.Env, rep Report, added int) error {
+	for _, w := range rep.Warnings {
+		// lock-host-gated is the one warning of the command.
+		cli.Warn(env.Stderr, "lock-host-gated", w.Message)
+	}
+	for _, f := range rep.Findings {
+		if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.Rule, termsafe.Escape(f.Text)); err != nil {
 			return err
 		}
 	}
 	if _, err := fmt.Fprintln(env.Stdout, notChecked()); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(env.Stdout, "spec validate %d files %d findings\n", files, len(findings)); err != nil {
-		return err
+	from := ""
+	if added > 0 {
+		from = fmt.Sprintf(" (%d from %s/)", added, projectsDir)
 	}
+	_, err := fmt.Fprintf(env.Stdout, "spec validate %d files%s %d findings\n", len(rep.Files), from, len(rep.Findings))
+	return err
+}
+
+// findingsError returns nil for no finding, and otherwise
+// check-findings (RJ-328), exit 6, whose details list each finding by
+// its slug (REQ-0435).
+func findingsError(findings []finding) error {
 	if len(findings) == 0 {
 		return nil
 	}
@@ -182,14 +199,13 @@ func notChecked() string {
 // rule of REQ-0178 judges it: the shell glob projects/*.yaml of the
 // config repo's CI never names one (REQ-0423). A file that cannot be
 // read, or a directory given, is usage, exit 2.
-func readFiles(args []string) ([]projectspec.File, error) {
-	var files []projectspec.File
+func readFiles(args []string) (files []projectspec.File, added int, err error) {
 	given := map[string]bool{}
 	var dirs []string
 	for _, a := range args {
 		data, err := readCapped(a)
 		if err != nil {
-			return nil, unreadable(a, err)
+			return nil, 0, unreadable(a, err)
 		}
 		p := filepath.ToSlash(filepath.Clean(a))
 		if given[p] {
@@ -204,17 +220,18 @@ func readFiles(args []string) ([]projectspec.File, error) {
 	for _, d := range dirs {
 		entries, err := os.ReadDir(d)
 		if err != nil {
-			return nil, unreadable(d, err)
+			return nil, 0, unreadable(d, err)
 		}
 		for _, e := range entries {
 			p := filepath.ToSlash(filepath.Join(d, e.Name()))
 			if path.Ext(p) != ".yaml" && !given[p] {
 				given[p] = true
 				files = append(files, projectspec.File{Path: p})
+				added++
 			}
 		}
 	}
-	return files, nil
+	return files, added, nil
 }
 
 // readCapped reads the regular file name, at most one byte over the cap

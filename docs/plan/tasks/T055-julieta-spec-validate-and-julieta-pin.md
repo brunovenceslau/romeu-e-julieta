@@ -15,6 +15,10 @@ owns:
   - examples/.github/workflows/validate.yml
   - internal/cmd/romeu/sync/step10_report.go
   - internal/cmd/romeu/sync/step10_report_test.go
+  - docs/spec/04-cli.md
+  - schemas/julieta-spec.v1.json
+  - tools/ci/internal/schema/julieta.go
+  - .gitattributes
 needs:
   - T021
   - T032
@@ -23,7 +27,10 @@ needs:
   - T051
   - T043
 after: []
-ask_first: []
+ask_first:
+  - checks
+  - contracts
+  - formats
 sitting: none
 ---
 
@@ -54,24 +61,45 @@ it owns `step10_report.go` of `sync` and its test for it, and T043
 moves from `after` to `needs`. Decided by the operator on 2026-10-30,
 scope this repository.
 
-Re-plan (2026-10-30): built in slices, scope this repository. Slice A
-is `julieta spec validate` (`internal/cmd/julieta/spec/`,
-`import_spec.go`, `e2e/julieta_spec_test.go`): the first acceptance
-line, without `--json`, whose schema registration in `tools/ci` is
-outside this file set. A file under `projects/` that is not `*.yaml` is
-found by reading the directory of each file given in `projects/`,
-since the glob of the config repo's CI never names one. The manifest of
-the size check is built from the spec alone with stand-ins, the root
-`/` among them, a lower bound that sync measures again. `--catalog`
-reads each lock through a full clone with gitsafe, which has no
-shallow fetch yet. The other lines wait on files outside `owns`: `pin
-workload` and the "behind" of `pin check` on a tag-to-digest read
-through the guarded client of `internal/oci`; the reader of
-`validate.yml` that `romeu sync` calls on a package both binaries may
-link (10 10.7); `examples/.github/workflows/validate.yml` on a rule of
-`tools/ci schema` for a workflow under `examples/`; and the J2 step on
-a world of `e2e/internal/romeu` that runs a julieta line, at the hybrid
-level of 10 10.1.
+Re-plan (2026-10-30): built in three slices, decided by the operator
+on 2026-10-30, scope this repository. Slice A is `julieta spec
+validate`: the first acceptance line, with `--json`
+(`internal/cmd/julieta/spec/`, `import_spec.go`,
+`e2e/julieta_spec_test.go`). Slice B is `julieta pin workload` and
+`pin check` for spec workloads; it needs a tag-to-digest read through
+the guarded client of `internal/oci`, outside this file set. Slice C
+is `pin check --workflows`, `examples/.github/workflows/validate.yml`,
+the warning `julieta-pin-mismatch` of `romeu sync` and the J2 step; it
+needs a rule of `tools/ci schema` for a workflow under `examples/`
+(`checks`), a world of `e2e/internal/romeu` whose `Run` accepts a
+julieta line, with one line each in `e2e/scenarios/j2/commands.yaml`,
+`j2.go` and `j2_test.go`, and the reader of `validate.yml`. That reader
+goes in a new package, `internal/pin`, linked by both binaries, which
+needs a row in the import table of 10 10.7 and in
+`tools/ci/internal/imports/rows.go` (`checks`); slice C builds it.
+Decided for slice A, the same day:
+- A file under `projects/` that is not `*.yaml` is found by reading
+  the directory of each file given in `projects/`, since the glob of
+  the config repo's CI never names one, and the summary says
+  `spec validate <n> files (<k> from projects/)` when it added some.
+- The manifest of the size check is built from the spec alone with
+  stand-ins, the root `/` among them, a lower bound that sync measures
+  again.
+- `--catalog` reads each lock through a full clone with gitsafe, which
+  has no shallow fetch yet.
+- An origin `--catalog` cannot read is the new error `fetch-failed`
+  (`RJ-360`, exit 1, a row of 04 4.4 declared in the command's
+  `errors.go`); a lock host the catalog does not produce is the new
+  warning `lock-host-gated` of 04 4.1; a lock that does not parse, or
+  that gitsafe refuses, is the finding `lock-unparsed`, exit 6, now in
+  the command's exit-code cell of 04 4.3.
+- `--json` prints the format `julieta-spec.v1`, whose schema is
+  registered in `tools/ci/internal/schema/julieta.go`: the files judged,
+  the findings, the rules not checked and the warnings, as the text
+  says.
+This task now owns `docs/spec/04-cli.md`, which T185, T188 and T189
+own too; T055 is on the critical path, so it comes first and each of
+them that `tools/ci plan` names takes T055 in its `after`.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03

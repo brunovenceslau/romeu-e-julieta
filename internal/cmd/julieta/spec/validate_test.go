@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
 )
 
@@ -144,7 +145,7 @@ func TestSpecValidateStrayFile(t *testing.T) {
 	assert.Equal(t, "RJ-328", errorID(t, stderr))
 	assert.Contains(t, stdout, "finding projects-yaml-only projects/blog.yml: the file: ")
 	assert.Contains(t, stdout, "finding projects-yaml-only projects/notes.txt: the file: ")
-	assert.Contains(t, stdout, "spec validate 3 files 2 findings\n")
+	assert.Contains(t, stdout, "spec validate 3 files (2 from projects/) 2 findings\n")
 }
 
 // TestSpecValidateUnreadableIsUsage: a file that cannot be read, a
@@ -205,4 +206,45 @@ func TestSpecValidateManifestSizeMeasuresTheManifest(t *testing.T) {
 	assert.Contains(t, back.Egress, "github.com", "the base set")
 	require.Len(t, back.Repos, 2)
 	assert.Equal(t, "/home/agent/src/shop/shop-web", back.Repos[1].Path)
+}
+
+// TestSpecValidateJSON: --json prints one document of the format
+// julieta-spec.v1, which carries what the text output says: the files
+// judged, the findings, the rules not checked and the warnings; the
+// error report is on stderr and the exit code is the same.
+func TestSpecValidateJSON(t *testing.T) {
+	configRepo(t, map[string]string{"shop.yaml": shopSpec, "notes.txt": "x"})
+
+	code, stdout, stderr := julieta(t, "spec", "validate", "--json", "projects/shop.yaml")
+
+	assert.Equal(t, 6, code, stderr)
+	assert.Equal(t, "RJ-328", errorID(t, stderr))
+	var rep Report
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rep, json.RejectUnknownMembers(true)), stdout)
+	assert.Equal(t, Report{
+		Files:      []string{"projects/shop.yaml", "projects/notes.txt"},
+		Findings:   []Finding{{Rule: "projects-yaml-only", Text: "projects/notes.txt: the file: is a file under projects/ that is not *.yaml"}},
+		NotChecked: []string{"config-project", "repo-url-host", "workload-repository"},
+		Schema:     "julieta-spec/v1",
+		Warnings:   []setup.Warning{},
+	}, rep)
+	assert.Equal(t, 1, strings.Count(stdout, "\n"), "one document")
+}
+
+// TestSpecValidateJSONWarnings: with --json, a warning is a member of the
+// document, and stderr holds nothing for it.
+func TestSpecValidateJSONWarnings(t *testing.T) {
+	configRepo(t, map[string]string{"shop.yaml": shopSpec + "  tools:\n    \"aqua:acme/tool\": [dl.acme.example]\n"})
+	o := &fakeOrigins{locks: map[string]string{"https://github.com/example/shop-web": acmeLock}}
+	var stdout, stderr bytes.Buffer
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr), JSON: true}
+
+	require.NoError(t, run(t.Context(), env, []string{"projects/shop.yaml"}, o.fetch))
+
+	assert.Empty(t, stderr.String())
+	var rep Report
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &rep))
+	require.Len(t, rep.Warnings, 1)
+	assert.Equal(t, "lock-host-gated", rep.Warnings[0].Slug)
+	assert.Empty(t, rep.Findings)
 }

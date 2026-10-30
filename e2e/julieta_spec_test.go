@@ -30,7 +30,7 @@ agent: sbx-kit-claude
 // whose name is not its file stem is a finding, and so is a file under
 // projects/ that is not *.yaml, though the glob does not name it
 // (REQ-0423), each exit 6, check-findings (RJ-328); a file that cannot
-// be read is exit 2.
+// be read is exit 2. --json prints the document of julieta-spec.v1.
 func TestJulietaSpecValidate(t *testing.T) {
 	steps := scenario(t, `
 mkdir -p /tmp/config/projects
@@ -42,6 +42,7 @@ step stem env -u JULIETA_MANIFEST "$J" spec validate projects/foo.yaml projects/
 rm projects/baz.yaml
 printf 'x' > projects/README.md
 step stray env -u JULIETA_MANIFEST "$J" spec validate projects/*.yaml
+step json env -u JULIETA_MANIFEST "$J" spec validate --json projects/*.yaml
 step missing env -u JULIETA_MANIFEST "$J" spec validate projects/gone.yaml
 `)
 	r := step(t, steps, "valid")
@@ -59,7 +60,31 @@ step missing env -u JULIETA_MANIFEST "$J" spec validate projects/gone.yaml
 	assert.Equal(t, 6, r.code, r.stderr)
 	assert.Equal(t, "RJ-328", textErrorID(r))
 	assert.True(t, strings.HasPrefix(r.stdout, "finding projects-yaml-only projects/README.md: the file: "), r.stdout)
-	assert.Contains(t, r.stdout, "spec validate 2 files 1 findings\n")
+	assert.Contains(t, r.stdout, "spec validate 2 files (1 from projects/) 1 findings\n")
+
+	r = step(t, steps, "json")
+	assert.Equal(t, 6, r.code, r.stderr)
+	assert.Equal(t, "RJ-328", errorID(t, r), "the error report of --json")
+	var rep struct {
+		Files    []string `json:"files"`
+		Findings []struct {
+			Rule string `json:"rule"`
+			Text string `json:"text"`
+		} `json:"findings"`
+		NotChecked []string `json:"notChecked"`
+		Schema     string   `json:"schema"`
+		Warnings   []struct {
+			Message string `json:"message"`
+			Slug    string `json:"slug"`
+		} `json:"warnings"`
+	}
+	decodeStrict(t, r.stdout, &rep)
+	assert.Equal(t, "julieta-spec/v1", rep.Schema)
+	assert.Equal(t, []string{"projects/foo.yaml", "projects/README.md"}, rep.Files)
+	require.Len(t, rep.Findings, 1)
+	assert.Equal(t, "projects-yaml-only", rep.Findings[0].Rule)
+	assert.Equal(t, []string{"config-project", "repo-url-host", "workload-repository"}, rep.NotChecked)
+	assert.Empty(t, rep.Warnings)
 
 	r = step(t, steps, "missing")
 	assert.Equal(t, 2, r.code, r.stderr)

@@ -16,6 +16,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/catalog"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/mise"
 	projectspec "github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -68,11 +69,12 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 // spec's egress.tools, as romeu sync does (07 7.5, step 2): one found
 // in neither is the finding catalog-unknown-tool. Each artifact host of
 // the lock that the catalog does not produce for these tools, nor its
-// meta and base sets, is a note, since sync gates it (step 3). A lock
-// that does not parse is the finding lock-unparsed. The domains found
-// are added to eg. A repo whose lock cannot be fetched stops the
-// command.
-func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, file string, p projectspec.Project, eg egressSet) ([]finding, []string, error) {
+// meta and base sets, is the warning lock-host-gated, since sync gates
+// it (step 3). A lock that does not parse, or that gitsafe refuses, is
+// the finding lock-unparsed. The domains found are added to eg. A repo
+// whose lock cannot be fetched stops the command with fetch-failed
+// (RJ-360), so nothing passes on a lock it did not read.
+func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, file string, p projectspec.Project, eg egressSet) ([]finding, []setup.Warning, error) {
 	produced := egressSet{}
 	produced.add(cat.Meta()...)
 	produced.add(cat.Base()...)
@@ -85,8 +87,9 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 			continue
 		}
 		if err != nil {
-			return nil, nil, cli.Internal.Wrap(err, "julieta spec validate --catalog could not read the mise.lock of "+
-				termsafe.Escape(r.URL)+" at "+termsafe.Escape(refName(r.Ref))+" from origin: "+termsafe.Escape(err.Error()))
+			return nil, nil, FetchFailed.Wrap(err, "julieta spec validate --catalog could not read the mise.lock of "+
+				termsafe.Escape(r.URL)+" at "+termsafe.Escape(refName(r.Ref))+" from origin: "+termsafe.Escape(err.Error()),
+				cli.Detail{Key: "url", Value: termsafe.Escape(r.URL)}, cli.Detail{Key: "ref", Value: termsafe.Escape(refName(r.Ref))})
 		}
 		if !found {
 			continue
@@ -131,16 +134,16 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 			}
 		}
 	}
-	var notes []string
+	var warnings []setup.Warning
 	slices.Sort(hosts)
 	for _, h := range hosts {
 		eg.add(h)
 		if !produced[h] {
-			notes = append(notes, "gated "+termsafe.Escape(file)+" "+termsafe.Escape(h)+
-				": a host of a mise.lock that the embedded egress catalog does not produce; romeu sync gates it")
+			warnings = append(warnings, setup.Warning{Slug: lockHostGated, Message: file + ": " + h +
+				" is an artifact host of a mise.lock that the embedded egress catalog does not produce; romeu sync gates it"})
 		}
 	}
-	return findings, notes, nil
+	return findings, warnings, nil
 }
 
 // hostOf returns the lowercase host of an artifact URL of a lock, or ""
@@ -153,6 +156,10 @@ func hostOf(raw string) string {
 	}
 	return strings.ToLower(u.Hostname())
 }
+
+// lockHostGated is the slug of the warning of a lock host the catalog
+// does not produce (04 4.1, Warnings).
+const lockHostGated = "lock-host-gated"
 
 // refName returns the name of the ref of a repo, for a message.
 func refName(ref string) string {
