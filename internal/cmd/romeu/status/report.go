@@ -31,8 +31,54 @@ const (
 // block per project, in name order. Its schema, romeu-status.v1, is
 // generated once the report is whole (T048, the last slice).
 type Report struct {
+	// Toolchain is the state of gate 1 on this machine (01 1.4); absent
+	// when it was not read.
+	Toolchain *Toolchain `json:"toolchain,omitzero"`
+	// Warnings are the report's warnings, each by its slug of 04 4.1,
+	// such as sbx-untested.
+	Warnings []Finding `json:"warnings"`
+	// Errors are the reads that failed outside any project's block
+	// (REQ-0329): sbx version, the toolchain record.
+	Errors []ReadError `json:"errors"`
 	// Projects are the blocks of the report.
 	Projects []Project `json:"projects"`
+}
+
+// The states of the toolchain acknowledgement (gate 1, 01 1.4).
+const (
+	// ToolchainAcknowledged: the record holds the live toolchain.
+	ToolchainAcknowledged = "acknowledged"
+	// ToolchainStale: a member of the live toolchain differs from the
+	// record; romeu approve --toolchain acknowledges it.
+	ToolchainStale = "stale"
+	// ToolchainMissing: no toolchain was ever acknowledged.
+	ToolchainMissing = "missing"
+	// ToolchainUnknown: a read the comparison needs failed.
+	ToolchainUnknown = "unknown"
+)
+
+// Toolchain is the state of gate 1: status reports a mismatch and does
+// not stop on it (REQ-0062).
+type Toolchain struct {
+	// State is acknowledged, stale, missing or unknown.
+	State string `json:"state"`
+	// Sbx is the live sbx version; absent when it was not read.
+	Sbx string `json:"sbx,omitzero"`
+	// Changes are the members whose live value differs from the record,
+	// in the order of 03 3.8; every member when none was acknowledged,
+	// and an empty list when the record holds the live toolchain.
+	Changes []ToolchainChange `json:"changes"`
+}
+
+// ToolchainChange is one member of the toolchain whose live value is not
+// the recorded one.
+type ToolchainChange struct {
+	// Member names it by its path in toolchain.json.
+	Member string `json:"member"`
+	// Recorded is the recorded value; "" when none was acknowledged.
+	Recorded string `json:"recorded"`
+	// Live is the live value.
+	Live string `json:"live"`
 }
 
 // Project is the block of one project.
