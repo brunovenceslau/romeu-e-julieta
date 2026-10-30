@@ -148,3 +148,31 @@ func TestDoctorRunsNoSecretArgvFromForeignSettings(t *testing.T) {
 	assert.Equal(t, 1, exitOf(err))
 	assert.NoFileExists(t, ran, "no secret argv ran")
 }
+
+// TestDoctorRunsNoSecretArgvThroughALink: settings that are a link, even
+// to a file of mode 0600 this user owns, run no secret argv; the settings
+// are judged through a descriptor opened without following a link, the
+// one their argv would be read from.
+func TestDoctorRunsNoSecretArgvThroughALink(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	ran := filepath.Join(f.tmp, "ran")
+	argv := stub(t, f, "secret", "/usr/bin/touch "+ran+"; echo value")
+	f.settings.Secrets = map[string]spec.Secret{"token@shop": {Service: "svc-alpha", Argv: []string{argv}}}
+	data, err := spec.EncodeHostSettings(f.settings)
+	require.NoError(t, err)
+	real := filepath.Join(f.tmp, "settings.yaml")
+	require.NoError(t, os.WriteFile(real, data, 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Dir(f.settingsPath()), 0o700))
+	require.NoError(t, os.Symlink(real, f.settingsPath()))
+	f.noSettings = true
+
+	rep, out, err := f.output(t)
+
+	c := check(t, rep, "secret-argv")
+	assert.Equal(t, resultError, c.Result, out)
+	assert.Contains(t, c.Message, "is a link")
+	assert.Contains(t, check(t, rep, "settings-mode").Message, "is a link")
+	assert.Equal(t, 1, exitOf(err))
+	assert.NoFileExists(t, ran, "no secret argv ran")
+}

@@ -187,3 +187,18 @@ func TestDoctorJSONIsItsSchema(t *testing.T) {
 		assert.Contains(t, doc, `"result":"`+r+`"`, "the document holds every result")
 	}
 }
+
+// TestDoctorListsALeftoverWhoseNameIsNotUTF8: a leftover whose name holds
+// a byte that is not UTF-8 is listed with U+FFFD in its place, so the
+// JSON report is still written whole.
+func TestDoctorListsALeftoverWhoseNameIsNotUTF8(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.store(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.stateDir(), "projects", ".bad\xff.json1"), []byte("{"), 0o600))
+
+	rep, out, err := f.output(t)
+
+	require.NoError(t, err, out)
+	assert.Equal(t, []string{filepath.Join(f.stateDir(), "projects", ".bad\uFFFD.json1")}, rep.Leftovers)
+}

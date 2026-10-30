@@ -16,9 +16,11 @@ import (
 )
 
 // The check settings-mode (04 4.2, REQ-0381): the host settings file is
-// not 0600, or the state directory is not 0700. The modes are read with
-// Lstat: a link in place of either is not the file romeu wrote. A state
-// directory that does not exist yet has no mode to judge.
+// not a regular file of mode 0600 that this user owns, judged through
+// the descriptor secret-argv reads its argv from (checkedSettings), or
+// the state directory is not 0700, read with Lstat. A link in place of
+// either is not what romeu wrote. A state directory that does not exist
+// yet has no mode to judge.
 var _ = register(row{slug: "settings-mode", run: checkSettingsMode})
 
 func checkSettingsMode(_ context.Context, h *host) Check {
@@ -30,32 +32,23 @@ func checkSettingsMode(_ context.Context, h *host) Check {
 		return errorOf(slug, h.stateErr)
 	}
 	var found []string
-	for _, f := range []struct {
-		path string
-		mode fs.FileMode
-		dir  bool
-	}{{h.settingsPath, state.FileMode, false}, {h.stateDir, state.DirMode, true}} {
-		info, err := os.Lstat(f.path)
-		switch {
-		case errors.Is(err, fs.ErrNotExist) && f.dir:
-			continue
-		case err != nil:
-			return errorOf(slug, err)
-		}
-		if info.Mode() != f.mode|dirBit(f.dir) {
-			found = append(found, fmt.Sprintf("%s is %v, not %v; chmod %04o %s", f.path, info.Mode(), f.mode|dirBit(f.dir), f.mode, f.path))
-		}
+	sf, err := h.checkedSettings()
+	if err != nil {
+		return errorOf(slug, err)
+	}
+	if sf.problem != "" {
+		found = append(found, h.settingsPath+" "+sf.problem)
+	}
+	info, err := os.Lstat(h.stateDir)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return errorOf(slug, err)
+	case info.Mode() != state.DirMode|fs.ModeDir:
+		found = append(found, fmt.Sprintf("%s is %v, not %v; chmod %04o %s", h.stateDir, info.Mode(), state.DirMode|fs.ModeDir, state.DirMode, h.stateDir))
 	}
 	if len(found) > 0 {
 		return fail(slug, joined(found))
 	}
 	return pass(slug, "")
-}
-
-// dirBit is fs.ModeDir for a directory.
-func dirBit(dir bool) fs.FileMode {
-	if dir {
-		return fs.ModeDir
-	}
-	return 0
 }

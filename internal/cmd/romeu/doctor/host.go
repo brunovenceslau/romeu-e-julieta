@@ -82,10 +82,12 @@ type host struct {
 	stateErr error
 	sbxr     sbxReader
 
-	floor    *memo[sbxdrv.Release]
-	list     *memo[[]sbxdrv.Sandbox]
-	records  *memo[records]
-	findings *memo[stepFive]
+	floor   *memo[sbxdrv.Release]
+	list    *memo[[]sbxdrv.Sandbox]
+	records *memo[records]
+	// settingsFile is the settings file as checkedSettings judged it.
+	settingsFile *memo[settingsFile]
+	findings     *memo[stepFive]
 }
 
 // memo is a value read once, on first use, with its error.
@@ -109,12 +111,13 @@ func (m *memo[T]) get(read func() (T, error)) (T, error) {
 // is the one it found.
 func newHost(env *cli.Env, s seams) *host {
 	h := &host{
-		seams:    s,
-		env:      env,
-		floor:    &memo[sbxdrv.Release]{},
-		list:     &memo[[]sbxdrv.Sandbox]{},
-		records:  &memo[records]{},
-		findings: &memo[stepFive]{},
+		seams:        s,
+		env:          env,
+		floor:        &memo[sbxdrv.Release]{},
+		list:         &memo[[]sbxdrv.Sandbox]{},
+		records:      &memo[records]{},
+		settingsFile: &memo[settingsFile]{},
+		findings:     &memo[stepFive]{},
 	}
 	h.home = s.getenv("HOME")
 	if !filepath.IsAbs(h.home) {
