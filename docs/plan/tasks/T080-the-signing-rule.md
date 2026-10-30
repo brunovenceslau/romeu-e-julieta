@@ -10,6 +10,16 @@ owns:
   - internal/preflight/signing.go
   - internal/sbxdrv/env_signing.go
   - e2e/signing_test.go
+  - internal/cmd/romeu/sync/signing_rule_test.go
+  - internal/cmd/romeu/sync/step6_render_test.go
+  - internal/cmd/romeu/doctor/signing_test.go
+  - internal/cmd/romeu/doctor/step5_test.go
+  - internal/preflight/signing_test.go
+  - internal/preflight/step5.go
+  - internal/preflight/step5_test.go
+  - internal/preflight/preflight.go
+  - internal/preflight/errors.go
+  - internal/sbxdrv/env_signing_test.go
 needs:
   - T025
   - T081
@@ -19,6 +29,7 @@ needs:
 after: []
 ask_first:
   - sbxdrv
+  - contracts
 sitting: none
 ---
 
@@ -40,6 +51,19 @@ risks in `docs/plan.md`); that row closes when this task lands. Its four
 files plug into the named seams of rule 14: `doctor/rows.go`,
 `preflight/step5.go`, `sync/rules.go` and `sbxdrv/env.go`'s `register`.
 The `sbxdrv` forecast is for `env_signing.go`.
+
+Re-plan (2026-10-30): the owns grow by what the seams need. The error
+`signing-socket` (`RJ-204`) is declared in `internal/preflight/errors.go`
+(the `contracts` surface), since the table is read from `errors.go`
+files and sync imports the preflight, never the reverse. The
+preflight's `Input` gains the field `Signing`, the one input the check
+needs that step 5 had no member for, and `step5.go` gains its one line.
+doctor's step 5 input names no project, so doctor's row runs the same
+function, `preflight.CheckSigning`, once per project whose approved
+widening set holds the product kit, and `doctor/step5.go` is unchanged.
+Two tests of T049 named `signing-socket` as a slug with no row, and a
+test of T043 rendered the kit with no socket; they move to a slug of no
+check and to a served agent. The tests of each new file sit beside it.
 
 - Implements: REQ-0075 (01 1.5), REQ-0296 (04 4.1), REQ-0384 (04 4.2),
   REQ-0520 (05 5.2), REQ-0549 (05 5.4), REQ-0600 (06 6.4), REQ-0601 (06
