@@ -3,7 +3,7 @@ id: T175
 title: "a durable home for memory"
 milestone: M2
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/memgit/**
   - internal/gitsafe/push*.go
@@ -24,6 +24,8 @@ ask_first:
   - contracts
   - formats
 sitting: none
+merged: 2026-10-29
+pr: 341
 ---
 
 # T175 - a durable home for memory

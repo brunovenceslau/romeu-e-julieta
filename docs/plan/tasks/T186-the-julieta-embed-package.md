@@ -3,7 +3,7 @@ id: T186
 title: "The julieta embed package"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/embedded/**
   - internal/cmd/romeu/approve/toolchain.go
@@ -30,6 +30,8 @@ ask_first:
   - checks
   - release
 sitting: none
+merged: 2026-10-29
+pr: 348
 ---
 
 # T186 - The julieta embed package

@@ -3,7 +3,7 @@ id: T187
 title: "`state`: the descriptor cache finds a workload by its index digest and platform"
 milestone: M3
 module: state
-fate: new
+fate: merged
 owns:
   - internal/state/load.go
   - internal/state/load_test.go
@@ -15,6 +15,8 @@ after: []
 ask_first:
   - gates
 sitting: none
+merged: 2026-10-29
+pr: 346
 ---
 
 # T187 - `state`: the descriptor cache finds a workload by its index digest and platform
