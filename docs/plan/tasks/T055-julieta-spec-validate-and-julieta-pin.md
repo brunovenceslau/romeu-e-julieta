@@ -98,8 +98,9 @@ Decided for slice A, the same day:
   the findings, the rules not checked and the warnings, as the text
   says.
 This task now owns `docs/spec/04-cli.md`, which T185, T188 and T189
-own too; T055 is on the critical path, so it comes first and each of
-them that `tools/ci plan` names takes T055 in its `after`.
+own too; T055 is on the critical path, so it comes first: T185 takes
+T055 in its `after`, and T188 and T189, which come after T185, follow
+it through that edge.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03
