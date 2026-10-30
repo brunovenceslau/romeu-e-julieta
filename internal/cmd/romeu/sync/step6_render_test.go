@@ -25,6 +25,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
+	"github.com/brunovenceslau/romeu-e-julieta/kits"
 )
 
 // The unit tests of step 6 render on the host tree of step 4's
@@ -33,13 +34,16 @@ import (
 // HTTPS registries alone, and the real kits are the e2e's.
 
 // The descriptors of the fixture kits: a mixin with nothing, the same
-// with a capability the gate shows, and one that declares the arg
-// julietaBin, as julieta-claude does.
+// with a capability the gate shows, one that declares the arg
+// julietaBin, as julieta-claude does, one that allows a host at
+// runtime, written with a port as the product kits write theirs, and
+// one that allows a host at install alone.
 const (
 	plainKit     = "schemaVersion: \"3\"\nkind: mixin\ndisplayName: plain\ndescription: a fixture\n"
 	lifecycleKit = plainKit + "capabilities:\n  - type: com.docker.sandbox/privileged@1\n"
 	binKit       = plainKit + "args:\n  julietaBin:\n    default: \"\"\n    description: the path of julieta\n"
-	networkKit   = plainKit + "capabilities:\n  - type: com.docker.sandbox/network-policy@2\n    config:\n      install: {allow: [kit.example.com]}\n"
+	networkKit   = plainKit + "capabilities:\n  - type: com.docker.sandbox/network-policy@2\n    config:\n      runtime: {allow: [\"kit.example.com:443\"]}\n"
+	installKit   = plainKit + "capabilities:\n  - type: com.docker.sandbox/network-policy@2\n    config:\n      install: {allow: [\"install.example.com:443\"]}\n"
 )
 
 // The two workload references of the fixture: the pinned one of
@@ -115,6 +119,7 @@ func renderRunOf(t *testing.T, setup func(h *hostTree)) *renderFixture {
 		"withbin/withbin.yaml":   {Data: []byte(binKit), Mode: 0o444},
 		"withcaps/withcaps.yaml": {Data: []byte(lifecycleKit), Mode: 0o444},
 		"withnet/withnet.yaml":   {Data: []byte(networkKit), Mode: 0o444},
+		"install/install.yaml":   {Data: []byte(installKit), Mode: 0o444},
 	}
 	t.Cleanup(func() { fetchWorkload, productKits = oldFetch, oldKits })
 	return f
@@ -204,6 +209,35 @@ func TestRenderCandidatesReadsTheCachedDescriptor(t *testing.T) {
 	require.NoError(t, renderCandidates(t.Context(), f.r))
 
 	assert.Equal(t, []string{workloadRef}, f.reads, "the second sync makes no registry read")
+}
+
+// TestRenderCandidatesStopsAtACacheEntryItCannotRead: an entry of the
+// descriptor cache of a newer format is format-newer (RJ-311, exit 2),
+// and the sync stops there rather than read the registry, so an offline
+// sync is not reported as registry-unreachable for a cache it could not
+// read (REQ-0165).
+func TestRenderCandidatesStopsAtACacheEntryItCannotRead(t *testing.T) {
+	f := renderRun(t)
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+	dir := filepath.Join(f.r.store.Dir(), "descriptors")
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	path := filepath.Join(dir, entries[0].Name())
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	newer := strings.Replace(string(data), "state-descriptor/v1", "state-descriptor/v2", 1)
+	require.NotEqual(t, string(data), newer)
+	require.NoError(t, os.WriteFile(path, []byte(newer), 0o600))
+	f.again()
+
+	err = renderCandidates(t.Context(), f.r)
+
+	e := cli.Of(err)
+	require.NotNil(t, e, "%v", err)
+	assert.Equal(t, "RJ-311", e.ID)
+	assert.Equal(t, 2, cli.ExitCode(err))
+	assert.Equal(t, []string{workloadRef}, f.reads, "no registry read")
 }
 
 // TestRenderCandidatesReadsAChangedDigestOnce: a changed workload
@@ -354,6 +388,28 @@ func TestRenderCandidatesFlipsGate2OnACapability(t *testing.T) {
 	assert.NotEqual(t, before, f.r.candidates[0].widening)
 }
 
+// TestRenderCandidatesFlipsGate2OnARef: changing a repo's ref to
+// another branch of its origin changes the egress commit and the
+// widening digest, so the change meets gate 2 (I9).
+func TestRenderCandidatesFlipsGate2OnARef(t *testing.T) {
+	f := renderRun(t)
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+	before, commit := f.r.candidates[0].widening, f.r.trees[0].repos[0].egressCommit
+	origin := f.origins[apiURL]
+	gitIn(t, origin, "checkout", "-q", "-b", "release")
+	commitFiles(t, origin, map[string]string{"README": "release"})
+	gitIn(t, origin, "checkout", "-q", "main")
+	f.r.targets[0].Repos[0].Ref = "release"
+	f.r.trees = nil
+	require.NoError(t, makeTree(t.Context(), f.r))
+	f.again()
+
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+
+	assert.NotEqual(t, commit, f.r.trees[0].repos[0].egressCommit)
+	assert.NotEqual(t, before, f.r.candidates[0].widening)
+}
+
 // TestRenderCandidatesFlipsGate2OnAPersonalKitCapability: a personal
 // kit read from the config commit's tree, and the same kit at a later
 // commit whose descriptor adds a capability a personal kit may hold:
@@ -440,8 +496,9 @@ func TestRenderCandidatesGatesAKitDeclaredDomain(t *testing.T) {
 }
 
 // TestRenderCandidatesGatesADomainAProductKitDeclares: a domain a
-// product kit's descriptor declares, which the catalog does not allow,
-// is gated as kit-declared in the widening set (I10).
+// product kit's descriptor declares for the runtime, with a port, which
+// the catalog does not allow, is gated as kit-declared in the widening
+// set, its port stripped by egress.Split (I10, REQ-0069).
 func TestRenderCandidatesGatesADomainAProductKitDeclares(t *testing.T) {
 	f := renderRun(t)
 	f.r.targets[0].Kits = []spec.Kit{{Product: "withnet"}}
@@ -449,6 +506,88 @@ func TestRenderCandidatesGatesADomainAProductKitDeclares(t *testing.T) {
 	require.NoError(t, renderCandidates(t.Context(), f.r))
 
 	assert.Contains(t, f.r.candidates[0].set.EgressGated, gate.GatedDomain{Domain: "kit.example.com", Reason: gate.ReasonKitDeclared})
+}
+
+// TestRenderCandidatesLeavesAnInstallHostOutOfTheEgress: a host a kit
+// allows at install alone is not in the derived egress, neither allowed
+// nor gated, and gate 2 shows it with the kit's capability set
+// (REQ-1315, 07 7.5).
+func TestRenderCandidatesLeavesAnInstallHostOutOfTheEgress(t *testing.T) {
+	f := renderRun(t)
+	f.r.targets[0].Kits = []spec.Kit{{Product: "install"}}
+
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+
+	c := f.r.candidates[0]
+	assert.NotContains(t, c.egress.Effective(), "install.example.com", "the install host is not in the derived set")
+	assert.NotContains(t, c.record.Egress.Auto, "install.example.com")
+	for _, g := range c.set.EgressGated {
+		assert.NotEqual(t, "install.example.com", g.Domain)
+	}
+	require.Len(t, c.kits, 1)
+	require.NotNil(t, c.kits[0].Capabilities.Network)
+	assert.Equal(t, []string{"install.example.com:443"}, c.kits[0].Capabilities.Network.Install.Allow[0].Hosts, "the capability set gate 2 shows holds it")
+}
+
+// TestRenderCandidatesRefusesAHostThatIsNoDomain: a declared host that
+// egress.Split refuses, in either phase, stops the sync as usage
+// (descriptor-invalid, exit 2) naming the kit and the host, and the
+// candidate is declined.
+func TestRenderCandidatesRefusesAHostThatIsNoDomain(t *testing.T) {
+	for _, phase := range []string{"install", "runtime"} {
+		t.Run(phase, func(t *testing.T) {
+			f := renderRun(t)
+			f.registry = func(ref string) (oci.Fetched, error) {
+				w, err := spec.ParseWorkload(ref)
+				if err != nil {
+					return oci.Fetched{}, err
+				}
+				rules := oci.Rules{Allow: []oci.NetEntry{{Hosts: []string{"kit.example.com:0"}}}}
+				network := &oci.Network{}
+				if phase == "install" {
+					network.Install = rules
+				} else {
+					network.Runtime = rules
+				}
+				return oci.Fetched{Workload: w, ManifestDigest: w.Digest, Kit: oci.Kit{Capabilities: oci.Capabilities{Kind: "workload", Network: network}}}, nil
+			}
+
+			err := renderCandidates(t.Context(), f.r)
+
+			assert.Equal(t, 2, cli.ExitCode(err), "%v", err)
+			assert.Contains(t, err.Error(), "descriptor-invalid")
+			assert.Contains(t, err.Error(), "kit.example.com:0")
+			assert.Contains(t, err.Error(), workloadRef)
+			assert.Empty(t, f.candidates(t), "the candidate is declined")
+		})
+	}
+}
+
+// TestRenderCandidatesRendersEveryProductKit: every product kit of the
+// embedded copy (06 6.4) renders through step 6, its declared network
+// hosts split by egress.Split before the derivation (REQ-0069).
+func TestRenderCandidatesRendersEveryProductKit(t *testing.T) {
+	f := renderRun(t)
+	productKits = kits.FS
+	entries, err := fs.ReadDir(kits.FS, ".")
+	require.NoError(t, err)
+	var all []spec.Kit
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		k := spec.Kit{Product: e.Name()}
+		if e.Name() == "git-ssh-sign" {
+			k.Args = map[string]string{"signingKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHk1a3Rlc3RrZXlmb3J0aGVmaXh0dXJlb25seTAwMDA="}
+		}
+		all = append(all, k)
+	}
+	require.NotEmpty(t, all)
+	f.r.targets[0].Kits = all
+
+	require.NoError(t, renderCandidates(t.Context(), f.r))
+
+	require.Len(t, f.r.candidates[0].kits, len(all))
 }
 
 // TestReadKitsRefusesAKitChangedAfterItsDigest: a kit file that changes
@@ -514,13 +653,12 @@ func TestRenderCandidatesDeclinesEveryCandidateOnAnError(t *testing.T) {
 	assert.Empty(t, entries)
 }
 
-// TestRenderCandidatesReadsAnIndexWorkloadEachSyncUntilStateLooksUpByPlatform
-// pins the gap of the descriptor cache for a multi-arch workload: the
-// entry is written under the digest of the platform manifest
-// (REQ-0240), the lookup is by the reference's index digest, so the
-// second sync reads the registry again. It changes when internal/state
-// looks an entry up by (workload, platform).
-func TestRenderCandidatesReadsAnIndexWorkloadEachSyncUntilStateLooksUpByPlatform(t *testing.T) {
+// TestRenderCandidatesReadsAnIndexWorkloadFromTheCache: the entry of a
+// multi-arch workload is written under the digest of the platform
+// manifest (REQ-0240), and the next sync finds it by the reference's
+// index digest and the platform (Store.FindDescriptor), so it reads no
+// registry, with the registry unreachable.
+func TestRenderCandidatesReadsAnIndexWorkloadFromTheCache(t *testing.T) {
 	f := renderRun(t)
 	const platformManifest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
 	f.registry = func(ref string) (oci.Fetched, error) {
@@ -531,11 +669,14 @@ func TestRenderCandidatesReadsAnIndexWorkloadEachSyncUntilStateLooksUpByPlatform
 		return oci.Fetched{Workload: w, ManifestDigest: platformManifest, Kit: oci.Kit{Capabilities: oci.Capabilities{Kind: "workload"}}}, nil
 	}
 	require.NoError(t, renderCandidates(t.Context(), f.r))
+	f.registry = func(string) (oci.Fetched, error) {
+		return oci.Fetched{}, oci.RegistryUnreachable.New("the registry docker.io did not answer")
+	}
 	f.again()
 
 	require.NoError(t, renderCandidates(t.Context(), f.r))
 
-	assert.Equal(t, []string{workloadRef, workloadRef}, f.reads, "the second sync reads the registry again")
+	assert.Equal(t, []string{workloadRef}, f.reads, "the second sync reads no registry")
 	d, err := f.r.store.GetDescriptor(platformManifest)
 	require.NoError(t, err, "the entry is under the platform manifest's digest")
 	w, err := spec.ParseWorkload(workloadRef)

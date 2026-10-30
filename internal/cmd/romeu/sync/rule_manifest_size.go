@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math"
 	"path"
-	"strings"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/canon"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/egress"
@@ -94,7 +93,7 @@ func sizedManifest(p spec.Project, t tree, eg egress.Result, commit string) (man
 		}
 		m.Repos = append(m.Repos, manifest.Repo{
 			Base: []string{rt.egressCommit}, Dir: rt.dir, Memory: rt.memory, Path: where, Primary: repo.Primary,
-			Ref: strings.TrimPrefix(rt.egressRef, "refs/romeu/origin/"+rt.dir+"/"), URL: repo.URL,
+			Ref: rt.branch, URL: repo.URL,
 		})
 	}
 	m.Run = manifest.Run{}

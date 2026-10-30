@@ -1,0 +1,8 @@
+// SPDX-FileCopyrightText: 2026 Bruno Venceslau
+// SPDX-License-Identifier: GPL-3.0-only
+
+//go:build unix
+
+package all
+
+import _ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/sync"

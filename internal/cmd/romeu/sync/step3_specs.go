@@ -28,7 +28,8 @@ const projectsDir = "projects"
 // every error listed in one exit 2: projects-stray-file (RJ-345) and
 // config-project-missing (RJ-346) keep their rows, and the other rules
 // are usage. Then it picks the targets, --all or the names given, and
-// checks their secret bindings (checkSecrets). It fills targets.
+// checks their secret bindings (checkSecrets). It fills specs and
+// targets.
 func readSpecs(ctx context.Context, r *run) error {
 	if err := r.git.Fsck(ctx, r.configClone, r.specCommit); err != nil {
 		return refused(err, "spec-commit-unsafe", "git fsck --strict refuses the spec commit "+r.specCommit)
@@ -45,6 +46,7 @@ func readSpecs(ctx context.Context, r *run) error {
 	if err != nil {
 		return invalid(err, r.specCommit)
 	}
+	r.specs = specs
 	if r.targets, err = targets(specs, r.flags); err != nil {
 		return err
 	}

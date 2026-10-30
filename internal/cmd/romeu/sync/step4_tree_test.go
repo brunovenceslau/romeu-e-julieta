@@ -152,7 +152,8 @@ func mode(t *testing.T, p string) fs.FileMode {
 // memory dirs, each made 0700 with their fixed subdirectories, a clone
 // of each repo, each origin fetched into refs/romeu/origin/<dir>/*, and
 // the egress commit of each repo, from the spec's ref or, with none,
-// the origin's HEAD.
+// the origin's HEAD fetched into refs/romeu/origin/<dir>/HEAD, the
+// branch it names read from the clone.
 func TestMakeTreeOnAFirstSync(t *testing.T) {
 	h := treeRun(t)
 
@@ -170,12 +171,13 @@ func TestMakeTreeOnAFirstSync(t *testing.T) {
 	webHead := gitIn(t, h.origins[webURL], "rev-parse", "HEAD")
 	assert.Equal(t, apiHead, gitIn(t, h.in("shop-api"), "rev-parse", "refs/romeu/origin/shop-api/main"))
 	assert.Equal(t, webHead, gitIn(t, h.in("shop-web"), "rev-parse", "refs/romeu/origin/shop-web/trunk"))
+	assert.Equal(t, webHead, gitIn(t, h.in("shop-web"), "rev-parse", "refs/romeu/origin/shop-web/HEAD"))
 	assert.Equal(t, []tree{{
 		env:    h.env,
 		shared: h.in("memory/_shared"),
 		repos: []repoTree{
-			{dir: "shop-api", clone: h.in("shop-api"), memory: h.in("memory/shop-api"), egressRef: "refs/romeu/origin/shop-api/main", egressCommit: apiHead},
-			{dir: "shop-web", clone: h.in("shop-web"), memory: h.in("memory/shop-web"), egressRef: "refs/romeu/origin/shop-web/trunk", egressCommit: webHead},
+			{dir: "shop-api", clone: h.in("shop-api"), memory: h.in("memory/shop-api"), branch: "main", egressRef: "refs/romeu/origin/shop-api/main", egressCommit: apiHead},
+			{dir: "shop-web", clone: h.in("shop-web"), memory: h.in("memory/shop-web"), branch: "trunk", egressRef: "refs/romeu/origin/shop-web/HEAD", egressCommit: webHead},
 		},
 	}}, h.r.trees)
 	assert.Empty(t, h.r.warnings)
@@ -262,6 +264,30 @@ func TestMakeTreeMovesNoRefOfAClone(t *testing.T) {
 
 	assert.Equal(t, before, cloneRefs(t, clone))
 	assert.Equal(t, head, h.r.trees[0].repos[0].egressCommit)
+}
+
+// TestMakeTreeReadsTheEgressOfARepoWithNoRefFromTheOrigin is I9 for a
+// repo whose spec names no ref: a local rewrite of the clone's
+// refs/remotes/origin/HEAD, to a branch of the clone's own, leaves the
+// egress commit the origin's HEAD, fetched into
+// refs/romeu/origin/<dir>/HEAD (T183); only the branch name follows
+// the local ref.
+func TestMakeTreeReadsTheEgressOfARepoWithNoRefFromTheOrigin(t *testing.T) {
+	h := treeRun(t)
+	require.NoError(t, makeTree(t.Context(), h.r))
+	clone := h.in("shop-web")
+	own := commitFiles(t, clone, map[string]string{"local": "never pushed"})
+	gitIn(t, clone, "update-ref", "refs/remotes/origin/mine", own)
+	gitIn(t, clone, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/mine")
+	head := commitFiles(t, h.origins[webURL], map[string]string{"README": "moved on"})
+	h.r.trees = nil
+
+	require.NoError(t, makeTree(t.Context(), h.r))
+
+	web := h.r.trees[0].repos[1]
+	assert.Equal(t, head, web.egressCommit, "the origin's HEAD, not the local ref")
+	assert.Equal(t, "refs/romeu/origin/shop-web/HEAD", web.egressRef)
+	assert.Equal(t, "mine", web.branch)
 }
 
 // TestMakeTreeRefuses: what step 4 refuses, exit 2 naming the path or

@@ -8,7 +8,6 @@ package sync
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
@@ -177,13 +176,33 @@ func TestFromDefaultsToOrigin(t *testing.T) {
 	}
 }
 
-func TestAStepNotBuiltStopsTheRun(t *testing.T) {
-	list := slices.Clone(steps)
-	for i := range 9 {
-		list[i].do = func(context.Context, *run) error { return nil }
-	}
-	err := runSteps(context.Background(), newRun(&cli.Env{}, flags{}), list)
-	if !errors.Is(err, errNotBuilt) || !strings.Contains(err.Error(), "step 10") {
-		t.Fatalf("got %v, want step 10 not built", err)
+// TestRunStepsPrintsTheWarningsLast: the warnings of the run close its
+// output, after every step, on a failed step too, so a warning found
+// before it is not lost (04 4.2).
+func TestRunStepsPrintsTheWarningsLast(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		var out strings.Builder
+		w := cli.NewWriter(&out)
+		r := newRun(&cli.Env{Stdout: w, Stderr: w}, flags{})
+		boom := errors.New("boom")
+		err := runSteps(context.Background(), r, []step{
+			{1, "warns", func(_ context.Context, r *run) error {
+				r.warnings = append(r.warnings, func(w *cli.Writer) { cli.Warn(w, "handoff-legacy", "a dir") })
+				return nil
+			}},
+			{2, "reports", func(_ context.Context, r *run) error {
+				_, _ = r.env.Stdout.Write([]byte("report\n"))
+				if fail {
+					return boom
+				}
+				return nil
+			}},
+		})
+		if fail != errors.Is(err, boom) {
+			t.Fatalf("fail %v: got %v", fail, err)
+		}
+		if got := out.String(); got != "report\nwarning handoff-legacy: a dir\n" {
+			t.Errorf("fail %v: got %q, want the report, then the warning", fail, got)
+		}
 	}
 }

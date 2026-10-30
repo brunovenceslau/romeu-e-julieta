@@ -40,8 +40,10 @@ type run struct {
 	configClone string
 	specCommit  string
 
-	// Step 3: the specs the command line names, validated, with their
-	// secrets bound, in the order of the config repo's projects/.
+	// Step 3: every spec of the config repo's projects/, validated, in
+	// its order, which step 10 reads, and the specs the command line
+	// names among them, with their secrets bound.
+	specs   []spec.Project
 	targets []spec.Project
 
 	// Step 4: the part of the host tree of each target, in the order of
@@ -60,18 +62,35 @@ type run struct {
 	// the warnings as lost edits once their project is promoted.
 	overwritten []lostEdit
 
+	// Step 8: a decline or a refusal of gate 2, which the run returns
+	// once step 10 has reported (gateStep).
+	deferred error
+
 	// Steps 4 and 5 (and each later step that warns): the warnings of
 	// the run, in the order they were found. Each is a print to the CLI
-	// writer of stderr, which step 10 makes after its own output (04 4.2:
-	// the warnings close the output); a print, not a slug and a message,
-	// so each slug stays a literal of its cli.Warn call, as the test of
-	// 04 4.1, Warnings reads it.
+	// writer of stderr, which runSteps makes once the steps end, after
+	// step 10's output or the step that failed (04 4.2: the warnings
+	// close the output); a print, not a slug and a message, so each slug
+	// stays a literal of its cli.Warn call, as the test of 04 4.1,
+	// Warnings reads it.
 	warnings []func(*cli.Writer)
 }
 
 // newRun returns the run of one command line.
 func newRun(env *cli.Env, f flags) *run {
 	return &run{env: env, flags: f}
+}
+
+// warn prints the warnings of the run to the CLI writer of stderr, in
+// the order they were found, once.
+func (r *run) warn() {
+	if r.env == nil || r.env.Stderr == nil {
+		return
+	}
+	for _, w := range r.warnings {
+		w(r.env.Stderr)
+	}
+	r.warnings = nil
 }
 
 // release unlocks the state store's lock and closes the store, when

@@ -7,6 +7,8 @@ package sync
 
 import (
 	"bytes"
+	"context"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"io"
 	"io/fs"
@@ -206,8 +208,9 @@ func (f *gateFixture) approve(t *testing.T) {
 // TestGateAndPromoteOnATerminal is gate 2 on a first sync with stdin
 // and stderr on a terminal: the diff and the prompt are written to
 // stderr, y approves and promotes, and any other line declines, deletes
-// the candidate dir and leaves the live files byte-identical (01 1.6,
-// REQ-1208, REQ-1209, REQ-1211; I7): the cases "sync approves on y and
+// the candidate dir, leaves the live files byte-identical and exits 1
+// with candidate-declined naming the project (01 1.6, REQ-1208,
+// REQ-1209, REQ-1211, REQ-1276; I7): the cases "sync approves on y and
 // promotes" and "sync declines on N and deletes the candidate".
 //
 //romeu:invariant I7 test
@@ -244,7 +247,7 @@ func TestGateAndPromoteOnATerminal(t *testing.T) {
 
 			shown, err := f.gateOnPTY(t, answer)
 
-			require.NoError(t, err)
+			requireDeclined(t, err, "shop")
 			assert.Contains(t, shown, gate.PromptLine)
 			assert.Empty(t, f.candidates(t), "no candidate dir remains")
 			assert.Equal(t, before, f.outsideCandidates(t), "the live files are byte-identical (I7)")
@@ -256,16 +259,25 @@ func TestGateAndPromoteOnATerminal(t *testing.T) {
 	}
 }
 
-// TestGateAndPromoteDeclinesWithoutATerminalUntilRJ301: a widening
-// digest that differs from the approval, with no terminal on stdin or
-// on stderr, deletes the candidate dir, prints the widening digest and
-// fails, recording no approval and promoting nothing (01 1.6, REQ-1210;
-// T045 folded). The exit is 1, an error of no row, until
-// project-approval-required (RJ-301, exit 3) is declared with the slice
-// that links sync into the binary; this test is the one to move to
-// RJ-301 then. The prompt is written to stderr and asked from stdin, so
-// either one that is not a terminal declines.
-func TestGateAndPromoteDeclinesWithoutATerminalUntilRJ301(t *testing.T) {
+// requireDeclined requires err to be candidate-declined (RJ-358, exit
+// 1) naming the projects names, its hint their sync.
+func requireDeclined(t *testing.T, err error, names ...string) {
+	t.Helper()
+	e := cli.Of(err)
+	require.Equal(t, CandidateDeclined.ID, e.ID, "%v", err)
+	assert.Equal(t, 1, cli.ExitCode(err))
+	assert.Equal(t, "gate 2 was declined for "+strings.Join(names, ", "), e.Message)
+	assert.Equal(t, "romeu sync "+strings.Join(names, " "), e.Hint())
+}
+
+// TestGateAndPromoteRefusesWithoutATerminal: a widening digest that
+// differs from the approval, with no terminal on stdin or on stderr,
+// deletes the candidate dir, prints the widening digest and exits 3
+// with project-approval-required (RJ-301), recording no approval and
+// promoting nothing (01 1.6, REQ-1210; T045 folded). The prompt is
+// written to stderr and asked from stdin, so either one that is not a
+// terminal declines.
+func TestGateAndPromoteRefusesWithoutATerminal(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func(t *testing.T)
@@ -298,8 +310,10 @@ func TestGateAndPromoteDeclinesWithoutATerminalUntilRJ301(t *testing.T) {
 
 			err := gateAndPromote(t.Context(), f.r)
 
-			require.ErrorIs(t, err, errApprovalRequired)
-			assert.Equal(t, 1, cli.ExitCode(err), "an error of no row, exit 1, until RJ-301")
+			e := cli.Of(err)
+			require.Equal(t, ProjectApprovalRequired.ID, e.ID, "%v", err)
+			assert.Equal(t, 3, cli.ExitCode(err))
+			assert.Equal(t, "romeu sync shop", e.Hint())
 			assert.Contains(t, f.stdout.String(), c.widening.String(), "the widening digest is printed")
 			assert.Equal(t, state.CandidateDeclined, c.dir.State())
 			assert.Empty(t, f.candidates(t), "the candidate dir is deleted")
@@ -365,7 +379,7 @@ func TestGateAndPromoteShowsTheChangeFromTheApproval(t *testing.T) {
 
 	shown, err := f.gateOnPTY(t, "n\n")
 
-	require.NoError(t, err)
+	requireDeclined(t, err, "shop")
 	assert.Equal(t, before, f.outsideCandidates(t), "N leaves the promoted live files byte-identical (I7)")
 	assert.Empty(t, f.candidates(t))
 	assert.NotContains(t, f.stderr.String(), "not the approved render", "the approved side is read from the live files")
@@ -387,7 +401,7 @@ func TestGateAndPromoteShowsTheWholeCandidateWhenTheLiveFilesAreNotTheApproval(t
 
 	shown, err := f.gateOnPTY(t, "n\n")
 
-	require.NoError(t, err)
+	requireDeclined(t, err, "shop")
 	assert.Contains(t, f.stderr.String(), "the live files are not the approved render")
 	assert.Contains(t, shown, "kit content product:plain: 0 file(s) changed, 2 added", "the approved kit is shown as added too")
 	assert.Contains(t, shown, "product:plain (added)")
@@ -446,8 +460,9 @@ func TestGateAndPromoteDeclinesTheRestOnAnError(t *testing.T) {
 
 // TestGateAndPromoteOfTwoTargetsWithoutATerminal: without a terminal, a
 // target whose digest equals its approval promotes, a later one whose
-// digest differs is deleted, and the interim refusal comes back; when a
-// later target then fails, the refusal is joined to its error, not lost.
+// digest differs is deleted, and project-approval-required names it;
+// when a later target then fails, its error stops the step, and the
+// refusal is the line printed for it.
 func TestGateAndPromoteOfTwoTargetsWithoutATerminal(t *testing.T) {
 	t.Run("the equal one promotes and the other is refused", func(t *testing.T) {
 		f := twoTargets(t)
@@ -457,7 +472,9 @@ func TestGateAndPromoteOfTwoTargetsWithoutATerminal(t *testing.T) {
 
 		err := gateAndPromote(t.Context(), f.r)
 
-		require.ErrorIs(t, err, errApprovalRequired)
+		e := cli.Of(err)
+		require.Equal(t, ProjectApprovalRequired.ID, e.ID, "%v", err)
+		assert.Equal(t, "romeu sync blog", e.Hint())
 		assert.Equal(t, state.CandidatePromoted, f.r.candidates[0].dir.State())
 		assert.Equal(t, state.CandidateDeclined, f.r.candidates[1].dir.State())
 		assert.NoDirExists(t, f.r.candidates[1].dir.Path())
@@ -473,10 +490,154 @@ func TestGateAndPromoteOfTwoTargetsWithoutATerminal(t *testing.T) {
 
 		err := gateAndPromote(t.Context(), f.r)
 
-		require.ErrorIs(t, err, errApprovalRequired)
 		require.ErrorIs(t, err, render.ErrKitDirDiffers)
+		assert.Contains(t, f.stdout.String(), "gate 2: shop needs an approval of the widening digest "+f.r.candidates[0].widening.String())
 		assert.Empty(t, f.candidates(t))
 	})
+}
+
+// TestGateAndPromoteGoesOnAfterADecline: N to gate 2 of the first
+// target does not stop the second, which promotes; the command then
+// exits 1 with candidate-declined naming the first alone (REQ-1276).
+// With N to both, the error names both, in the order of the targets.
+func TestGateAndPromoteGoesOnAfterADecline(t *testing.T) {
+	t.Run("the next target promotes", func(t *testing.T) {
+		f := twoTargets(t)
+		f.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
+		f.rerender(t)
+
+		_, err := f.gateOnPTY(t, "N\n")
+
+		requireDeclined(t, err, "shop")
+		assert.Equal(t, state.CandidateDeclined, f.r.candidates[0].dir.State())
+		assert.Equal(t, state.CandidatePromoted, f.r.candidates[1].dir.State())
+		assert.Contains(t, f.stdout.String(), "promoted  blog")
+	})
+	t.Run("both are declined", func(t *testing.T) {
+		f := twoTargets(t)
+		f.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
+		f.r.targets[1].Kits = []spec.Kit{{Product: "withcaps"}}
+		f.rerender(t)
+
+		_, err := f.gateOnPTY(t, "N\n")
+
+		requireDeclined(t, err, "shop", "blog")
+		assert.Empty(t, f.candidates(t))
+	})
+}
+
+// workspaceFolders returns the folders of the workspace file name in
+// the root of f.
+func (f *gateFixture) workspaceFolders(t *testing.T, name string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.root, name))
+	require.NoError(t, err)
+	var doc struct {
+		Folders []struct {
+			Path string `json:"path"`
+		} `json:"folders"`
+	}
+	require.NoError(t, jsonv2.Unmarshal(data, &doc))
+	out := []string{}
+	for _, d := range doc.Folders {
+		out = append(out, d.Path)
+	}
+	return out
+}
+
+// TestGateAndPromoteWritesTheWorkspaceFiles: after the last promotion
+// of a run, dev.code-workspace lists every host clone of every
+// project's record, the projects promoted before this run among them,
+// and review.code-workspace lists no review checkout, since host state
+// records none yet (REQ-0048, REQ-0137).
+func TestGateAndPromoteWritesTheWorkspaceFiles(t *testing.T) {
+	f := gateRun(t)
+	f.approve(t)
+	assert.Equal(t, []string{"shop-env/shop-api", "shop-env/shop-web"}, f.workspaceFolders(t, render.DevWorkspaceFile))
+	assert.Empty(t, f.workspaceFolders(t, render.ReviewWorkspaceFile))
+
+	g := twoTargets(t)
+	g.r.targets[0].Kits = []spec.Kit{{Product: "withcaps"}}
+	g.rerender(t)
+	require.NoError(t, os.Remove(filepath.Join(g.root, render.DevWorkspaceFile)))
+
+	_, err := g.gateOnPTY(t, "N\n")
+
+	requireDeclined(t, err, "shop")
+	assert.Equal(t, []string{"blog-env/blog-site", "shop-env/shop-api", "shop-env/shop-web"}, g.workspaceFolders(t, render.DevWorkspaceFile),
+		"a project declined in this run is listed from its record")
+}
+
+// TestGateAndPromoteLeavesTheWorkspaceFilesWhenNothingIsPromoted: a run
+// that promotes nothing, on a decline or without a terminal, leaves the
+// workspace files as they were, byte for byte.
+func TestGateAndPromoteLeavesTheWorkspaceFilesWhenNothingIsPromoted(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		gate func(t *testing.T, f *gateFixture) error
+	}{
+		{"declined", func(t *testing.T, f *gateFixture) error {
+			t.Helper()
+			_, err := f.gateOnPTY(t, "N\n")
+			return err
+		}},
+		{"refused", func(t *testing.T, f *gateFixture) error {
+			t.Helper()
+			noTerminal(t)
+			return gateAndPromote(t.Context(), f.r)
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := gateRun(t)
+			for _, name := range []string{render.DevWorkspaceFile, render.ReviewWorkspaceFile} {
+				require.NoError(t, os.WriteFile(filepath.Join(f.root, name), []byte("by hand\n"), 0o644))
+			}
+
+			require.Error(t, tt.gate(t, f))
+
+			for _, name := range []string{render.DevWorkspaceFile, render.ReviewWorkspaceFile} {
+				data, err := os.ReadFile(filepath.Join(f.root, name))
+				require.NoError(t, err)
+				assert.Equal(t, "by hand\n", string(data), name)
+				assert.Equal(t, fs.FileMode(0o644), mode(t, filepath.Join(f.root, name)), name)
+			}
+		})
+	}
+}
+
+// TestGateStepDefersADecline: a decline of gate 2 does not stop the
+// run, so step 10 still reports, and the run then returns
+// candidate-declined; another error of step 8 stops the run there.
+func TestGateStepDefersADecline(t *testing.T) {
+	f := gateRun(t)
+	master, terminal := openPTY(t)
+	withTerminal(t, terminal, int(terminal.Fd()))
+	f.r.env.Stderr = cli.NewWriter(&typingBuffer{lockedBuffer: f.stderr, master: master, answer: "N\n"})
+	reported := false
+	list := []step{
+		{8, "gate 2 and promote", gateStep},
+		{10, "report orphans", func(context.Context, *run) error { reported = true; return nil }},
+	}
+
+	err := runSteps(t.Context(), f.r, list)
+
+	requireDeclined(t, err, "shop")
+	assert.True(t, reported, "step 10 ran after the decline")
+}
+
+// TestGateAndPromoteLeavesOutARecordItCannotRead: the record of another
+// project that does not decode is left out of the workspace files with
+// a line among the warnings, and the sync that promoted does not fail.
+func TestGateAndPromoteLeavesOutARecordItCannotRead(t *testing.T) {
+	f := gateRun(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(f.root, "blog-env"), 0o700))
+	require.NoError(t, os.MkdirAll(filepath.Join(f.r.store.Dir(), "projects"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(f.r.store.Dir(), "projects", "blog.json"), []byte("{not json"), 0o600))
+
+	f.approve(t)
+
+	assert.Equal(t, []string{"shop-env/shop-api", "shop-env/shop-web"}, f.workspaceFolders(t, render.DevWorkspaceFile))
+	assert.Contains(t, warned(f.r), "the workspace files leave out blog")
 }
 
 // TestGateAndPromoteRefusesACandidateChangedAfterTheRender: a candidate

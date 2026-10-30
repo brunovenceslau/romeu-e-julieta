@@ -34,25 +34,22 @@ var steps = []step{
 	{n: 5, name: "check the memory dirs", do: checkMemory},
 	{n: 6, name: "read descriptors and render the candidate", do: renderCandidates},
 	{n: 7, name: "check the live files for drift", do: checkDrift},
-	{n: 8, name: "gate 2 and promote", do: gateAndPromote},
+	{n: 8, name: "gate 2 and promote", do: gateStep},
 	{n: 9, name: "apply live changes", do: skipLive},
-	{n: 10, name: "report orphans and the julieta pin", do: notBuilt},
+	{n: 10, name: "report orphans", do: reportOrphans},
 }
-
-// errNotBuilt is what a step returns until its slice of T043 lands.
-var errNotBuilt = errors.New("not built yet")
-
-// notBuilt is each step whose slice of T043 has not landed: the slice
-// replaces it, in its line of steps, with the step's function in a file
-// of its own.
-func notBuilt(context.Context, *run) error { return errNotBuilt }
 
 // runSteps runs each step in order and stops at the first error, which
 // it returns as is when it is an error of the table (cli.Error) and
-// wrapped with the step otherwise. It releases the lock step 1 took,
-// whatever happened.
+// wrapped with the step otherwise; once every step ran, it returns the
+// error a step deferred (gateStep). Whatever happened, it releases the
+// lock step 1 took and prints the warnings of the run to stderr, which
+// close the command's own output (04 4.2), so a warning found before a
+// failed step is not lost; the error line, which cli.Main prints once
+// the command returns, comes after them.
 func runSteps(ctx context.Context, r *run, list []step) error {
 	defer r.release()
+	defer r.warn()
 	for _, s := range list {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -64,7 +61,21 @@ func runSteps(ctx context.Context, r *run, list []step) error {
 			return fmt.Errorf("sync: step %d (%s): %w", s.n, s.name, err)
 		}
 	}
-	return nil
+	return r.deferred
+}
+
+// gateStep is step 8 as the run takes it: gateAndPromote, whose decline
+// on a terminal (candidate-declined) or refusal without one
+// (project-approval-required) does not stop the run, so step 10 still
+// reports the orphans; runSteps returns that error once the steps end.
+// Any other error stops the run there.
+func gateStep(ctx context.Context, r *run) error {
+	err := gateAndPromote(ctx, r)
+	if e, ok := errors.AsType[*cli.Error](err); ok && (e.ID == CandidateDeclined.ID || e.ID == ProjectApprovalRequired.ID) {
+		r.deferred = err
+		return nil
+	}
+	return err
 }
 
 // skipLive is step 9, which T047 builds: until then a running sandbox

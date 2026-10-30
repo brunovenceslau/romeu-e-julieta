@@ -32,8 +32,8 @@ var fetch = func(ctx context.Context, g *gitsafe.Runner, dir, url string, refspe
 // fetchConfig is step 2 of 04 4.2 (REQ-0336): the hardened fetch of the
 // config repo's origin into refs/romeu/origin/<cfg-dir>/*, then the
 // spec commit: the head of the config ref, or with --from <sha> that
-// commit, which must be reachable from it (exit 2 otherwise). It fills
-// git, configClone and specCommit.
+// commit, which must be reachable from a ref the fetch wrote (exit 2
+// otherwise). It fills git, configClone and specCommit.
 func fetchConfig(ctx context.Context, r *run) error {
 	h := r.settings
 	g, err := hostGit(h, r.home)
@@ -58,7 +58,7 @@ func fetchConfig(ctx context.Context, r *run) error {
 	}
 	commit := head
 	if r.flags.from != fromOrigin {
-		if err := reachable(ctx, g, clone, r.flags.from, prefix+h.Config.Ref, head); err != nil {
+		if err := reachable(ctx, g, clone, r.flags.from, prefix); err != nil {
 			return err
 		}
 		commit = r.flags.from
@@ -121,14 +121,14 @@ func configDir(h spec.HostSettings) (string, error) {
 }
 
 // reachable returns nil when from, the value of --from, a full object
-// id, names a commit, and head, the tip of ref, the config
-// ref as fetched, reaches that commit. Otherwise it returns usage (exit
-// 2), a commit the clone does not hold among them. An id that names a
-// tree or a blob is refused too, so step 3 never reads projects/ from
-// an object that is not a commit. The spec reads any commit reachable
-// from refs/romeu/origin/*; gitsafe lists no ref of that namespace, so
-// a commit only another fetched branch reaches is refused here too.
-func reachable(ctx context.Context, g *gitsafe.Runner, clone, from, ref, head string) error {
+// id, names a commit that a ref of the namespace prefix,
+// refs/romeu/origin/<cfg-dir>/, reaches: a branch of the origin as
+// step 2 fetched it, the config ref or any other (REQ-0336, REQ-0466),
+// listed by gitsafe (T183). Otherwise it returns usage (exit 2), a
+// commit the clone does not hold among them. An id that names a tree or
+// a blob is refused too, so step 3 never reads projects/ from an object
+// that is not a commit.
+func reachable(ctx context.Context, g *gitsafe.Runner, clone, from, prefix string) error {
 	refuse := func(why string) error {
 		return usage("from-unreachable", "--from "+termsafe.Escape(from)+" "+why)
 	}
@@ -145,12 +145,20 @@ func reachable(ctx context.Context, g *gitsafe.Runner, clone, from, ref, head st
 	if len(commit) != 1 || commit[0] != from {
 		return refuse("names no commit of the config repo's clone")
 	}
-	out, err := g.Unreached(ctx, clone, []string{from}, []string{head})
+	refs, _, err := g.ListRefs(ctx, clone, []string{prefix})
+	if err != nil {
+		return err
+	}
+	tips := make([]string, len(refs))
+	for i, ref := range refs {
+		tips[i] = ref.OID
+	}
+	out, err := g.Unreached(ctx, clone, []string{from}, tips)
 	if err != nil {
 		return err
 	}
 	if len(out) > 0 {
-		return refuse("is not reachable from " + termsafe.Escape(ref))
+		return refuse("is not reachable from " + termsafe.Escape(prefix) + "*")
 	}
 	return nil
 }

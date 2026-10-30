@@ -200,14 +200,14 @@ func TestLockAndCheck(t *testing.T) {
 	}
 }
 
-// TestLockAndCheckExitsOneOnAnAbandonedPromotionUntilRJ304: step 1
-// runs promotion recovery (REQ-0087) on each <name>-env/ under the root,
-// whatever the targets: a first promotion killed after its step 1,
-// whose candidate is gone, is abandoned, so its render.json is removed,
-// and the command stops naming the dir with exit 1, the interim exit
-// until interrupted-promotion-abandoned (RJ-304, exit 4) is declared.
-// A dir that is not <name>-env/ is not read.
-func TestLockAndCheckExitsOneOnAnAbandonedPromotionUntilRJ304(t *testing.T) {
+// TestLockAndCheckStopsOnAnAbandonedPromotion: step 1 runs promotion
+// recovery (REQ-0087) on each <name>-env/ under the root, whatever the
+// targets: a first promotion killed after its step 1, whose candidate
+// is gone, is abandoned, so its render.json is removed, and the command
+// stops with interrupted-promotion-abandoned (RJ-304, exit 4), naming
+// the dir, its hint the sync of the project. A dir that is not
+// <name>-env/ is not read.
+func TestLockAndCheckStopsOnAnAbandonedPromotion(t *testing.T) {
 	h := newHost(t)
 	h.acknowledge(t)
 	record := h.interrupt(t, "shop")
@@ -220,8 +220,11 @@ func TestLockAndCheckExitsOneOnAnAbandonedPromotionUntilRJ304(t *testing.T) {
 	err := lockAndCheck(t.Context(), r)
 
 	require.ErrorIs(t, err, render.ErrPromotionAbandoned)
-	assert.Equal(t, 1, cli.ExitCode(err))
+	e := cli.Of(err)
+	assert.Equal(t, InterruptedPromotionAbandoned.ID, e.ID)
+	assert.Equal(t, 4, cli.ExitCode(err))
 	assert.Contains(t, err.Error(), "shop-env")
+	assert.Equal(t, "romeu sync shop", e.Hint())
 	assert.NoFileExists(t, record, "recovery left the render.json of the abandoned first promotion")
 	assert.FileExists(t, other)
 }
