@@ -50,7 +50,8 @@ backend possible later.
   each case takes (`user`, `feedback`, `project`, `reference`; `handoff`
   through the `handoff` skill, 8.3), that a session hitting friction
   worth fixing writes a `feedback` entry so that another session can
-  triage it in parallel (03 3.9), when `--shared` is right, and to
+  triage it in parallel (03 3.9), which target each entry takes
+  (`--repo <dir|url>`, `-C <path>` or `--shared`, exactly one, 03 3.9), and to
   keep out what the code, the git history or an instruction file
   (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/`) already holds; `add`
   warns `memory-derivable` on the part of that rule a check can judge
@@ -116,9 +117,9 @@ the same hook succeeds, a clean `setup` for `Setup`.
 
 | Aspect | Decision |
 |---|---|
-| Narrative handoff | `REQ-0676` the operator types `/handoff` (before `/clear`) or `/handoff --final` (before recreate/rm); the skill has the agent write the required headings (03 3.9) and pipe them to `julieta memory add --tag handoff --body-file -`, with `--tag tombstone` for `--final`; a handoff is a memory entry, and nothing else holds one |
+| Narrative handoff | `REQ-0676` the operator types `/handoff` (before `/clear`) or `/handoff --final` (before recreate/rm); the skill has the agent write the required headings (03 3.9) and pipe them to `julieta memory add --tag handoff --repo <dir> --body-file -`, with `--tag tombstone` for `--final`; a handoff is a memory entry, and nothing else holds one |
 | Stamp | measured by julieta into the entry at `add`, and written as a file by the SessionEnd hook (8.2; 03 3.10) |
-| Location | `REQ-0677` the project's shared dir, whatever the agent's cwd; the command prints `shared`. Every other entry is filed under the repo containing the cwd, or `--repo`, and the command prints it, so work across repos is filed where the agent meant |
+| Location | `REQ-0677` the project's shared dir, with `repo` the url of the repo the narrative is about, named by `--repo` or `-C` (03 3.9, REQ-1296); the command prints `shared` and that repo. Every other entry is filed under the repo `add` names, never under the working directory, which the agent's shell does not keep between commands (03 3.9), and the command prints it, so work across repos is filed where the agent meant, and a repo the manifest does not hold is refused, never filed under another (decided on 2026-10-29, after a session's notes on a repo outside the manifest were filed under this one) |
 | One open | `REQ-0678` `add` of a `handoff` closes the open one first (03 3.9), and the migration of 04 4.3 leaves one open, so the project has one open narrative; the reader takes the newest `createdAt` should a hand edit leave two |
 | Stamping | `REQ-0679` julieta writes the `stamp` key of the entry at `add` and refuses one supplied by the caller (03 3.9) |
 | Reader | `REQ-0680` one function in `memstore`, used by julieta and romeu: "the open handoff" = the open `handoff` entry of the shared dir; "newest stamp" = the greatest ULID among the files of `stamps/`; no file hides an entry |

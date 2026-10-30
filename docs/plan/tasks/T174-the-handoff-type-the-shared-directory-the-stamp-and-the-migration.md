@@ -13,6 +13,14 @@ owns:
   - internal/cmd/julieta/stamp/**
   - internal/cmd/julieta/all/import_stamp.go
   - internal/cmd/julieta/memory/add*.go
+  - internal/cmd/julieta/memory/edit*.go
+  - internal/cmd/julieta/memory/list*.go
+  - internal/cmd/julieta/memory/memory*.go
+  - internal/cmd/julieta/memory/show*.go
+  - internal/cmd/julieta/memory/target*.go
+  - internal/spec/rules*.go
+  - skills/julieta/**
+  - kits/julieta-claude/skills/julieta/**
   - internal/cmd/julieta/setup/migrate*.go
   - internal/manifest/**
   - internal/render/env.go
@@ -30,6 +38,8 @@ after:
 ask_first:
   - contracts
   - formats
+  - gates
+  - kits
 sitting: none
 ---
 
@@ -100,6 +110,42 @@ does not have before this task (decided on 2026-10-29).
    fails the heading rule stays and is warned `handoff-legacy`; the
    directory is removed only once empty. A second run finds nothing.
    Under the store lock of both dirs.
+6. The explicit target (REQ-1318 of 03 3.9, REQ-0411, REQ-1290,
+   REQ-0677, REQ-0660; decided on 2026-10-29, after a session's notes
+   on a repo outside the manifest were filed under this one, since the
+   agent's shell does not keep the working directory between commands).
+   `add` takes exactly one of `--repo <dir|url>`, `-C <path>` and
+   `--shared`, through one `pflag.Value` per flag that refuses a second
+   `Set`, so a repeated flag is the parser's usage error (`RJ-349`);
+   none or two is the same usage error, its hint the `dir` and `url` of
+   every manifest repo. `--repo` matches a `dir`, or a `url` after the
+   normalization of REQ-0177; `-C` is made absolute against the working
+   directory, cleaned, and matched against each repo's `path` by whole
+   components (`filepath.Rel` with no `..`, never a string prefix), the
+   deepest match winning; a value in no repo is the usage error
+   `memory-target` (exit 2) with the same hint, a new id declared in
+   the package's `errors.go` with its row of 04 4.4 (the `contracts`
+   tick), which also replaces the `RJ-348` path `resolve` takes today
+   for a working directory in no repo. `edit`, `show` and `list` locate
+   by id over every memory dir of the project, an id in two dirs
+   failing (exit 1) with both paths, `list` narrowed by `--repo` or
+   `--shared`, and the `--repo` of `show` and `edit` is removed. A
+   `handoff` takes `--repo` or `-C` and never `--shared`, and its front
+   matter gains `repo`, the matched repo's `url`, refused on any other
+   type (REQ-1296), with `schemas/memory-entry.v1.json` regenerated for
+   the key (the `formats` tick); the reader shows a `repo` the manifest
+   no longer holds as text. The spec rule `repo-url-unique` (REQ-0177)
+   joins `repo-dir-unique`, and both manifest readers refuse a repeated
+   `dir` or `url` (REQ-1317 of 03 3.6). `memory-derivable` reads the
+   instruction files of the target repo, the primary's for `--shared`.
+   The `julieta` skill (`skills/julieta/SKILL.md`, its
+   `references/memory.md`, and the copy under
+   `kits/julieta-claude/skills/julieta/`) names the target in every
+   example and drops the "wrong repo" advice that rests on the working
+   directory, following skill-creator (ADR 0040); the `handoff` skill is
+   T172's, which gains the `--repo <dir>` example (decided on
+   2026-10-29), and either task may land first, since `--repo` is a
+   flag of `add` today.
 
 Re-plan (2026-10-28): after T178, and through it T177, for the file
 overlap of `internal/cmd/julieta/setup/migrate*.go` with their
@@ -107,15 +153,20 @@ overlap of `internal/cmd/julieta/setup/migrate*.go` with their
 until T177 stopped waiting on it. It costs nothing, since this task
 already waits on T043.
 
-- Implements: REQ-0140 (02 2.3), REQ-1295 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
+- Implements: REQ-0140 (02 2.3), REQ-0177 (03 3.1), REQ-1317 (03 3.6),
+  REQ-1295 (03 3.9), REQ-1318 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
   REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-1302 (03 3.9), REQ-0237 (03 3.8), REQ-0244 (03 3.10), REQ-1300
   (03 3.10), REQ-0259 (03 3.12), REQ-0411 (04 4.3), REQ-0413 (04 4.3),
-  REQ-1301 (04 4.3), REQ-0642 (08 8.1), REQ-0645 (08 8.1), REQ-0648
-  (08 8.1), REQ-0649 (08 8.1), REQ-0650 (08 8.1), REQ-0668 (08 8.2),
+  REQ-1290 (04 4.3), REQ-1301 (04 4.3), REQ-0642 (08 8.1), REQ-0645
+  (08 8.1), REQ-0648 (08 8.1), REQ-0649 (08 8.1), REQ-0650 (08 8.1),
+  REQ-0660 (08 8.1), REQ-0668 (08 8.2),
   REQ-0676 (08 8.3), REQ-0677 (08 8.3), REQ-0678 (08 8.3), REQ-0679
   (08 8.3), REQ-0680 (08 8.3), REQ-0685 (08 8.3).
-- Operator: approves the `contracts` surface if a new error id is
-  needed for the manifest without `sharedMemory`; otherwise no.
+- Operator: approves the `contracts` surface for the error id of a
+  target in no repo of the manifest (item 6), and for a new id for the
+  manifest without `sharedMemory` if one is needed; the `gates` surface
+  for the rule `repo-url-unique` in `internal/spec/rules.go`; and the
+  `kits` surface for the `julieta` skill and its kit copy.
 - Acceptance:
   - `romeu sync` step 4 creates `memory/_shared/stamps/` beside
     `entries/`, and step 5 warns when `stamps/` is over its cap: T043
@@ -168,6 +219,33 @@ already waits on T043.
   - The container e2e of `julieta stamp` and of `memory add --tag
     handoff` run the SessionEnd command and a handoff add in a real
     sandbox.
+  - The explicit target (item 6), with a manifest of two repos, `a` at
+    `/w/a` and `b` at `/w/a/b`, run from `/w/a`: `add` with no target,
+    with `--repo a --shared`, with `--repo a --repo b`, with `-C . --repo
+    a`, with `--repo c` and with `-C /w/x` each exit 2, and the hint of
+    each names `a`, `b` and their urls; `--repo a`, `--repo
+    https://github.com/o/a` and `--repo https://github.com/O/A.git` file
+    under `a`; `-C /w/a/b/src` files under `b` and `-C /w/ab` exits 2;
+    `add --tag handoff --repo b --body-file -` writes in `_shared/` with
+    `repo: https://github.com/o/b`, `--tag handoff --shared` exits 2,
+    and `--tag project --repo a` with a body front matter `repo` exits
+    2; `edit <id>` and `show <id>` find an entry of `b` run from `/w/a`
+    with no target, and `list` prints the entries of both repos and the
+    shared dir, `list --repo b` only `b`'s; a handoff whose `repo` is in
+    no manifest repo is listed with the url as text; a manifest with
+    two repos of `dir` `a` and `A`, or of urls `https://github.com/o/a`
+    and `https://github.com/O/A.git`, is refused by julieta and by
+    `sync` naming the repeated value, and `julieta spec validate`
+    reports `repo-url-unique`; `add --shared` warns `memory-derivable`
+    against the primary repo's instruction files, and `add --repo b`
+    against `b`'s and not `a`'s; `--shared --shared` and `-C x -C y`
+    exit 2 as `RJ-349`; `-C b/src` run from `/w/a` and `-C /w/a` file
+    under `b` and `a`; `edit <id> --title x` of a handoff leaves `repo`
+    as it was, the url as the manifest holds it (`https://github.com/O/B`
+    when the manifest says so, not lowercased); `list --shared` prints
+    the shared dir's entries only; `show` and `edit` of an unknown id
+    exit 1, and of an id present in two dirs exit 1 naming both paths;
+    the `julieta` skill's examples carry a target.
   - The ids above say what the code does; `go run ./tools/ci reqs`
     passes, and `go generate` leaves `schemas/` and `docs/reference`
     unchanged.

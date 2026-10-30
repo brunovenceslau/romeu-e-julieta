@@ -122,7 +122,7 @@ naming the host-only rules it did not check.
 |---|---|---|
 | project `name` | `REQ-0175` `^[a-z][a-z0-9-]{0,38}[a-z0-9]$`; unique across the config repo; equals the file stem (satisfies sbx's <= 63 chars, no trailing `-` or `.`) | both |
 | repo `dir` | `REQ-0176` `^[a-z0-9][a-z0-9._-]{0,62}$`, not `.` or `..`, no `/`, not a name romeu reserves inside `<name>-env/`: `memory`, `review`, `ledger`, `.romeu`, `sbxenv.yaml`, `.git` (compared case-insensitively); unique within the project, also case-insensitively. This row is the one list of reserved names | both |
-| repo `url` | `REQ-0177` `https://<host>/<owner>/<repo>[.git]` only: v1 supports GitHub-shaped URLs (one owner segment, so no GitLab subgroups), and repos, CI and releases assume GitHub; a URL may appear in at most one project, compared after one normalization: host and path lowercased, a trailing `.git` removed | both |
+| repo `url` | `REQ-0177` `https://<host>/<owner>/<repo>[.git]` only: v1 supports GitHub-shaped URLs (one owner segment, so no GitLab subgroups), and repos, CI and releases assume GitHub; a URL may appear in at most one project, and once within it (the rule `repo-url-unique`, beside the `dir` rule above; a memory target names a repo by either, 3.9), compared after one normalization: host and path lowercased, a trailing `.git` removed | both |
 | `projects/` | `REQ-0178` holds `*.yaml` files only; a file of another name or extension is an error naming the path (`RJ-345`) | both |
 | the config project | `REQ-0179` exactly one spec's primary repo URL equals `config.url` of host settings; none is an error naming `config.url` (`RJ-346`) | romeu only |
 | repo `url` host | `REQ-0180` `<host>` must be a host-settings `gitHosts` entry | romeu only |
@@ -442,8 +442,13 @@ package both binaries import for it. `REQ-1257` julieta's reader skips a
 member of `manifest.v1` it does not know, at any depth, as the other
 readers between binaries do (the opening of this page; ADR 0041), and
 keeps every other rule: a duplicate member, the size cap, the canonical
-form of the members it knows, and the protocol window below. The one
-exception is the must-understand rule: a member that an older julieta
+form of the members it knows, and the protocol window below. `REQ-1317`
+Both readers refuse a manifest whose `repos` repeat a `dir`
+(case-insensitively, REQ-0176) or a `url` (after the normalization of
+REQ-0177), as they refuse any other invalid manifest, naming the
+repeated value: a memory target names a repo by either (3.9), and a
+manifest that `sync` wrote from a valid spec never repeats one. The one
+exception to the skipping of REQ-1257 is the must-understand rule: a member that an older julieta
 could not safely ignore, one that restricts, denies or changes what
 julieta must do, is not added as an optional member; it bumps the
 protocol number (`protocol`, below), and the window refuses a julieta
@@ -700,22 +705,49 @@ rewritten for the rule.
 `REQ-1295` An entry is filed in the memory dir of one repo, or, with
 `--shared`, in the project's shared dir `_shared/` (08 8.1), for what
 holds for the project as a whole; the index of 08 8.2 shows `shared` in
-place of the repo; `--shared` with `--repo` is a usage error. `REQ-1302`
+place of the repo. `REQ-1318` The target is explicit: `add` takes exactly
+one of `--repo <dir|url>`, `-C <path>` and `--shared`, and none, two, or
+one given twice is a usage error (exit 2) whose hint lists the `dir` and
+`url` of every repo of the manifest; the working directory decides
+nothing, since the agent's shell does not keep it between commands
+(decided on 2026-10-29). `--repo` names a repo of the manifest by its
+`dir`, or by its `url` after the normalization of 3.1 (REQ-0177); `-C`
+names a directory, made absolute and cleaned, and matches the repo
+whose `path` contains it by whole path components, the deepest when
+repos nest, as `romeu pull -C` does (04 4.2); a value that matches no
+repo of the manifest is a usage error of its own id (exit 2, slug
+`memory-target`) with the same hint, so a repo the manifest does not
+hold is refused and never filed under another; its row of 04 4.4 lands
+with its `errors.go`. `edit`, `show` and `list` take no target: an id
+is found over every memory dir of the project, an id found in two dirs
+fails (exit 1) naming both paths, and `list` reads them all, narrowed
+by `--repo` or `--shared`.
+The manifest reader refuses a repeated `dir` or `url` (3.6), so a target
+names one repo. Value completion for these flags is a deferred decision
+of the index. `REQ-1302`
 A manifest without `sharedMemory` (3.6) makes `--shared` and a `handoff`
 a usage error (exit 2) naming the member, so nothing is filed in the
 wrong place, and makes `julieta stamp` and `memory index --hook` warn
 `shared-memory-missing` and exit 0, since a hook must not fail the
-session. `REQ-1296` A `handoff` entry is always shared: `add`
-files it there without the flag, and `--repo` with it is a usage error.
+session. `REQ-1296` A `handoff` entry is always shared: `add` files it
+in `_shared/`, and its target, `--repo` or `-C`, names the repo the
+narrative is about, so `--shared` with a `handoff` is a usage error;
+the entry's front matter carries `repo`, the matched repo's `url` as
+the manifest holds it (decided on 2026-10-29), since a rename of `dir`
+leaves a url untouched: a caller cannot supply the key, `edit` leaves
+it, and it is refused on any other type, whose memory dir already names
+its repo; a reader shows a `repo` the manifest no longer holds as text,
+as REQ-1292 shows an untyped entry.
 `REQ-1297` A `handoff` body holds the headings the `handoff` skill names,
 `## Goal`, `## State`, `## Decisions`, `## Next steps` and `## Open
 questions`, in that order, and `## What would be lost` last when the
 entry also carries the tag `tombstone`, the handoff written before the
 sandbox is destroyed (08 8.5); `add` and `edit` refuse a body without
 them (exit 2), and `tombstone` on any other type is refused the same
-way. `REQ-1298` A `handoff` entry's front matter carries one more key,
-`stamp`, the stamp of 3.10 julieta measures at `add`: a caller cannot
-supply it, `edit` leaves it, and the key is refused on any other type.
+way. `REQ-1298` A `handoff` entry's front matter carries, besides
+`repo` (REQ-1296), one more key, `stamp`, the stamp of 3.10 julieta
+measures at `add`: a caller cannot supply it, `edit` leaves it, and the
+key is refused on any other type.
 `REQ-1299` One `handoff` is open at a time: `add` of a `handoff` first
 closes the open one of the shared dir (status `done`), after the
 duplicate rule of 04 4.1 (a duplicate prints the existing id and closes
