@@ -18,12 +18,13 @@ import (
 
 // source is what the sections of one project's block read: the
 // project's name, its record (nil when it has none or it did not read)
-// with the record's state, and the listing of sbx (listed false when it
-// failed).
+// with the record's state, its <name>-env/ ("" when the root is not
+// known), and the listing of sbx (listed false when it failed).
 type source struct {
 	name      string
 	record    *state.Project
 	recorded  string
+	envDir    string
 	sandboxes []sbxdrv.Sandbox
 	listed    bool
 }
