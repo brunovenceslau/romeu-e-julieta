@@ -6,8 +6,9 @@
 // Package hostpaths is the one place of romeu's host paths: the path of
 // the host settings file, the state directory, the reader of the
 // settings, the resolution of links in a path, and the root check of
-// root-unsafe (04 4.2; I20). init, approve, sync and doctor call it in
-// place of copies of their own.
+// root-unsafe (04 4.2; I20). init calls all of it; approve and sync take
+// the settings and the state directory from it; doctor (T049) is to
+// call the root check for its root-unsafe row.
 //
 // The settings path is built from the environment by spec.SettingsPath
 // and the state directory by state.DefaultDir, which their packages
@@ -17,9 +18,11 @@ package hostpaths
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
@@ -30,10 +33,15 @@ import (
 // SettingsPath returns the path of the host settings file (03 3.4):
 // env.SettingsPath when the binary or a test set it, or the path the
 // environment getenv reads names (spec.SettingsPath: ROMEU_SETTINGS,
-// XDG_CONFIG_HOME, HOME; REQ-0148, REQ-0150).
+// XDG_CONFIG_HOME, HOME; REQ-0148, REQ-0150). A env.SettingsPath that is
+// not absolute is refused, as spec.SettingsPath refuses ROMEU_SETTINGS,
+// so the path never depends on the working directory.
 func SettingsPath(env *cli.Env, getenv func(string) string) (string, error) {
 	if env != nil && env.SettingsPath != "" {
-		return env.SettingsPath, nil
+		if !filepath.IsAbs(env.SettingsPath) {
+			return "", fmt.Errorf("the settings path %q is not an absolute path", env.SettingsPath)
+		}
+		return filepath.Clean(env.SettingsPath), nil
 	}
 	return spec.SettingsPath(getenv)
 }
