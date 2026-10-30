@@ -68,8 +68,10 @@ step missing env -u JULIETA_MANIFEST "$J" spec validate projects/gone.yaml
 	var rep struct {
 		Files    []string `json:"files"`
 		Findings []struct {
-			Rule string `json:"rule"`
-			Text string `json:"text"`
+			File    string `json:"file"`
+			Message string `json:"message"`
+			Path    string `json:"path"`
+			Rule    string `json:"rule"`
 		} `json:"findings"`
 		NotChecked []string `json:"notChecked"`
 		Schema     string   `json:"schema"`
@@ -83,6 +85,8 @@ step missing env -u JULIETA_MANIFEST "$J" spec validate projects/gone.yaml
 	assert.Equal(t, []string{"projects/foo.yaml", "projects/README.md"}, rep.Files)
 	require.Len(t, rep.Findings, 1)
 	assert.Equal(t, "projects-yaml-only", rep.Findings[0].Rule)
+	assert.Equal(t, "projects/README.md", rep.Findings[0].File)
+	assert.Equal(t, "the file", rep.Findings[0].Path)
 	assert.Equal(t, []string{"config-project", "repo-url-host", "workload-repository"}, rep.NotChecked)
 	assert.Empty(t, rep.Warnings)
 

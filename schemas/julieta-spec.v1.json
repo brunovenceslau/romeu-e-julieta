@@ -13,16 +13,24 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "rule": {
+          "file": {
             "type": "string"
           },
-          "text": {
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "rule": {
             "type": "string"
           }
         },
         "required": [
-          "rule",
-          "text"
+          "file",
+          "message",
+          "path",
+          "rule"
         ],
         "type": "object"
       },

@@ -9,6 +9,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	projectspec "github.com/brunovenceslau/romeu-e-julieta/internal/spec"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Schema is the value of the schema field of the --json document of
@@ -35,14 +36,19 @@ type Report struct {
 	Warnings []setup.Warning `json:"warnings"`
 }
 
-// Finding is one finding: the slug of its rule and the text that names
-// the file, the place and why.
+// Finding is one finding, as internal/spec names one: the file, the
+// place of the value, the slug of the rule and why it is refused. The
+// fields are in the order of their JSON names.
 type Finding struct {
+	// File is the path of the file, as the files judged name it.
+	File string `json:"file"`
+	// Message says why the value is refused, escaped (I29).
+	Message string `json:"message"`
+	// Path is the place of the value, as "repos[1].dir", "the file" or
+	// "repos[0]" for a repo's lock; empty for the whole spec.
+	Path string `json:"path"`
 	// Rule is the slug of the rule.
 	Rule string `json:"rule"`
-	// Text names the file, the place of the value and why it is
-	// refused.
-	Text string `json:"text"`
 }
 
 // newReport returns the report of the files judged, the findings and
@@ -53,12 +59,15 @@ func newReport(files []projectspec.File, findings []finding, warnings []setup.Wa
 		rep.Files = append(rep.Files, f.Path)
 	}
 	for _, f := range findings {
-		rep.Findings = append(rep.Findings, Finding{Rule: f.rule, Text: f.text})
+		rep.Findings = append(rep.Findings, Finding{File: termsafe.Escape(f.file), Message: termsafe.Escape(f.message),
+			Path: termsafe.Escape(f.path), Rule: f.rule})
 	}
 	for _, r := range projectspec.HostOnly() {
 		rep.NotChecked = append(rep.NotChecked, r.Slug)
 	}
-	rep.Warnings = append(rep.Warnings, warnings...)
+	for _, w := range warnings {
+		rep.Warnings = append(rep.Warnings, setup.Warning{Slug: w.Slug, Message: termsafe.Escape(w.Message)})
+	}
 	return rep
 }
 

@@ -87,8 +87,9 @@ func manifestFinding(file string, p projectspec.Project, eg egressSet) ([]findin
 	if n <= manifest.MaxEncodedSize {
 		return nil, nil
 	}
-	return []finding{{rule: "manifest-size", text: fmt.Sprintf("%s: the manifest of the project is at least %d bytes encoded, over the cap of %d bytes",
-		file, n, manifest.MaxEncodedSize)}}, nil
+	return []finding{{file: file, rule: "manifest-size", message: fmt.Sprintf(
+		"the manifest of the project is at least %d bytes encoded, over the cap of %d bytes; julieta measures a lower bound, and romeu sync measures it again",
+		n, manifest.MaxEncodedSize)}}, nil
 }
 
 // sizedManifest returns the manifest of p with the egress eg and the

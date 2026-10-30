@@ -10,7 +10,6 @@ import (
 	"maps"
 	"net/url"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -25,41 +24,24 @@ import (
 
 // lockFetcher returns the mise.lock of the repo at url as it is at the
 // tip of its branch ref on origin, the default branch when ref is
-// empty, and whether that commit holds one. A lock it refuses to read
-// (over the cap, a link) is an error that wraps gitsafe.ErrFileRefused.
+// empty, and whether that commit holds one. What gitsafe refuses of the
+// origin's content (a lock over the cap or a link, a HEAD it does not
+// accept) is an error that wraps gitsafe.ErrRefused.
 type lockFetcher func(ctx context.Context, url, ref string) (data []byte, found bool, err error)
 
-// gitFetcher returns the lockFetcher of julieta: a clone of the origin,
-// through gitsafe in sandbox mode (05 5.1), into a temporary directory
-// it removes, and the lock read from the commit of origin's ref with
-// git cat-file under the file cap of mise, never from a work tree.
+// gitFetcher returns the lockFetcher of julieta: a shallow fetch of the
+// one commit at the tip of the ref, through gitsafe in sandbox mode
+// (05 5.1), into a temporary directory it removes, and the lock read
+// from that commit with git cat-file under the file cap of mise, never
+// from a work tree (gitsafe.Runner.TipFile).
 func gitFetcher(g *gitsafe.Runner) lockFetcher {
 	return func(ctx context.Context, url, ref string) ([]byte, bool, error) {
-		tmp, err := os.MkdirTemp("", "julieta-spec-")
+		work, err := os.MkdirTemp("", "julieta-spec-")
 		if err != nil {
 			return nil, false, err
 		}
-		defer func() { _ = os.RemoveAll(tmp) }()
-		dest := filepath.Join(tmp, "repo")
-		if err := g.Clone(ctx, url, dest); err != nil {
-			return nil, false, err
-		}
-		if ref == "" {
-			if ref, err = g.DefaultBranch(ctx, dest); err != nil {
-				return nil, false, err
-			}
-			if ref == "" {
-				return nil, false, errors.New("origin names no default branch")
-			}
-		}
-		oid, ok, err := g.RefOID(ctx, dest, "refs/remotes/origin/"+ref)
-		if err != nil {
-			return nil, false, err
-		}
-		if !ok {
-			return nil, false, fmt.Errorf("origin has no branch %s", ref)
-		}
-		return g.CommitFile(ctx, dest, oid, "mise.lock", mise.MaxFileSize)
+		defer func() { _ = os.RemoveAll(work) }()
+		return g.TipFile(ctx, work, url, ref, "mise.lock", mise.MaxFileSize)
 	}
 }
 
@@ -70,20 +52,27 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 // in neither is the finding catalog-unknown-tool. Each artifact host of
 // the lock that the catalog does not produce for these tools, nor its
 // meta and base sets, is the warning lock-host-gated, since sync gates
-// it (step 3). A lock that does not parse, or that gitsafe refuses, is
-// the finding lock-unparsed. The domains found are added to eg. A repo
-// whose lock cannot be fetched stops the command with fetch-failed
-// (RJ-360), so nothing passes on a lock it did not read.
+// it (step 3), and so is an artifact URL with no host it can read. A
+// lock that does not parse, or what gitsafe refuses of the origin's
+// content (a lock that is a link or over the cap, a HEAD it does not
+// accept), is the finding lock-unparsed: a property of the repo, not of
+// the network. The domains found are added to eg. A repo whose lock
+// cannot be fetched otherwise (git fails, the ref or a default branch
+// is missing) stops the command with fetch-failed (RJ-360), so nothing
+// passes on a lock it did not read.
 func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, file string, p projectspec.Project, eg egressSet) ([]finding, []setup.Warning, error) {
 	produced := egressSet{}
 	produced.add(cat.Meta()...)
 	produced.add(cat.Base()...)
 	var findings []finding
 	var hosts []string
-	for _, r := range p.Repos {
+	var warnings []setup.Warning
+	for i, r := range p.Repos {
+		at := fmt.Sprintf("repos[%d]", i)
 		data, found, err := fetch(ctx, r.URL, r.Ref)
-		if errors.Is(err, gitsafe.ErrFileRefused) {
-			findings = append(findings, finding{rule: "lock-unparsed", text: fmt.Sprintf("%s: the mise.lock of %s cannot be read: %v", file, r.URL, err)})
+		if errors.Is(err, gitsafe.ErrRefused) {
+			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
+				message: fmt.Sprintf("gitsafe refuses what the origin %s sent for its mise.lock: %v", r.URL, err)})
 			continue
 		}
 		if err != nil {
@@ -96,7 +85,8 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 		}
 		lock, err := mise.ParseLock(data)
 		if err != nil {
-			findings = append(findings, finding{rule: "lock-unparsed", text: fmt.Sprintf("%s: the mise.lock of %s does not parse: %v", file, r.URL, err)})
+			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
+				message: fmt.Sprintf("the mise.lock of %s does not parse: %v", r.URL, err)})
 			continue
 		}
 		var unknown []string
@@ -120,21 +110,27 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 			}
 		}
 		for _, tool := range unknown {
-			findings = append(findings, finding{rule: "catalog-unknown-tool", text: fmt.Sprintf(
-				"%s: %s in the mise.lock of %s is neither in the embedded egress catalog nor in egress.tools of the spec: "+
-					"add it to the catalog (internal/catalog/egress/) or declare it in egress.tools", file, tool, r.URL)})
+			findings = append(findings, finding{file: file, path: at, rule: "catalog-unknown-tool", message: fmt.Sprintf(
+				"%s in the mise.lock of %s is neither in the embedded egress catalog nor in egress.tools of the spec: "+
+					"add it to the catalog (internal/catalog/egress/) or declare it in egress.tools", tool, r.URL)})
 		}
 		for _, key := range slices.Sorted(maps.Keys(lock.Tools)) {
 			for _, e := range lock.Tools[key] {
 				for _, platform := range e.PlatformNames() {
-					if h := hostOf(e.Platforms[platform].URL); h != "" && !slices.Contains(hosts, h) {
+					raw := e.Platforms[platform].URL
+					h := hostOf(raw)
+					switch {
+					case raw != "" && h == "":
+						warnings = append(warnings, setup.Warning{Slug: lockHostGated, Message: fmt.Sprintf(
+							"%s: the mise.lock of %s records an artifact URL for %s, platform %s, with no host julieta can read; romeu sync refuses or gates it",
+							file, r.URL, key, platform)})
+					case h != "" && !slices.Contains(hosts, h):
 						hosts = append(hosts, h)
 					}
 				}
 			}
 		}
 	}
-	var warnings []setup.Warning
 	slices.Sort(hosts)
 	for _, h := range hosts {
 		eg.add(h)

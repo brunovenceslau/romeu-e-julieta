@@ -19,6 +19,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // shopSpec is a valid spec of the project shop, two repos, the primary
@@ -133,11 +134,13 @@ func TestSpecValidateFindingsAcrossFiles(t *testing.T) {
 	assert.Contains(t, stdout, "spec validate 2 files 1 findings\n")
 }
 
-// TestSpecValidateStrayFile: a file under projects/ that is not *.yaml
-// is a finding naming its path, exit 6, though the glob of the config
-// repo's CI does not name it (REQ-0423, REQ-0178).
+// TestSpecValidateStrayFile: every entry of projects/ that is not
+// *.yaml is a finding naming its path, exit 6, though the glob of the
+// config repo's CI does not name it (REQ-0423, REQ-0178): a file of
+// another extension, a dotfile and a subdirectory alike.
 func TestSpecValidateStrayFile(t *testing.T) {
-	configRepo(t, map[string]string{"shop.yaml": shopSpec, "notes.txt": "x", "blog.yml": "x"})
+	configRepo(t, map[string]string{"shop.yaml": shopSpec, "notes.txt": "x", "blog.yml": "x", ".gitkeep": ""})
+	require.NoError(t, os.Mkdir(filepath.Join("projects", "old"), 0o700))
 
 	code, stdout, stderr := julieta(t, "spec", "validate", "projects/shop.yaml")
 
@@ -145,7 +148,9 @@ func TestSpecValidateStrayFile(t *testing.T) {
 	assert.Equal(t, "RJ-328", errorID(t, stderr))
 	assert.Contains(t, stdout, "finding projects-yaml-only projects/blog.yml: the file: ")
 	assert.Contains(t, stdout, "finding projects-yaml-only projects/notes.txt: the file: ")
-	assert.Contains(t, stdout, "spec validate 3 files (2 from projects/) 2 findings\n")
+	assert.Contains(t, stdout, "finding projects-yaml-only projects/.gitkeep: the file: ")
+	assert.Contains(t, stdout, "finding projects-yaml-only projects/old: the file: ")
+	assert.Contains(t, stdout, "spec validate 5 files (4 from projects/) 4 findings\n")
 }
 
 // TestSpecValidateUnreadableIsUsage: a file that cannot be read, a
@@ -185,7 +190,7 @@ func TestSpecValidateManifestSize(t *testing.T) {
 	assert.Equal(t, 6, code, stderr)
 	assert.Equal(t, "RJ-328", errorID(t, stderr))
 	assert.Contains(t, stdout, "finding manifest-size projects/shop.yaml: the manifest of the project is at least ")
-	assert.Contains(t, stdout, "over the cap of 32768 bytes\n")
+	assert.Contains(t, stdout, "over the cap of 32768 bytes; julieta measures a lower bound, and romeu sync measures it again\n")
 }
 
 // TestSpecValidateManifestSizeMeasuresTheManifest: the manifest the
@@ -223,7 +228,8 @@ func TestSpecValidateJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(stdout), &rep, json.RejectUnknownMembers(true)), stdout)
 	assert.Equal(t, Report{
 		Files:      []string{"projects/shop.yaml", "projects/notes.txt"},
-		Findings:   []Finding{{Rule: "projects-yaml-only", Text: "projects/notes.txt: the file: is a file under projects/ that is not *.yaml"}},
+		Findings: []Finding{{File: "projects/notes.txt", Message: "is a file under projects/ that is not *.yaml", Path: "the file",
+			Rule: "projects-yaml-only"}},
 		NotChecked: []string{"config-project", "repo-url-host", "workload-repository"},
 		Schema:     "julieta-spec/v1",
 		Warnings:   []setup.Warning{},
@@ -247,4 +253,24 @@ func TestSpecValidateJSONWarnings(t *testing.T) {
 	require.Len(t, rep.Warnings, 1)
 	assert.Equal(t, "lock-host-gated", rep.Warnings[0].Slug)
 	assert.Empty(t, rep.Findings)
+}
+
+// TestSpecValidateJSONEscapes: the text of a finding and of a warning
+// is escaped in the --json document too (I29), so a control byte the
+// config repo's content carries never reaches a terminal raw.
+func TestSpecValidateJSONEscapes(t *testing.T) {
+	var stdout bytes.Buffer
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&bytes.Buffer{}), JSON: true}
+	rep := newReport(nil, []finding{{file: "projects/x\x1b[31m.yaml", path: "name", rule: "decode", message: "bad\x1b]0;t\x07"}},
+		[]setup.Warning{{Slug: "lock-host-gated", Message: "host\x1b[2J"}})
+
+	require.NoError(t, writeJSON(env, rep))
+
+	var back Report
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &back))
+	for _, s := range []string{back.Findings[0].File, back.Findings[0].Message, back.Warnings[0].Message} {
+		assert.NotContains(t, s, "\x1b", "the decoded text holds no escape byte")
+		assert.NotContains(t, s, "\x07")
+	}
+	assert.Equal(t, termsafe.Escape("projects/x\x1b[31m.yaml"), back.Findings[0].File)
 }

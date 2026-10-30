@@ -19,6 +19,8 @@ owns:
   - schemas/julieta-spec.v1.json
   - tools/ci/internal/schema/julieta.go
   - .gitattributes
+  - internal/gitsafe/fetch_tip.go
+  - internal/gitsafe/fetch_tip_test.go
 needs:
   - T021
   - T032
@@ -31,6 +33,7 @@ ask_first:
   - checks
   - contracts
   - formats
+  - gitsafe
 sitting: none
 ---
 
@@ -85,8 +88,13 @@ Decided for slice A, the same day:
 - The manifest of the size check is built from the spec alone with
   stand-ins, the root `/` among them, a lower bound that sync measures
   again.
-- `--catalog` reads each lock through a full clone with gitsafe, which
-  has no shallow fetch yet.
+- `--catalog` reads each lock with a shallow fetch, the one commit at
+  the tip of the ref, through the new `TipFile` of gitsafe
+  (`internal/gitsafe/fetch_tip.go`, `gitsafe`), decided by the
+  operator on 2026-10-30 in place of a full clone; what gitsafe refuses
+  of the origin's content is the finding `lock-unparsed`, and a failed
+  fetch, a missing ref or an origin with no default branch is
+  `fetch-failed`.
 - An origin `--catalog` cannot read is the new error `fetch-failed`
   (`RJ-360`, exit 1, a row of 04 4.4 declared in the command's
   `errors.go`); a lock host the catalog does not produce is the new
@@ -95,8 +103,14 @@ Decided for slice A, the same day:
   the command's exit-code cell of 04 4.3.
 - `--json` prints the format `julieta-spec.v1`, whose schema is
   registered in `tools/ci/internal/schema/julieta.go`: the files judged,
-  the findings, the rules not checked and the warnings, as the text
-  says.
+  the findings, each `{file, message, path, rule}` as internal/spec
+  names one, the rules not checked and the warnings, each text escaped
+  (I29); under `--json` stderr holds nothing but an error.
+- A lock artifact URL with no host julieta can read is the warning
+  `lock-host-gated` too, and a pass of `--catalog` is no gate on lock
+  hosts, which sync gates; the config repo's CI runs it for trusted
+  authors only, or under restricted egress (from the security review
+  of 2026-10-30).
 This task now owns `docs/spec/04-cli.md`, which T185, T188 and T189
 own too; T055 is on the critical path, so it comes first: T185 takes
 T055 in its `after`, and T188 and T189, which come after T185, follow

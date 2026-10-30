@@ -45,11 +45,17 @@ var _ = cli.Register(func() cli.Command {
 				"julieta spec validate --catalog projects/*.yaml",
 			Long: "Decodes each project spec strictly and checks it against the schema and the name and path rules of 03 3.1, " +
 				"each file alone and the files together, and prints one line naming the rules only romeu checks, since they read host settings. " +
-				"A file under projects/ that is not *.yaml, and a spec whose manifest would pass 32 KiB, are findings too. " +
-				"With --catalog it also reads each repo's mise.lock at its ref from origin and reports each backend:tool the embedded egress catalog " +
-				"and the spec's egress.tools lack, a finding, and warns lock-host-gated for each lock host the catalog does not produce, which sync gates; " +
-				"an origin it cannot read is fetch-failed, exit 1. Any finding is exit 6; a file that cannot be read is exit 2. " +
-				"With --json it prints one document of the format julieta-spec.v1.",
+				"Every entry of a projects/ directory that holds a file given and is not *.yaml, a subdirectory or a dotfile among them, is a finding. " +
+				"So is a spec whose manifest would be at least 32 KiB over the cap: julieta measures it with stand-ins for what only romeu knows, " +
+				"a lower bound, and romeu sync measures it again. " +
+				"With --catalog it also reads each repo's mise.lock at the tip of its ref with a shallow fetch from origin and reports each backend:tool " +
+				"the embedded egress catalog and the spec's egress.tools lack, a finding, and a lock that does not parse or that gitsafe refuses, a finding too; " +
+				"it warns lock-host-gated for each lock host the catalog does not produce, and for an artifact URL with no host it can read. " +
+				"A pass is no gate on those hosts: romeu sync gates them. --catalog fetches from origins the specs name, so the config repo's CI " +
+				"runs it for trusted authors only, or under restricted egress. " +
+				"An origin it cannot read, or one that lacks the ref or a default branch, is fetch-failed, exit 1. " +
+				"Any finding is exit 6; a file that cannot be read is exit 2. " +
+				"With --json it prints one document of the format julieta-spec.v1, the warnings among its members, and stderr is then empty but for an error.",
 			Args: cobra.MinimumNArgs(1),
 			RunE: func(c *cobra.Command, args []string) error {
 				var fetch lockFetcher
@@ -77,10 +83,19 @@ var _ = cli.Register(func() cli.Command {
 // (02 2.2).
 const projectsDir = "projects"
 
-// finding is one finding of the command: the slug of its rule and the
-// line that names where it is and why.
+// finding is one finding of the command: the file, the place of the
+// value in it (empty for the whole spec), the slug of its rule and why.
 type finding struct {
-	rule, text string
+	file, path, rule, message string
+}
+
+// String returns the finding as the text output names it:
+// "<file>: <path>: <message>", or "<file>: <message>" without a path.
+func (f finding) String() string {
+	if f.path == "" {
+		return f.file + ": " + f.message
+	}
+	return f.file + ": " + f.path + ": " + f.message
 }
 
 // run validates the files of args; fetch, when it is not nil, reads the
@@ -97,7 +112,7 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 			return err
 		}
 		for _, f := range inv.Findings {
-			findings = append(findings, finding{rule: f.Rule, text: strings.TrimSuffix(f.String(), " ("+f.Rule+")")})
+			findings = append(findings, finding{file: f.File, path: f.Path, rule: f.Rule, message: f.Message})
 		}
 	}
 	cat, err := catalog.Embedded()
@@ -133,7 +148,7 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 		if err := writeJSON(env, rep); err != nil {
 			return err
 		}
-	} else if err := writeText(env, rep, added); err != nil {
+	} else if err := writeText(env, rep, findings, warnings, added); err != nil {
 		return err
 	}
 	return findingsError(findings)
@@ -143,13 +158,15 @@ func run(ctx context.Context, env *cli.Env, args []string, fetch lockFetcher) er
 // of the rules not checked and a summary line on stdout. The summary
 // counts the files judged, and among them the entries of projects/ the
 // command added (REQ-0423).
-func writeText(env *cli.Env, rep Report, added int) error {
-	for _, w := range rep.Warnings {
-		// lock-host-gated is the one warning of the command.
-		cli.Warn(env.Stderr, "lock-host-gated", w.Message)
+func writeText(env *cli.Env, rep Report, findings []finding, warnings []setup.Warning, added int) error {
+	for _, w := range warnings {
+		// lock-host-gated is the one warning of the command, and
+		// TestWarningSlugs reads the slug of every call as a literal of
+		// the list of 04 4.1, so the call names it rather than w.Slug.
+		cli.Warn(env.Stderr, "lock-host-gated", termsafe.Escape(w.Message))
 	}
-	for _, f := range rep.Findings {
-		if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.Rule, termsafe.Escape(f.Text)); err != nil {
+	for _, f := range findings {
+		if _, err := fmt.Fprintf(env.Stdout, "finding %s %s\n", f.rule, termsafe.Escape(f.String())); err != nil {
 			return err
 		}
 	}
@@ -174,7 +191,7 @@ func findingsError(findings []finding) error {
 	details := make([]cli.Detail, len(findings))
 	var slugs []string
 	for i, f := range findings {
-		details[i] = cli.Detail{Key: termsafe.Escape(f.text), Value: f.rule}
+		details[i] = cli.Detail{Key: termsafe.Escape(f.String()), Value: f.rule}
 		if !slices.Contains(slugs, f.rule) {
 			slugs = append(slugs, f.rule)
 		}
@@ -197,7 +214,9 @@ func notChecked() string {
 // For an argument in a directory named projects, every other entry of
 // that directory that is not *.yaml is added with no content, so the
 // rule of REQ-0178 judges it: the shell glob projects/*.yaml of the
-// config repo's CI never names one (REQ-0423). A file that cannot be
+// config repo's CI never names one (REQ-0423). Every such entry is a
+// finding, whatever it is: a subdirectory, a dotfile such as .gitkeep,
+// or a link, as sync judges the tree of projects/ (03 3.1). A file that cannot be
 // read, or a directory given, is usage, exit 2.
 func readFiles(args []string) (files []projectspec.File, added int, err error) {
 	given := map[string]bool{}

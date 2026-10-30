@@ -21,6 +21,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/catalog"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/mise"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	projectspec "github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 )
@@ -122,7 +123,7 @@ func TestSpecValidateCatalogUnknownTool(t *testing.T) {
 
 	assert.Equal(t, 6, code, stderr)
 	assert.Contains(t, stderr, "RJ-328")
-	assert.Contains(t, stdout, "finding catalog-unknown-tool projects/shop.yaml: aqua:acme/tool in the mise.lock of https://github.com/example/shop-web ")
+	assert.Contains(t, stdout, "finding catalog-unknown-tool projects/shop.yaml: repos[1]: aqua:acme/tool in the mise.lock of https://github.com/example/shop-web ")
 	assert.Contains(t, stderr, "warning lock-host-gated: projects/shop.yaml: dl.acme.example is an artifact host ")
 	assert.NotContains(t, stdout, "dl.acme.example")
 	assert.Contains(t, stdout, "spec validate 1 files 1 findings\n")
@@ -154,15 +155,15 @@ func TestSpecValidateCatalogUnparsedLock(t *testing.T) {
 	code, stdout, stderr := validate(t, o, "projects/shop.yaml")
 
 	assert.Equal(t, 6, code, stderr)
-	assert.Contains(t, stdout, "finding lock-unparsed projects/shop.yaml: the mise.lock of https://github.com/example/shop-api does not parse: ")
+	assert.Contains(t, stdout, "finding lock-unparsed projects/shop.yaml: repos[0]: the mise.lock of https://github.com/example/shop-api does not parse: ")
 
 	refused := func(context.Context, string, string) ([]byte, bool, error) {
-		return nil, false, fmt.Errorf("%w: a link", gitsafe.ErrFileRefused)
+		return nil, false, fmt.Errorf("%w: %w: a link", gitsafe.ErrRefused, gitsafe.ErrFileRefused)
 	}
 	var out, errOut bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
 	assert.Equal(t, 6, cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, refused)))
-	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: the mise.lock of https://github.com/example/shop-api cannot be read: ")
+	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: gitsafe refuses what the origin https://github.com/example/shop-api sent for its mise.lock: ")
 }
 
 // TestSpecValidateCatalogFetchFails: an origin that cannot be read stops
@@ -194,7 +195,7 @@ func TestSpecValidateCatalogSkipsWhatDoesNotDecode(t *testing.T) {
 
 	assert.Equal(t, 6, code)
 	assert.Contains(t, stdout, "finding decode projects/shop.yaml: ")
-	assert.Contains(t, stdout, "finding catalog-unknown-tool projects/blog.yaml: aqua:acme/tool ")
+	assert.Contains(t, stdout, "finding catalog-unknown-tool projects/blog.yaml: repos[1]: aqua:acme/tool ")
 	assert.Equal(t, []string{"https://github.com/example/blog-api@main", "https://github.com/example/blog-web@"}, o.asked)
 }
 
@@ -213,11 +214,14 @@ func TestSpecValidateCatalogEgressCounts(t *testing.T) {
 	assert.True(t, eg["proxy.golang.org"], "a domain of core:go in the catalog")
 }
 
-// TestSpecValidateCatalogReadsOrigin runs the fetcher of julieta, through
-// gitsafe, against an origin served over git:// on the loopback: it
-// reads the lock of the branch named, or of the default branch, from
-// the commit of origin and not from a work tree, finds none on a branch
-// without one, and fails on a branch origin lacks.
+// TestSpecValidateCatalogReadsOrigin runs the fetcher of julieta, a
+// shallow fetch through gitsafe, against an origin served over git://
+// on the loopback, and the check over what it reads: the lock of the
+// branch named, or of the default branch, is read from the commit of
+// origin; a branch without one has none; a lock that is a symbolic
+// link, or one over the cap of mise, is the finding lock-unparsed, not
+// a failure of the network; a branch origin lacks is fetch-failed
+// (RJ-360). No temporary directory is left.
 func TestSpecValidateCatalogReadsOrigin(t *testing.T) {
 	base := t.TempDir()
 	work := t.TempDir()
@@ -228,24 +232,70 @@ func TestSpecValidateCatalogReadsOrigin(t *testing.T) {
 	git(t, work, "checkout", "-q", "-b", "bare")
 	git(t, work, "rm", "-q", "mise.lock")
 	git(t, work, "commit", "-q", "-m", "no lock")
+	git(t, work, "checkout", "-q", "-b", "link", "main")
+	git(t, work, "rm", "-q", "mise.lock")
+	require.NoError(t, os.Symlink("/etc/passwd", filepath.Join(work, "mise.lock")))
+	git(t, work, "add", "mise.lock")
+	git(t, work, "commit", "-q", "-m", "a link")
+	git(t, work, "checkout", "-q", "-b", "big", "main")
+	require.NoError(t, os.WriteFile(filepath.Join(work, "mise.lock"), bytes.Repeat([]byte("#"), mise.MaxFileSize+1), 0o600))
+	git(t, work, "add", "mise.lock")
+	git(t, work, "commit", "-q", "-m", "big")
 	git(t, work, "checkout", "-q", "main")
 	git(t, base, "clone", "-q", "--bare", work, "api.git")
 	url := serveGit(t, base) + "api.git"
 	g, err := gitsafe.New(gitsafe.Config{Mode: gitsafe.Sandbox, Git: gitPath(t), Home: t.TempDir()})
 	require.NoError(t, err)
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
 	fetch := gitFetcher(g)
+	cat := embedded(t)
+	check := func(ref string) ([]finding, error) {
+		p := projectspec.Project{Name: "shop", Repos: []projectspec.Repo{{URL: url, Ref: ref, Dir: "api", Primary: true}}}
+		found, _, err := checkCatalog(t.Context(), fetch, cat, "projects/shop.yaml", p, egressSet{})
+		return found, err
+	}
 
 	for _, ref := range []string{"", "main"} {
 		data, found, err := fetch(t.Context(), url, ref)
 		require.NoError(t, err, ref)
 		assert.True(t, found, ref)
 		assert.Equal(t, validLock, data, ref)
+		got, err := check(ref)
+		require.NoError(t, err, ref)
+		assert.Empty(t, got, ref)
 	}
 	_, found, err := fetch(t.Context(), url, "bare")
 	require.NoError(t, err)
 	assert.False(t, found)
-	_, _, err = fetch(t.Context(), url, "gone")
-	assert.ErrorContains(t, err, "origin has no branch gone")
+	for _, ref := range []string{"link", "big"} {
+		got, err := check(ref)
+		require.NoError(t, err, ref)
+		require.Len(t, got, 1, ref)
+		assert.Equal(t, "lock-unparsed", got[0].rule, ref)
+		assert.Equal(t, "repos[0]", got[0].path, ref)
+	}
+	_, err = check("gone")
+	assert.Equal(t, "RJ-360", cli.Of(err).ID, "a branch origin lacks: %v", err)
+
+	left, err := os.ReadDir(tmp)
+	require.NoError(t, err)
+	assert.Empty(t, left, "no julieta-spec-* directory is left")
+}
+
+// TestSpecValidateCatalogHostlessURL: an artifact URL of a lock with no
+// host julieta can read is the warning lock-host-gated, not dropped.
+func TestSpecValidateCatalogHostlessURL(t *testing.T) {
+	lock := strings.Replace(acmeLock, "https://dl.acme.example/tool_linux_arm64.tar.gz", "https:///tool_linux_arm64.tar.gz", 1)
+	configRepo(t, map[string]string{"shop.yaml": shopSpec + "  tools:\n    \"aqua:acme/tool\": [dl.acme.example]\n"})
+	o := &fakeOrigins{locks: map[string]string{"https://github.com/example/shop-web": lock}}
+
+	code, _, stderr := validate(t, o, "projects/shop.yaml")
+
+	require.Equal(t, 0, code, stderr)
+	assert.Contains(t, stderr, "warning lock-host-gated: projects/shop.yaml: the mise.lock of https://github.com/example/shop-web records an artifact URL "+
+		"for aqua:acme/tool, platform linux-arm64, with no host julieta can read; ")
+	assert.Contains(t, stderr, "warning lock-host-gated: projects/shop.yaml: dl.acme.example is an artifact host ")
 }
 
 // gitPath is the git of the tests, the first one julieta looks at.
