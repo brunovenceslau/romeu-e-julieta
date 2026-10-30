@@ -34,7 +34,7 @@ type fakeSbx struct {
 
 func (f fakeSbx) List(context.Context, sbxdrv.Opts) ([]sbxdrv.Sandbox, error) { return f.list, f.err }
 
-func (f fakeSbx) Version(context.Context, sbxdrv.Opts) (sbxdrv.Release, error) {
+func (f fakeSbx) RequireFloor(context.Context, sbxdrv.Opts) (sbxdrv.Release, error) {
 	return f.version, f.versionErr
 }
 

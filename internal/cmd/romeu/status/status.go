@@ -29,11 +29,12 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
-// sbxReader is what status asks sbx: the sandboxes of the host and the
-// live version, sbxdrv.Runner's List and Version.
+// sbxReader is what status asks sbx: the floor check, which reads the
+// live version and must come first, and the sandboxes of the host;
+// sbxdrv.Runner's RequireFloor and List.
 type sbxReader interface {
+	RequireFloor(ctx context.Context, o sbxdrv.Opts) (sbxdrv.Release, error)
 	List(ctx context.Context, o sbxdrv.Opts) ([]sbxdrv.Sandbox, error)
-	Version(ctx context.Context, o sbxdrv.Opts) (sbxdrv.Release, error)
 }
 
 // host is what status reads: the state directory, open to read (nil
@@ -67,11 +68,6 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 	}
 	rep := Report{Warnings: []Finding{}, Errors: []ReadError{}, Projects: []Project{}}
 	failed := 0
-	// With no host state there is no record to compare, and the note
-	// says the one thing to run.
-	if h.measure != nil && h.store != nil {
-		failed += readToolchain(ctx, h, &rep)
-	}
 	note := ""
 	switch {
 	case h.store == nil && len(names) == 0:
@@ -81,15 +77,31 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 		names, err = h.store.ProjectNames()
 		switch {
 		case err != nil:
-			// The report goes on: the toolchain read above is still shown.
+			// The report goes on: the toolchain below is still read.
 			rep.Errors = append(rep.Errors, readError(readNames, err))
 			failed++
 		case len(names) == 0:
 			note = "no projects: run romeu sync"
 		}
 	}
+	// With no host state there is no record to compare, and the note
+	// says the one thing to run.
+	toolchain := h.measure != nil && h.store != nil
+	// The sbx floor check runs once, before any other sbx call, as the
+	// driver requires of every command (sbxdrv.Runner.RequireFloor); its
+	// failure is one failed read, shown where sbx was needed.
+	var v sbxdrv.Release
+	var floorErr error
+	if toolchain || len(names) > 0 {
+		if v, floorErr = h.sbx.RequireFloor(ctx, sbxdrv.Opts{Step: "status"}); floorErr != nil {
+			failed++
+		}
+	}
+	if toolchain {
+		failed += readToolchain(h, &rep, v, floorErr)
+	}
 	if len(names) > 0 {
-		failed += readProjects(ctx, h, names, &rep)
+		failed += readProjects(ctx, h, names, &rep, floorErr)
 	}
 	if err := write(env, rep, note); err != nil {
 		return err
@@ -102,15 +114,22 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 
 // readProjects fills one block per project of names into rep and
 // returns how many reads failed.
-func readProjects(ctx context.Context, h host, names []string, rep *Report) int {
+func readProjects(ctx context.Context, h host, names []string, rep *Report, floorErr error) int {
 	// sbx is listed once; a failed listing is shown in every block, the
-	// read each block depends on, and counts as one failed read.
-	sandboxes, listErr := h.sbx.List(ctx, sbxdrv.Opts{Step: "status"})
+	// read each block depends on, and counts as one failed read. A failed
+	// floor check, counted by run, stands for the listing it prevents.
+	var sandboxes []sbxdrv.Sandbox
+	listErr := floorErr
+	failed := 0
+	if floorErr == nil {
+		if sandboxes, listErr = h.sbx.List(ctx, sbxdrv.Opts{Step: "status"}); listErr != nil {
+			failed++
+		}
+	}
 	shared := 0
 	if listErr != nil {
 		shared = 1
 	}
-	failed := shared
 	for _, name := range names {
 		p := Project{Name: name, Generations: []Generation{}, Findings: []Finding{}, Errors: []ReadError{}}
 		src := &source{name: name, recorded: RecordAbsent, sandboxes: sandboxes, listed: listErr == nil}

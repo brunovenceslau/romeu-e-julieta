@@ -61,7 +61,10 @@ salvage-only work. Slice C:
 the toolchain acknowledgement (`approve.Changes`, reported and never
 exit 3) and `sbx-untested`, once at the head of the report, since gate 1
 is the machine's and not a project's, whatever REQ-0327 lists per
-project. Slice D: the command file, `import_status.go`, the `versions`
+project. Slice D1: the command file over T169's `hostpaths`, which
+runs the sbx floor check once before any other sbx call, as the driver
+requires, `import_status.go` and the e2e cases `TestStatus*`. Slice D2:
+the `versions`
 object of `romeu version --json` (which reads the settings too), the
 e2e cases, the J10 line and the schema `romeu-status.v1` (`formats`),
 once the report is whole; and the text of REQ-0327, REQ-0329 and the
