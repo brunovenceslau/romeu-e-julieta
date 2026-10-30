@@ -67,6 +67,7 @@ schemas/julieta-handoff.v1.json -text
 schemas/julieta-memory.v1.json -text
 schemas/julieta-salvage.v1.json -text
 schemas/julieta-setup.v1.json -text
+schemas/julieta-spec.v1.json -text
 schemas/julieta-status.v1.json -text
 schemas/manifest.v1.json -text
 schemas/memory-entry.v1.json -text
