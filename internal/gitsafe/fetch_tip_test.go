@@ -64,7 +64,7 @@ func TestTipFile(t *testing.T) {
 		repo := filepath.Join(work, tipRepo)
 		assert.Equal(t, "1", plainGit(t, repo, "rev-list", "--count", "refs/remotes/origin/main"), "one commit, depth 1")
 		_, err = os.Stat(filepath.Join(repo, "shallow"))
-		assert.NoError(t, err, "a shallow repository")
+		require.NoError(t, err, "a shallow repository")
 		assert.Empty(t, plainGit(t, repo, "for-each-ref", "refs/tags", "refs/heads"))
 	}
 	_, found, err := r.TipFile(t.Context(), t.TempDir(), url, "bare", "mise.lock", 64)
@@ -93,7 +93,7 @@ func TestTipFileMissingRef(t *testing.T) {
 	r := newRunner(t, Sandbox)
 	_, _, err := r.TipFile(t.Context(), t.TempDir(), url, "gone", "mise.lock", 64)
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, ErrRefused)
+	require.NotErrorIs(t, err, ErrRefused)
 
 	base := t.TempDir()
 	plainGit(t, base, "init", "-q", "--bare", "empty.git")
