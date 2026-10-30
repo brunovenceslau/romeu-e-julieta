@@ -21,6 +21,7 @@ owns:
   - .gitattributes
   - internal/gitsafe/fetch_tip.go
   - internal/gitsafe/fetch_tip_test.go
+  - docs/spec/05-security.md
 needs:
   - T021
   - T032
@@ -34,6 +35,7 @@ ask_first:
   - contracts
   - formats
   - gitsafe
+  - spec
 sitting: none
 ---
 
@@ -103,7 +105,9 @@ Decided for slice A, the same day:
   maintenance and check every object, the tip is peeled to its commit,
   and each repo's read and the whole `--catalog` run have a deadline,
   the limits of the classes `julieta-git` and `julieta-setup` of
-  `internal/procgroup`, since no section names one.
+  `internal/procgroup`, since no section names one; 04 4.3 names them
+  in the command's row, and 05 5.1 states `TipFile`'s exception to the
+  sandbox's own `http.*`.
 - An origin `--catalog` cannot read is the new error `fetch-failed`
   (`RJ-360`, exit 1, a row of 04 4.4 declared in the command's
   `errors.go`); a lock host the catalog does not produce is the new

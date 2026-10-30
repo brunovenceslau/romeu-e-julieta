@@ -72,6 +72,7 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 		at := fmt.Sprintf("repos[%d]", i)
 		repoCtx, cancel := context.WithTimeout(ctx, repoTimeout)
 		data, found, err := fetch(repoCtx, r.URL, r.Ref)
+		repoErr := repoCtx.Err()
 		cancel()
 		if errors.Is(err, gitsafe.ErrFileRefused) {
 			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
@@ -79,9 +80,7 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 			continue
 		}
 		if err != nil {
-			return nil, nil, FetchFailed.Wrap(err, "julieta spec validate --catalog could not read the mise.lock of "+
-				termsafe.Escape(r.URL)+" at "+termsafe.Escape(refName(r.Ref))+" from origin: "+termsafe.Escape(err.Error()),
-				cli.Detail{Key: "url", Value: termsafe.Escape(r.URL)}, cli.Detail{Key: "ref", Value: termsafe.Escape(refName(r.Ref))})
+			return nil, nil, fetchFailed(ctx, repoErr, r, err)
 		}
 		if !found {
 			continue
@@ -154,6 +153,30 @@ func hostOf(raw string) string {
 		return ""
 	}
 	return strings.ToLower(u.Hostname())
+}
+
+// fetchFailed returns fetch-failed (RJ-360) for the error err of the
+// read of the lock of r. A deadline is named by its limit: the run's,
+// catalogTimeout, when ctx, the context of the whole --catalog run,
+// expired, so the repo that was being read when it did is not blamed;
+// the repo's, repoTimeout, when repoErr, its own context's error, says
+// it expired. A cancellation of the run (an interrupt) is returned as
+// it is, for cli.Main to report.
+func fetchFailed(ctx context.Context, repoErr error, r projectspec.Repo, err error) error {
+	where := []cli.Detail{{Key: "url", Value: termsafe.Escape(r.URL)}, {Key: "ref", Value: termsafe.Escape(refName(r.Ref))}}
+	switch {
+	case errors.Is(ctx.Err(), context.Canceled):
+		return ctx.Err()
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		return FetchFailed.Wrap(err, fmt.Sprintf("julieta spec validate --catalog ran past its limit of %s for the whole run, the limit of the class julieta-setup", catalogTimeout),
+			cli.Detail{Key: "limit", Value: catalogTimeout.String()})
+	case errors.Is(repoErr, context.DeadlineExceeded):
+		return FetchFailed.Wrap(err, fmt.Sprintf("julieta spec validate --catalog ran past its limit of %s, the limit of the class julieta-git, reading the mise.lock of %s at %s",
+			repoTimeout, termsafe.Escape(r.URL), termsafe.Escape(refName(r.Ref))),
+			append(where, cli.Detail{Key: "limit", Value: repoTimeout.String()})...)
+	}
+	return FetchFailed.Wrap(err, "julieta spec validate --catalog could not read the mise.lock of "+
+		termsafe.Escape(r.URL)+" at "+termsafe.Escape(refName(r.Ref))+" from origin: "+termsafe.Escape(err.Error()), where...)
 }
 
 // The deadlines of --catalog. No section of the spec names one, so they

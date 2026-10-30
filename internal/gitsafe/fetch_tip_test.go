@@ -7,6 +7,8 @@ package gitsafe
 
 import (
 	"bytes"
+	"context"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 )
 
 // tipOrigin serves a repository over git:// whose main holds a lock
@@ -215,8 +219,13 @@ func TestTipFileFlags(t *testing.T) {
 // redirect fails with ErrMoved, and no request reaches the other host,
 // for the read of the default branch and for the fetch. The sandbox's
 // own global config trusts the test CA (http.sslCAInfo), as a sandbox's
-// git config is its own in sandbox mode.
+// git config is its own in sandbox mode. The network pass-through of
+// sandbox mode is emptied first, so a proxy of the shell that runs the
+// test does not carry the request to 127.0.0.1.
 func TestTipFileFollowsNoRedirect(t *testing.T) {
+	for _, k := range NetworkEnv() {
+		t.Setenv(k, "")
+	}
 	for _, ref := range []string{"", "main"} {
 		url, hosts, reached := moved(t, http.StatusMovedPermanently)
 		home := t.TempDir()
@@ -227,4 +236,48 @@ func TestTipFileFollowsNoRedirect(t *testing.T) {
 		require.ErrorIs(t, err, ErrMoved, "ref %q: %v", ref, err)
 		assert.Zero(t, reached.Load(), "no request reaches the new host")
 	}
+}
+
+// remoteAnswering returns a sandbox runner whose git ls-remote prints
+// out and exits 0, and whose other calls start nothing.
+func remoteAnswering(t *testing.T, out string) *Runner {
+	t.Helper()
+	r := newRunner(t, Sandbox)
+	r.start = func(_ context.Context, c procgroup.Command) error {
+		if slices.Contains(c.Argv, "ls-remote") && c.Stdout != nil {
+			_, err := io.WriteString(c.Stdout, out)
+			return err
+		}
+		return nil
+	}
+	return r
+}
+
+// TestRemoteDefaultRefusedName: a HEAD that names a branch gitsafe does
+// not accept (not valid UTF-8, holding ..) names no default branch to
+// read: ErrNoDefaultBranch, not a refusal of the caller's input.
+func TestRemoteDefaultRefusedName(t *testing.T) {
+	for _, target := range []string{"refs/heads/\xff", "refs/heads/a..b", "refs/heads/x.lock"} {
+		r := remoteAnswering(t, "ref: "+target+"\tHEAD\n"+strings.Repeat("a", 40)+"\tHEAD\n")
+		_, err := r.remoteDefault(t.Context(), stubRepo, "https://example.com/o/r", "https://example.com/o/r")
+		require.ErrorIs(t, err, ErrNoDefaultBranch, target)
+		assert.NotErrorIs(t, err, ErrRefused, target)
+	}
+	r := remoteAnswering(t, "ref: refs/heads/trunk\tHEAD\n"+strings.Repeat("a", 40)+"\tHEAD\n")
+	branch, err := r.remoteDefault(t.Context(), stubRepo, "https://example.com/o/r", "https://example.com/o/r")
+	require.NoError(t, err, "the control")
+	assert.Equal(t, "trunk", branch)
+}
+
+// TestRemoteDefaultOversize: an advertisement over outputLimit is read
+// no further and names no default branch: ErrNoDefaultBranch, even when
+// a usable HEAD line comes first.
+func TestRemoteDefaultOversize(t *testing.T) {
+	r := remoteAnswering(t, "ref: refs/heads/main\tHEAD\n"+strings.Repeat("x", outputLimit+1))
+
+	_, err := r.remoteDefault(t.Context(), stubRepo, "https://example.com/o/r", "https://example.com/o/r")
+
+	require.ErrorIs(t, err, ErrNoDefaultBranch)
+	assert.NotErrorIs(t, err, ErrRefused)
+	assert.Contains(t, err.Error(), "advertises more than")
 }

@@ -364,22 +364,62 @@ func serveGit(t *testing.T, base string) string {
 }
 
 // TestSpecValidateCatalogDeadline: a repo whose read runs past its
-// deadline stops the command with fetch-failed (RJ-360), never a pass.
+// deadline stops the command with fetch-failed (RJ-360), never a pass,
+// and the message names the repo and the limit that expired.
 func TestSpecValidateCatalogDeadline(t *testing.T) {
 	configRepo(t, map[string]string{"shop.yaml": shopSpec})
 	saved := repoTimeout
 	repoTimeout = 10 * time.Millisecond
 	t.Cleanup(func() { repoTimeout = saved })
-	slow := func(ctx context.Context, _, _ string) ([]byte, bool, error) {
-		<-ctx.Done()
-		return nil, false, ctx.Err()
-	}
 	var out, errOut bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
 
-	err := run(t.Context(), env, []string{"projects/shop.yaml"}, slow)
+	err := run(t.Context(), env, []string{"projects/shop.yaml"}, hang)
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Equal(t, "RJ-360", cli.Of(err).ID)
+	e := cli.Of(err)
+	assert.Equal(t, "RJ-360", e.ID)
+	assert.Contains(t, e.Error(), "ran past its limit of 10ms, the limit of the class julieta-git, reading the mise.lock of https://github.com/example/shop-api at main")
+	assert.Contains(t, e.Details, cli.Detail{Key: "limit", Value: "10ms"})
 	assert.Empty(t, out.String())
+}
+
+// TestSpecValidateCatalogRunDeadline: when the deadline of the whole
+// --catalog run expires, fetch-failed names the run's limit and not the
+// repo that was being read when it did.
+func TestSpecValidateCatalogRunDeadline(t *testing.T) {
+	configRepo(t, map[string]string{"shop.yaml": shopSpec})
+	saved := catalogTimeout
+	catalogTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { catalogTimeout = saved })
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&bytes.Buffer{}), Stderr: cli.NewWriter(&bytes.Buffer{})}
+
+	err := run(t.Context(), env, []string{"projects/shop.yaml"}, hang)
+
+	e := cli.Of(err)
+	assert.Equal(t, "RJ-360", e.ID)
+	assert.Contains(t, e.Error(), "ran past its limit of 10ms for the whole run, the limit of the class julieta-setup")
+	assert.NotContains(t, e.Error(), "shop-api")
+	assert.Equal(t, []cli.Detail{{Key: "limit", Value: "10ms"}}, e.Details)
+}
+
+// TestSpecValidateCatalogInterrupted: a run cancelled from outside, an
+// interrupt, returns the cancellation as it is, for cli.Main to report.
+func TestSpecValidateCatalogInterrupted(t *testing.T) {
+	configRepo(t, map[string]string{"shop.yaml": shopSpec})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&bytes.Buffer{}), Stderr: cli.NewWriter(&bytes.Buffer{})}
+
+	err := run(ctx, env, []string{"projects/shop.yaml"}, hang)
+
+	require.ErrorIs(t, err, context.Canceled)
+	_, isRow := errors.AsType[*cli.Error](err)
+	assert.False(t, isRow, "no row of the table: the interrupt is reported as one")
+}
+
+// hang is a lockFetcher that returns only when its context ends.
+func hang(ctx context.Context, _, _ string) ([]byte, bool, error) {
+	<-ctx.Done()
+	return nil, false, ctx.Err()
 }

@@ -32,7 +32,9 @@ var ErrNoDefaultBranch = errors.New("gitsafe: the origin names no default branch
 // no automatic gc or maintenance runs in the throwaway repository; and
 // every object received is checked. They are TipFile's own, not added
 // to sandboxSettings: julieta's other git calls run in the clones the
-// agent works in, whose config is the sandbox's own.
+// agent works in, whose config is the sandbox's own (05 5.1 states the
+// exception). No setting of a git host is added: hostSettings reads the
+// gitHosts of host mode, which sandbox mode does not have.
 var tipFlags = []setting{
 	{"http.followRedirects", "false"},
 	{"gc.auto", "0"},
@@ -101,7 +103,7 @@ func (r *Runner) TipFile(ctx context.Context, work, url, ref, name string, limit
 		return nil, false, err
 	}
 	args := slices.Concat([]string{"fetch"}, fetchFlags, []string{"--depth=1", url, spec})
-	if err := r.runWith(ctx, dest, r.tipSettings(url), nil, args...); err != nil {
+	if err := r.runWith(ctx, dest, tipFlags, nil, args...); err != nil {
 		return nil, false, movedError(err, url, resolved)
 	}
 	oid, ok, err := r.RefOID(ctx, dest, tracking)
@@ -111,11 +113,11 @@ func (r *Runner) TipFile(ctx context.Context, work, url, ref, name string, limit
 	if !ok {
 		return nil, false, fmt.Errorf("gitsafe: the fetch of %s wrote no %s", ref, tracking)
 	}
-	out, err := r.output(ctx, dest, nil, "rev-parse", "--verify", "-q", "--end-of-options", oid+"^{commit}")
-	if err != nil {
+	out := limitedBuffer{limit: outputLimit}
+	if err := r.runInput(ctx, dest, historySettings, historyEnv, nil, &out, "rev-parse", "--verify", "-q", "--end-of-options", oid+"^{commit}"); err != nil {
 		return nil, false, fmt.Errorf("gitsafe: the tip of %s is no commit: %w", ref, err)
 	}
-	commit := strings.TrimSuffix(out, "\n")
+	commit := strings.TrimSuffix(out.String(), "\n")
 	if err := checkObjectID(commit); err != nil {
 		return nil, false, err
 	}
@@ -129,7 +131,7 @@ func (r *Runner) TipFile(ctx context.Context, work, url, ref, name string, limit
 // ErrNoDefaultBranch.
 func (r *Runner) remoteDefault(ctx context.Context, dir, url, resolved string) (string, error) {
 	out := limitedBuffer{limit: outputLimit}
-	if err := r.runWith(ctx, dir, r.tipSettings(url), &out, "ls-remote", "--symref", "--", url, remoteHEAD); err != nil {
+	if err := r.runWith(ctx, dir, tipFlags, &out, "ls-remote", "--symref", "--", url, remoteHEAD); err != nil {
 		return "", movedError(err, url, resolved)
 	}
 	if out.truncated {
@@ -151,10 +153,4 @@ func (r *Runner) remoteDefault(ctx context.Context, dir, url, resolved string) (
 		return branch, nil
 	}
 	return "", fmt.Errorf("%w: %q", ErrNoDefaultBranch, url)
-}
-
-// tipSettings returns the extra flags of TipFile's network calls for
-// url: tipFlags, then the settings of the URL's host.
-func (r *Runner) tipSettings(url string) []setting {
-	return slices.Concat(tipFlags, r.hostSettings(url))
 }
