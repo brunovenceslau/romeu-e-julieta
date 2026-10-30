@@ -477,11 +477,13 @@ func TestInitRefusesARootSwappedBeforeItIsOpened(t *testing.T) {
 		want string
 	}{
 		{"by a directory its group can write", func(t *testing.T, root string) string {
+			t.Helper()
 			require.NoError(t, os.Mkdir(root, 0o700))
 			require.NoError(t, os.Chmod(root, 0o770))
 			return root
 		}, "the root is writable by its group or others"},
 		{"by a link to another directory", func(t *testing.T, root string) string {
+			t.Helper()
 			other := root + ".other"
 			require.NoError(t, os.Mkdir(other, 0o700))
 			require.NoError(t, os.Symlink(other, root))
