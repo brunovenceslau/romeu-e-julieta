@@ -173,7 +173,9 @@ var allowedSettingsSites = map[string]map[string]string{
 // holds the string "ROMEU_SETTINGS", "XDG_CONFIG_HOME" or
 // "settings.yaml", so every command takes the settings path from
 // SettingsPath and a copy built by hand from the environment is caught.
-// allowedSettingsSites holds the exceptions.
+// allowedSettingsSites holds the exceptions. It matches whole string
+// literals only, so a name joined from parts or taken from a constant of
+// another package escapes it: it guards against a copy made by accident.
 func TestNoOtherPackageBuildsTheSettingsPath(t *testing.T) {
 	// The test runs in internal/hostpaths, two levels below the root.
 	root, err := filepath.Abs(filepath.Join("..", ".."))

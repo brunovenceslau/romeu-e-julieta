@@ -40,7 +40,8 @@ var (
 	defaultRef = "main"
 
 	// openRoot opens the root; a test replaces it to swap the root
-	// between its check and its open.
+	// between its check and its open, so the package's tests do not run
+	// in parallel.
 	openRoot = os.OpenRoot
 
 	// cloneRepo is the hardened clone of the config repo, with the
@@ -389,7 +390,9 @@ func cloneConfig(ctx context.Context, cmd *cobra.Command, g *gitsafe.Runner, h s
 // not only before (hostpaths.RootProblem), so a directory or a link
 // created in between is caught. A directory init made is 0700; one that
 // was there is chmod'ed through the handle only when the checks passed,
-// and never followed out of the root.
+// and never followed out of the root. A refusal leaves what this run made:
+// once the root may have been swapped, its path no longer names the
+// directory init made, so nothing is removed by path.
 func openTree(root, envName string) (*os.Root, string, made, error) {
 	var m made
 	// The levels above the root are made as they are needed and stay;
@@ -415,7 +418,10 @@ func openTree(root, envName string) (*os.Root, string, made, error) {
 	}
 	// The root is checked again through the handle, before anything is
 	// written under it: a root swapped between the Lstat and the open, for
-	// another directory or a link to one, is refused.
+	// another directory or a link to one, is refused. os.OpenRoot follows a
+	// final link, so the handle's Lstat(".") is never a link: InfoProblem on
+	// it catches a mode or owner change in place, and only SameFile catches
+	// a link or another directory put in place of the root.
 	opened, err := rt.Lstat(".")
 	if err != nil {
 		_ = rt.Close()
@@ -427,7 +433,7 @@ func openTree(root, envName string) (*os.Root, string, made, error) {
 	}
 	if !os.SameFile(before, opened) {
 		_ = rt.Close()
-		return nil, "", m, RootUnsafe.New("the root was replaced while init opened it")
+		return nil, "", m, RootUnsafe.New("the root is a symbolic link or another directory, put in place while init opened it")
 	}
 	if err := rt.Mkdir(envName, dirMode); err == nil {
 		m.env = true

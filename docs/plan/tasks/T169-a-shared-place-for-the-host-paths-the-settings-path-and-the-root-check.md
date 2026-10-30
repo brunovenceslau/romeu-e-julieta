@@ -58,7 +58,9 @@ owned by the user or writable by its group or others. `init` and
 `approve` call it and delete their copies; `doctor` (T049) calls it for
 its `root-unsafe` row.
 
-Decided on 2026-10-30, scope this repository, written here: the
+Decided on 2026-10-30, scope this repository, written here, and
+superseded the same day by the operator's decision below (hostpaths
+absorbs the settings path): the
 settings path stays built by `spec.SettingsPath` (`internal/spec`,
 T041) and the state directory by `state.DefaultDir`, which predate the
 package and which `hostpaths` imports, so neither is a copy;

@@ -488,7 +488,7 @@ func TestInitRefusesARootSwappedBeforeItIsOpened(t *testing.T) {
 			require.NoError(t, os.Mkdir(other, 0o700))
 			require.NoError(t, os.Symlink(other, root))
 			return other
-		}, "the root was replaced while init opened it"},
+		}, "the root is a symbolic link or another directory, put in place while init opened it"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newMachine(t, projectSpec)
