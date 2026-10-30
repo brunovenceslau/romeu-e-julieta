@@ -180,15 +180,15 @@ func TestDoctorKeepsAFindingWithNoRow(t *testing.T) {
 	f := newFixture(t)
 	f.hostFindings = func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string) {
 		findings, unchecked := preflight.HostFindings(ctx, d, in)
-		return append(findings, preflight.Finding{Slug: "signing-socket", Err: errors.New("the socket answers no key")}), unchecked
+		return append(findings, preflight.Finding{Slug: "future-check", Err: errors.New("the check found something")}), unchecked
 	}
 
 	rep, out, err := f.output(t)
 
 	assert.Equal(t, 1, exitOf(err), out)
-	c := check(t, rep, "signing-socket")
+	c := check(t, rep, "future-check")
 	assert.Equal(t, resultError, c.Result)
-	assert.Contains(t, c.Message, "the socket answers no key")
+	assert.Contains(t, c.Message, "has no row in doctor")
 }
 
 // TestDoctorCleansAFindingWithNoRow: a finding of step 5 with no row in
@@ -199,13 +199,13 @@ func TestDoctorCleansAFindingWithNoRow(t *testing.T) {
 	f := newFixture(t)
 	f.hostFindings = func(ctx context.Context, d preflight.Deps, in preflight.Input) ([]preflight.Finding, []string) {
 		findings, unchecked := preflight.HostFindings(ctx, d, in)
-		return append(findings, preflight.Finding{Slug: "signing-socket", Err: errors.New("a byte \xff that is not UTF-8")}), unchecked
+		return append(findings, preflight.Finding{Slug: "future-check", Err: errors.New("a byte \xff that is not UTF-8")}), unchecked
 	}
 
 	rep, out, err := f.output(t)
 
 	assert.Equal(t, 1, exitOf(err), out)
-	assert.Contains(t, check(t, rep, "signing-socket").Message, "\uFFFD")
+	assert.Contains(t, check(t, rep, "future-check").Message, "\uFFFD")
 }
 
 // TestDoctorErrsOnARowStep5DoesNotRun: a pre row whose check step 5 does
