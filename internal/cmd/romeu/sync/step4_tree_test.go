@@ -79,13 +79,17 @@ func treeRun(t *testing.T) *hostTree {
 		{URL: apiURL, Primary: true, Dir: "shop-api", Ref: "main"},
 		{URL: webURL, Dir: "shop-web"},
 	}}}
+	// The fixture's git runs no automatic gc or maintenance, as
+	// gitsafe's does not: a background maintenance run would leave
+	// objects/maintenance.lock in a clone while a test reads the tree.
+	quiet := []string{"-c", "gc.auto=0", "-c", "maintenance.auto=false"}
 	oldClone, oldFetch := cloneRepo, fetch
 	cloneRepo = func(_ context.Context, _ *gitsafe.Runner, url, dest string) error {
-		gitIn(t, filepath.Dir(dest), "clone", "-q", h.origins[url], dest)
+		gitIn(t, filepath.Dir(dest), append(quiet, "clone", "-q", h.origins[url], dest)...)
 		return nil
 	}
 	fetch = func(_ context.Context, _ *gitsafe.Runner, dir, url string, refspecs []string) error {
-		gitIn(t, dir, append([]string{"fetch", "-q", h.origins[url]}, refspecs...)...)
+		gitIn(t, dir, append(append(quiet, "fetch", "-q", h.origins[url]), refspecs...)...)
 		return nil
 	}
 	t.Cleanup(func() { cloneRepo, fetch = oldClone, oldFetch })
