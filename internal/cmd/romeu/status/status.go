@@ -88,12 +88,15 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 	// no host state the note alone says the one thing to run.
 	toolchain := h.measure != nil && h.store != nil
 	// The sbx floor check runs once, before any other sbx call, as the
-	// driver requires of every command (sbxdrv.Runner.RequireFloor); its
-	// failure is one failed read, shown where sbx was needed.
+	// driver requires of every command (sbxdrv.Runner.RequireFloor). Its
+	// failure is one failed read of the machine's, printed once at the
+	// head of the report (REQ-0329), whether or not the toolchain is read;
+	// each block shows only the listing it prevents.
 	var v sbxdrv.Release
 	var floorErr error
 	if toolchain || len(names) > 0 {
 		if v, floorErr = h.sbx.RequireFloor(ctx, sbxdrv.Opts{Step: "status"}); floorErr != nil {
+			rep.Errors = append(rep.Errors, readError(readSbxVersion, floorErr))
 			failed++
 		}
 	}
