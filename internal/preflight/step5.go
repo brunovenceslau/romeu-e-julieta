@@ -54,15 +54,32 @@ func hostStep(ctx context.Context, d *Deps, in *Input, res *Result) error {
 	return nil
 }
 
-// HostFindings runs every host check and returns the error of each that
-// fails, in the order of step 5, for doctor, which reports them all, and
-// the checks that ran in part (Result.Unchecked), which it reports as
-// not checked.
-func HostFindings(ctx context.Context, d Deps, in Input) (findings []error, unchecked []string) {
+// Finding is the failure of one host check, for doctor: the slug of
+// the check, as doctor reports it, and the error of its row, or the
+// error that kept it from running.
+type Finding struct {
+	Slug string
+	Err  error
+}
+
+// HostFindings runs every host check and returns a finding for each
+// that fails, in the order of step 5, each with the slug of its check,
+// for doctor, which reports them all by slug, and the checks that ran in
+// part (Result.Unchecked), which it reports as not checked.
+func HostFindings(ctx context.Context, d Deps, in Input) (findings []Finding, unchecked []string) {
 	for _, c := range hostChecks {
 		if err := c.run(ctx, &hostEnv{deps: &d, in: &in, unchecked: &unchecked}); err != nil {
-			findings = append(findings, err)
+			findings = append(findings, Finding{Slug: c.slug, Err: err})
 		}
 	}
 	return findings, unchecked
+}
+
+// HostSlugs returns the slugs of the host checks, in the order of step 5.
+func HostSlugs() []string {
+	slugs := make([]string, 0, len(hostChecks))
+	for _, c := range hostChecks {
+		slugs = append(slugs, c.slug)
+	}
+	return slugs
 }

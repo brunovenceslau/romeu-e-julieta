@@ -26,6 +26,7 @@ import (
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hostpaths"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
@@ -91,7 +92,7 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 	if f, ok := in.(*os.File); !ok || !term.IsTerminal(int(f.Fd())) || !term.IsTerminal(stderrFD()) {
 		return noTerminal()
 	}
-	h, err := loadSettings(env)
+	h, err := hostpaths.LoadSettings(env, getenv, usage)
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 		return err
 	}
 
-	stateDir, err := state.DefaultDir(getenv)
+	stateDir, err := hostpaths.StateDir(getenv)
 	if err != nil {
 		return usage("state", err.Error())
 	}

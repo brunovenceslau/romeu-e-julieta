@@ -221,64 +221,6 @@ func TestInitUsesEnvSettingsPath(t *testing.T) {
 	assert.FileExists(t, path)
 }
 
-// TestRealPath resolves the links of the part that exists and keeps the
-// rest.
-func TestRealPath(t *testing.T) {
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	require.NoError(t, os.Mkdir(filepath.Join(tmp, "real"), 0o700))
-	require.NoError(t, os.Symlink(filepath.Join(tmp, "real"), filepath.Join(tmp, "link")))
-
-	got, err := realPath(filepath.Join(tmp, "link", "a", "b"))
-
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(tmp, "real", "a", "b"), got)
-	loop := filepath.Join(tmp, "loop")
-	require.NoError(t, os.Symlink(loop, loop))
-	_, err = realPath(loop)
-	assert.Error(t, err)
-}
-
-// TestRootProblem names each reason a root is unsafe, and accepts a safe
-// one that does not exist yet.
-func TestRootProblem(t *testing.T) {
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	home := filepath.Join(tmp, "home")
-	settings := filepath.Join(home, ".config", "romeu", "settings.yaml")
-	state := filepath.Join(home, ".local", "state", "romeu")
-	require.NoError(t, os.MkdirAll(filepath.Join(home, "repo", ".git"), 0o700))
-	require.NoError(t, os.MkdirAll(filepath.Join(home, "dev"), 0o700))
-	require.NoError(t, os.WriteFile(filepath.Join(home, "file"), nil, 0o600))
-
-	for _, tc := range []struct{ name, root, want string }{
-		{"safe and absent", filepath.Join(home, "new", "dev"), ""},
-		{"safe and present", filepath.Join(home, "dev"), ""},
-		{"home", home, "$HOME"},
-		{"holds the settings", filepath.Join(home, ".config"), "holds the host settings"},
-		{"holds the state", filepath.Join(home, ".local"), "holds the host state"},
-		{"inside the settings directory", filepath.Join(home, ".config", "romeu", "dev"), "inside the host settings directory"},
-		{"the settings directory", filepath.Join(home, ".config", "romeu"), "host settings"},
-		{"inside the state directory", filepath.Join(state, "dev"), "inside the host state directory"},
-		{"the state directory", state, "host state"},
-		{"in a repository", filepath.Join(home, "repo", "dev"), "git repository"},
-		{"a repository", filepath.Join(home, "repo"), "git repository"},
-		{"a file", filepath.Join(home, "file"), "not a directory"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := rootProblem(tc.root, home, settings, state)
-			if tc.want == "" {
-				assert.Empty(t, got)
-				return
-			}
-			assert.Contains(t, got, tc.want)
-		})
-	}
-	if os.Geteuid() != 0 {
-		assert.Contains(t, rootProblem("/usr", home, settings, state), "not owned")
-	}
-}
-
 // TestInitSettingsDirUnwritable: a settings directory init cannot write
 // leaves no clone and no settings, is a precondition (exit 2,
 // settings-unwritable) and not an internal error, and the retry after the
@@ -341,46 +283,6 @@ func TestInitSettingsAppearAfterTheClone(t *testing.T) {
 	assert.Empty(t, left, "the temporary file is removed")
 }
 
-// TestRootProblemByIdentity: a root that is $HOME through a link, or a
-// parent of the settings through one, is caught by os.SameFile and not
-// by a string (a case variant on a case-insensitive volume is the same).
-func TestRootProblemByIdentity(t *testing.T) {
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	home := filepath.Join(tmp, "home")
-	require.NoError(t, os.MkdirAll(filepath.Join(home, ".config", "romeu"), 0o700))
-	alias := filepath.Join(tmp, "alias")
-	require.NoError(t, os.Symlink(home, alias))
-	settings := filepath.Join(home, ".config", "romeu", "settings.yaml")
-	state := filepath.Join(home, ".local", "state", "romeu")
-
-	assert.Contains(t, rootProblem(alias, home, settings, state), "$HOME")
-	cfgAlias := filepath.Join(tmp, "cfgalias")
-	require.NoError(t, os.Symlink(filepath.Join(home, ".config"), cfgAlias))
-	assert.Contains(t, rootProblem(cfgAlias, filepath.Join(tmp, "other"), settings, state), "holds the host settings")
-}
-
-// TestDirProblem names each fault of a directory of the tree.
-func TestDirProblem(t *testing.T) {
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	ok := filepath.Join(tmp, "ok")
-	require.NoError(t, os.Mkdir(ok, 0o700))
-	open := filepath.Join(tmp, "open")
-	require.NoError(t, os.Mkdir(open, 0o700))
-	require.NoError(t, os.Chmod(open, 0o770))
-	file := filepath.Join(tmp, "file")
-	require.NoError(t, os.WriteFile(file, nil, 0o600))
-	link := filepath.Join(tmp, "link")
-	require.NoError(t, os.Symlink(ok, link))
-
-	assert.Empty(t, dirProblem(os.Lstat, ok))
-	assert.Contains(t, dirProblem(os.Lstat, open), "writable by its group or others")
-	assert.Contains(t, dirProblem(os.Lstat, file), "not a directory")
-	assert.Contains(t, dirProblem(os.Lstat, link), "symbolic link")
-	assert.Contains(t, dirProblem(os.Lstat, filepath.Join(tmp, "none")), "cannot be read")
-}
-
 // TestInitNoDefaultBranch: a remote whose HEAD names no branch fails
 // closed, whatever ref is asked.
 func TestInitNoDefaultBranch(t *testing.T) {
@@ -409,44 +311,6 @@ func TestInitRootWithTrailingSlash(t *testing.T) {
 
 	require.Equal(t, 0, code, stderr)
 	assert.DirExists(t, filepath.Join(m.home, "tree", "cfg-env", "cfg", ".git"))
-}
-
-// TestRootProblemUnreadableParent: a directory the root's path cannot be
-// searched in is unsafe, not "no repository" (a .git it cannot see).
-func TestRootProblemUnreadableParent(t *testing.T) {
-	if os.Geteuid() == 0 {
-		return // root reads every directory
-	}
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	locked := filepath.Join(tmp, "locked")
-	require.NoError(t, os.Mkdir(locked, 0o700))
-	require.NoError(t, os.Chmod(locked, 0o000))
-	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })
-
-	got := rootProblem(filepath.Join(locked, "dev"), filepath.Join(tmp, "home"), "/s/settings.yaml", "/s/state")
-
-	assert.Contains(t, got, "cannot be checked for a git repository")
-}
-
-// TestRootProblemInsideByIdentity: a root below the settings or the state
-// directory through a link is inside it, which a string comparison of
-// the paths misses.
-func TestRootProblemInsideByIdentity(t *testing.T) {
-	tmp, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	home := filepath.Join(tmp, "home")
-	cfgDir := filepath.Join(home, ".config", "romeu")
-	stateDir := filepath.Join(home, ".local", "state", "romeu")
-	require.NoError(t, os.MkdirAll(cfgDir, 0o700))
-	require.NoError(t, os.MkdirAll(stateDir, 0o700))
-	settings := filepath.Join(cfgDir, "settings.yaml")
-	cfgAlias, stateAlias := filepath.Join(tmp, "cfgalias"), filepath.Join(tmp, "statealias")
-	require.NoError(t, os.Symlink(cfgDir, cfgAlias))
-	require.NoError(t, os.Symlink(stateDir, stateAlias))
-
-	assert.Contains(t, rootProblem(filepath.Join(cfgAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host settings directory")
-	assert.Contains(t, rootProblem(filepath.Join(stateAlias, "dev"), filepath.Join(tmp, "other"), settings, stateDir), "inside the host state directory")
 }
 
 // TestInitCloneErrors: a git clone that exits non-zero is
@@ -598,6 +462,54 @@ func TestInitRefusesAHelperOthersCanWrite(t *testing.T) {
 			assert.NoFileExists(t, m.settings())
 			assert.NoDirExists(t, filepath.Join(m.home, "Developer"))
 			assert.NoDirExists(t, m.env["XDG_STATE_HOME"])
+		})
+	}
+}
+
+// TestInitRefusesARootSwappedBeforeItIsOpened: a root replaced between
+// its check and its open, by a directory its group can write or by a
+// link to another directory, is refused through the handle (root-unsafe,
+// exit 2) before anything is written under it.
+func TestInitRefusesARootSwappedBeforeItIsOpened(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		swap func(t *testing.T, root string) string // returns the directory the open reaches
+		want string
+	}{
+		{"by a directory its group can write", func(t *testing.T, root string) string {
+			t.Helper()
+			require.NoError(t, os.Mkdir(root, 0o700))
+			require.NoError(t, os.Chmod(root, 0o770))
+			return root
+		}, "the root is writable by its group or others"},
+		{"by a link to another directory", func(t *testing.T, root string) string {
+			t.Helper()
+			other := root + ".other"
+			require.NoError(t, os.Mkdir(other, 0o700))
+			require.NoError(t, os.Symlink(other, root))
+			return other
+		}, "the root is a symbolic link or another directory, put in place while init opened it"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			old := openRoot
+			t.Cleanup(func() { openRoot = old })
+			var reached string
+			openRoot = func(root string) (*os.Root, error) {
+				require.NoError(t, os.Rename(root, root+".old"))
+				reached = tc.swap(t, root)
+				return old(root)
+			}
+
+			code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
+
+			assert.Equal(t, 2, code, stderr)
+			assert.Contains(t, stderr, "RJ-352")
+			assert.Contains(t, stderr, tc.want)
+			assert.NoFileExists(t, m.settings())
+			entries, err := os.ReadDir(reached)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "nothing is written under the swapped root")
 		})
 	}
 }

@@ -155,20 +155,16 @@ func TestPreflightHostFindings(t *testing.T) {
 	sbx.secrets = synthetic(t, "secrets-global-used.txt")
 	d := (&trace{}).deps(t)
 	d.Sbx = sbx
-	var ids []string
+	var ids, slugs []string
 	findings, unchecked := HostFindings(t.Context(), d, host)
-	for _, err := range findings {
-		ids = append(ids, cli.Of(err).ID)
+	for _, f := range findings {
+		ids = append(ids, cli.Of(f.Err).ID)
+		slugs = append(slugs, f.Slug)
 	}
 	assert.Equal(t, []string{"RJ-329", "RJ-331"}, ids)
+	assert.Equal(t, []string{"sbx-global-secret", "home-symlink"}, slugs, "each finding names its check")
 	assert.Equal(t, []string{UncheckedVSCodeFolders}, unchecked, "the folders of VS Code were not given, and the report says so")
-	assert.Equal(t, []string{"sbx-global-secret", "sbx-broad-allow", "home-symlink", "auto-trust", "vscode-trust"},
-		func() (slugs []string) {
-			for _, c := range hostChecks {
-				slugs = append(slugs, c.slug)
-			}
-			return slugs
-		}())
+	assert.Equal(t, []string{"sbx-global-secret", "sbx-broad-allow", "home-symlink", "auto-trust", "vscode-trust"}, HostSlugs())
 }
 
 // TestPreflightTouchesNoNetwork shows REQ-0077 and 10 10.1: no file of

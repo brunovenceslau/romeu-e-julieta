@@ -30,6 +30,7 @@ romeu-e-julieta/
 │  ├─ state/                   host state records, the candidate and generation state machines, descriptor cache, flock
 │  ├─ gate/                    widening set, diff, prompt
 │  ├─ preflight/              the ordered checks of 01 1.5 before a mutating sbx call
+│  ├─ hostpaths/              romeu's host paths: the settings path, the state directory, the settings reader, link resolution and the root check of root-unsafe (04 4.2; I20)
 │  ├─ memgit/                 the commit and push of the durable copy of memory (08 8.1)
 │  ├─ signing/                 ssh-agent identity listing for the git-ssh-sign rule
 │  ├─ sbxdrv/                  sbx argv builders and output parsing

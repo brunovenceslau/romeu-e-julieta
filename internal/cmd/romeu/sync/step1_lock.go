@@ -19,9 +19,9 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/approve"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/embedded"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/hostpaths"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/render"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
-	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
@@ -51,7 +51,7 @@ var (
 // this one renders. The binding of the spec secrets, which REQ-0335
 // places here, reads the specs and so runs at step 3 (checkSecrets).
 func lockAndCheck(ctx context.Context, r *run) error {
-	h, err := loadSettings(r.env)
+	h, err := hostpaths.LoadSettings(r.env, getenv, usage)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func lockAndCheck(ctx context.Context, r *run) error {
 	if err != nil {
 		return err
 	}
-	stateDir, err := state.DefaultDir(getenv)
+	stateDir, err := hostpaths.StateDir(getenv)
 	if err != nil {
 		return usage("state", err.Error())
 	}
@@ -140,39 +140,4 @@ func envDirs(root string) ([]string, error) {
 		}
 	}
 	return names, nil
-}
-
-// loadSettings reads and validates the host settings (03 3.4). Settings
-// that are absent, or that do not decode, are usage (RJ-349) with the
-// slug settings-missing or settings-invalid; an error of the table the
-// decoder raises (format-newer, secret-in-argv) passes through. It is
-// the reader of romeu approve, whose copy is unexported.
-func loadSettings(env *cli.Env) (spec.HostSettings, error) {
-	path := env.SettingsPath
-	if path == "" {
-		var err error
-		if path, err = spec.SettingsPath(getenv); err != nil {
-			return spec.HostSettings{}, usage("settings-missing", err.Error())
-		}
-	}
-	f, err := os.Open(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return spec.HostSettings{}, usage("settings-missing", "no host settings at "+termsafe.Escape(path)+"; run romeu init first")
-	}
-	if err != nil {
-		return spec.HostSettings{}, usage("settings-invalid", termsafe.Escape(err.Error()))
-	}
-	defer func() { _ = f.Close() }()
-	data, err := io.ReadAll(io.LimitReader(f, spec.MaxFileSize+1))
-	if err != nil {
-		return spec.HostSettings{}, usage("settings-invalid", termsafe.Escape(err.Error()))
-	}
-	h, err := spec.DecodeHostSettings(data)
-	if _, ok := errors.AsType[*cli.Error](err); ok {
-		return spec.HostSettings{}, err
-	}
-	if err != nil {
-		return spec.HostSettings{}, usage("settings-invalid", termsafe.Escape(path)+": "+termsafe.Escape(err.Error()))
-	}
-	return h, nil
 }

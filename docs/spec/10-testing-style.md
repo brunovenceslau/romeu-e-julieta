@@ -1322,7 +1322,7 @@ deferred function, which is why the cleanup stands between the two).
 
 | Package | May be imported by | Must not import |
 |---|---|---|
-| `REQ-0968` `sbxdrv`, `render`, `gate`, `state`, `egress`, `signing`, `preflight`, `memgit`, `embedded` | `cmd/romeu`, `tools/ci` | `mise`, `hooks`, `layout` |
+| `REQ-0968` `sbxdrv`, `render`, `gate`, `state`, `egress`, `signing`, `preflight`, `memgit`, `embedded`, `hostpaths` | `cmd/romeu`, `tools/ci` | `mise`, `hooks`, `layout` |
 | `REQ-1233` `mise`, `hooks`, `hooks/actions`, `layout`, `agent/*`, `memstore/write` | `cmd/julieta` only | `sbxdrv` |
 | `REQ-0969` `gitsafe`, `spec`, `canon`, `catalog`, `oci`, `manifest`, `memstore`, `handoff`, `salvage`, `shquote`, `termsafe`, `cli`, `procgroup` | both | `sbxdrv`, `layout` |
 | `REQ-1247` `cli/clidoc` (ADR 0015) | `tools/ci` only | `sbxdrv`, `layout` |
