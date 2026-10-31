@@ -65,13 +65,14 @@ var Admitted = []Site{
 	{KindExec, "internal/procgroup", "Run"},
 
 	// The runner: sbxdrv and gitsafe for romeu, mise and hooks for
-	// julieta (04 4.1, Subprocesses, item 1; REQ-0500). The doctor's
-	// secret-argv row and layout have no call site yet; each joins in the
-	// pull request that writes its first one.
+	// julieta (04 4.1, Subprocesses, item 1; REQ-0500), and the one
+	// function of doctor that runs each secret argv. layout has no call
+	// site yet; it joins in the pull request that writes its first one.
 	{KindRunner, "internal/sbxdrv", AnyFunc},
 	{KindRunner, "internal/gitsafe", AnyFunc},
 	{KindRunner, "internal/mise", AnyFunc},
 	{KindRunner, "internal/hooks", AnyFunc},
+	{KindRunner, "internal/cmd/romeu/doctor", "runSecretArgv"},
 
 	// I16 (05 5.2): the functions that remove temp files, candidate dirs,
 	// kit dirs no longer referenced by the live sbxenv.yaml and what the

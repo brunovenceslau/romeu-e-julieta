@@ -31,6 +31,7 @@ romeu <command> [flags]
 
 * [romeu approve](romeu/approve.md) - acknowledge the toolchain of this machine (gate 1)
 * [romeu completion](romeu/completion.md) - print the shell completion script
+* [romeu doctor](romeu/doctor.md) - check the health and the security of this host
 * [romeu init](romeu/init.md) - write the host settings and clone the config repo
 * [romeu status](romeu/status.md) - report each project's sandbox, generations, tree and toolchain, read only
 * [romeu sync](romeu/sync.md) - render the specs into candidates, run gate 2 and promote
