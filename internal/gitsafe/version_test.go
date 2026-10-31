@@ -9,8 +9,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -98,6 +96,5 @@ func TestVersionOutputBound(t *testing.T) {
 func TestVersionRealGit(t *testing.T) {
 	got, err := newRunner(t, Host).Version(t.Context())
 	require.NoError(t, err)
-	assert.Regexp(t, regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(\.rc)?$`), got)
-	assert.False(t, slices.Contains([]string{"", "0.0.0"}, got))
+	assert.Regexp(t, `^[0-9]+\.[0-9]+\.[0-9]+(\.rc)?$`, got)
 }

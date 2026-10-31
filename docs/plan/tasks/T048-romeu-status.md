@@ -24,7 +24,6 @@ owns:
   - internal/gitsafe/floor.go
   - tools/ci/internal/schema/status.go
   - .gitattributes
-  - docs/spec/04-cli.md
 needs:
   - T043
   - T103
