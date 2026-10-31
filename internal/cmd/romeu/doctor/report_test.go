@@ -7,9 +7,11 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -195,7 +197,13 @@ func TestDoctorListsALeftoverWhoseNameIsNotUTF8(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	f.store(t)
-	require.NoError(t, os.WriteFile(filepath.Join(f.stateDir(), "projects", ".bad\xff.json1"), []byte("{"), 0o600))
+	err := os.WriteFile(filepath.Join(f.stateDir(), "projects", ".bad\xff.json1"), []byte("{"), 0o600)
+	if errors.Is(err, syscall.EILSEQ) {
+		// A filesystem that refuses a name that is not UTF-8 (APFS on
+		// macOS) cannot hold such a leftover, so there is nothing to clean.
+		return
+	}
+	require.NoError(t, err)
 
 	rep, out, err := f.output(t)
 
