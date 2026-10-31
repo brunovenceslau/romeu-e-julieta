@@ -38,7 +38,8 @@ import (
 type Versions struct {
 	// Sbx is the version sbx version reports.
 	Sbx string `json:"sbx,omitzero"`
-	// Git is the version of the host git, as gitsafe reads it.
+	// Git is the version of the host git, git's own token of it as
+	// gitsafe.Version returns it.
 	Git string `json:"git,omitzero"`
 	// MacOS is the product version of macOS; absent off macOS, where
 	// romeu runs for the tests alone.
@@ -62,6 +63,7 @@ type ProjectVersions struct {
 	// render.json, in path order; absent when they were not read: before
 	// the first promotion, while a promotion is interrupted (its record
 	// is the candidate's, as status says), or when the root is not known.
+	// A live render that holds no kit dir gives an empty list, [].
 	Kits []KitPin `json:"kits,omitzero"`
 	// Errors are the reads of the project that failed.
 	Errors []ReadError `json:"errors"`
