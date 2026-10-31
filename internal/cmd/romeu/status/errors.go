@@ -11,7 +11,8 @@ import "github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 var (
 	// StatusIncomplete is the error status-incomplete (RJ-359): a read of
 	// the report failed, so the report was printed with each failed read
-	// in its project's block and the command fails (04 4.2, REQ-0329). It
+	// in its project's block, or at its head for a read of the machine's,
+	// and the command fails (04 4.2, REQ-0329). It
 	// is also the id of a failed read that carries no row of its own,
 	// such as a record that cannot be opened; a read with a row of its
 	// own (sbx-unknown, record-unreadable) keeps it. Declared on
