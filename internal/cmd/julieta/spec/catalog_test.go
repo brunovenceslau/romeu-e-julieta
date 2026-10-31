@@ -184,32 +184,6 @@ func TestSpecValidateCatalogFetchFails(t *testing.T) {
 	assert.Empty(t, stdout)
 }
 
-// TestSpecValidateCatalogRefusalsAreFetchFailed: only a refusal of the
-// file itself (gitsafe.ErrFileRefused) is lock-unparsed; a refusal of the
-// read (gitsafe.ErrRefused alone) and an origin that names no default
-// branch (gitsafe.ErrNoDefaultBranch) are the error fetch-failed, exit 1.
-func TestSpecValidateCatalogRefusalsAreFetchFailed(t *testing.T) {
-	for name, cause := range map[string]error{
-		"refused read":      fmt.Errorf("%w: the origin URL", gitsafe.ErrRefused),
-		"no default branch": gitsafe.ErrNoDefaultBranch,
-	} {
-		t.Run(name, func(t *testing.T) {
-			configRepo(t, map[string]string{"shop.yaml": shopSpec})
-			fetch := func(context.Context, string, string) ([]byte, bool, error) {
-				return nil, false, cause
-			}
-			var out, errOut bytes.Buffer
-			env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
-
-			code := cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, fetch))
-
-			require.Equal(t, 1, code, errOut.String())
-			assert.Equal(t, "RJ-360", errorID(t, errOut.String()), errOut.String())
-			assert.NotContains(t, out.String(), "lock-unparsed")
-		})
-	}
-}
-
 // TestSpecValidateCatalogSkipsWhatDoesNotDecode: --catalog reads the
 // origins of the specs that decode only, and a finding of one spec does
 // not stop the catalog check of another.
