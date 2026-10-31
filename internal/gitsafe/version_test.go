@@ -20,8 +20,9 @@ import (
 
 // TestVersion: git version is read with the hardened argv and
 // environment of host mode, and its first line is parsed strictly: a
-// version line gives major.minor.patch, and anything else is the error
-// git-floor (RJ-344), whatever the floor says of the version.
+// version line gives git's own token, escaped and cut, and anything
+// else is the error git-floor (RJ-344), whatever the floor says of the
+// version.
 func TestVersion(t *testing.T) {
 	tests := []struct {
 		name string
@@ -29,9 +30,12 @@ func TestVersion(t *testing.T) {
 		want string
 	}{
 		{name: "a release", out: "git version 2.53.0\n", want: "2.53.0"},
-		{name: "below the floor is still a version", out: "git version 2.39.5 (Apple Git-154)\n", want: "2.39.5"},
-		{name: "a build suffix is left out", out: "git version 2.45.4.windows.1\n", want: "2.45.4"},
-		{name: "a release candidate", out: "git version 2.46.0.rc1\n", want: "2.46.0.rc"},
+		{name: "below the floor is still a version, the suffix after the space left out", out: "git version 2.39.5 (Apple Git-154)\n", want: "2.39.5"},
+		{name: "a build suffix is git's own token", out: "git version 2.45.4.windows.1\n", want: "2.45.4.windows.1"},
+		{name: "a release candidate", out: "git version 2.46.0.rc1\n", want: "2.46.0.rc1"},
+		{name: "a release candidate with a hyphen", out: "git version 2.46.0-rc1\n", want: "2.46.0-rc1"},
+		{name: "a suffix of I29's code points is escaped", out: "git version 2.53.0.\u202e\u3164\x9bx\n", want: `2.53.0.\u202e\u3164\x9bx`},
+		{name: "a long suffix is cut", out: "git version 2.53.0." + strings.Repeat("a", 300) + "\n", want: "2.53.0." + strings.Repeat("a", foundLimit-len("2.53.0."))},
 		{name: "two fields", out: "git version 2.45\n"},
 		{name: "another program", out: "hub version 2.45.4\n"},
 		{name: "an escape in the line", out: "git version \x1b[31m2.53.0\n"},
@@ -96,5 +100,5 @@ func TestVersionOutputBound(t *testing.T) {
 func TestVersionRealGit(t *testing.T) {
 	got, err := newRunner(t, Host).Version(t.Context())
 	require.NoError(t, err)
-	assert.Regexp(t, `^[0-9]+\.[0-9]+\.[0-9]+(\.rc)?$`, got)
+	assert.Regexp(t, `^[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.-]*$`, got)
 }
