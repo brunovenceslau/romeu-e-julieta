@@ -15,9 +15,10 @@ owns:
   - internal/render/live.go
   - internal/render/drift.go
   - internal/render/live_test.go
-  - internal/cmd/romeu/version/versions.go
+  - internal/cmd/romeu/version/**
   - internal/cmd/romeu/all/import_status.go
   - e2e/status_test.go
+  - e2e/version_test.go
   - internal/gitsafe/version.go
   - internal/gitsafe/version_test.go
   - internal/gitsafe/floor.go

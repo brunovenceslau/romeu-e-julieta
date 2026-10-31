@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json/v2"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -56,8 +57,13 @@ func TestVersionText(t *testing.T) {
 }
 
 // TestVersionJSON prints one JSON document that adds the sha256 of the
-// running binary and its GOARCH to the fields of the text.
+// running binary, its GOARCH and the versions object to the fields of
+// the text. With no host settings and no host state, the versions object
+// lists the settings as a failed read, and the command still exits 0
+// (04 4.2).
 func TestVersionJSON(t *testing.T) {
+	t.Setenv("ROMEU_SETTINGS", filepath.Join(t.TempDir(), "none.yaml"))
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	code, stdout, stderr := run(t.Context(), "version", "--json")
 	require.Equal(t, 0, code, stderr)
 	assert.Empty(t, stderr)
@@ -76,7 +82,20 @@ func TestVersionJSON(t *testing.T) {
 	assert.InDelta(t, 7, doc["protocol"], 0)
 	assert.Equal(t, hex.EncodeToString(sum[:]), doc["sha256"])
 	assert.Equal(t, runtime.GOARCH, doc["goarch"])
-	assert.Len(t, doc, 7, "the fields of 04 4.1")
+	assert.Len(t, doc, 8, "the fields of 04 4.1")
+	versions, ok := doc["versions"].(map[string]any)
+	require.True(t, ok, "%v", doc["versions"])
+	assert.Equal(t, []any{}, versions["projects"])
+	errs, ok := versions["errors"].([]any)
+	require.True(t, ok)
+	require.Len(t, errs, 1)
+	assert.Equal(t, "RJ-349", errs[0].(map[string]any)["id"])
+	assert.Equal(t, "host settings", errs[0].(map[string]any)["read"])
+	assert.NotContains(t, versions, "sbx", "no settings, so sbx was not run")
+	assert.NotContains(t, versions, "git", "no settings, so git was not run")
+	if runtime.GOOS != "darwin" {
+		assert.NotContains(t, versions, "macos")
+	}
 }
 
 // TestVersionInterrupted returns the cancellation of its context, so
