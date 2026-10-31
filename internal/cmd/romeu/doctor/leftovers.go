@@ -16,7 +16,8 @@ import (
 // leave beside the record they were to replace, in the state directory,
 // projects/ and descriptors/. doctor lists them for the operator to
 // remove and deletes none (T049, re-plan of 2026-10-22); a directory it
-// cannot read lists none. It is never nil.
+// cannot read lists none. Each path is made valid UTF-8, for the JSON
+// and the text output alike. It is never nil.
 func leftovers(h *host) []string {
 	out := []string{}
 	if h.store == nil {
@@ -29,7 +30,9 @@ func leftovers(h *host) []string {
 		}
 		for _, e := range entries {
 			if strings.HasPrefix(e.Name(), ".") && e.Type().IsRegular() {
-				out = append(out, filepath.Join(dir, e.Name()))
+				// A name is any bytes; one that is not UTF-8 would stop
+				// the JSON encoder and lose the whole report.
+				out = append(out, strings.ToValidUTF8(filepath.Join(dir, e.Name()), "\uFFFD"))
 			}
 		}
 	}

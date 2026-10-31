@@ -23,13 +23,33 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
 
-// fakeSbx answers sbx ls --json with a list or an error.
+// fakeSbx answers sbx ls --json with a list or an error, and sbx
+// version with a release or an error.
 type fakeSbx struct {
-	list []sbxdrv.Sandbox
-	err  error
+	list       []sbxdrv.Sandbox
+	err        error
+	version    sbxdrv.Release
+	versionErr error
+	// calls, when set, counts the calls of each kind.
+	calls *sbxCalls
 }
 
-func (f fakeSbx) List(context.Context, sbxdrv.Opts) ([]sbxdrv.Sandbox, error) { return f.list, f.err }
+// sbxCalls counts the calls a fakeSbx answered.
+type sbxCalls struct{ floor, list int }
+
+func (f fakeSbx) List(context.Context, sbxdrv.Opts) ([]sbxdrv.Sandbox, error) {
+	if f.calls != nil {
+		f.calls.list++
+	}
+	return f.list, f.err
+}
+
+func (f fakeSbx) RequireFloor(context.Context, sbxdrv.Opts) (sbxdrv.Release, error) {
+	if f.calls != nil {
+		f.calls.floor++
+	}
+	return f.version, f.versionErr
+}
 
 // id parses a ULID of a fixture.
 func id(t *testing.T, s string) canon.ULID {

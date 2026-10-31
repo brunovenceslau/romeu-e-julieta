@@ -7,9 +7,11 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -186,4 +188,25 @@ func TestDoctorJSONIsItsSchema(t *testing.T) {
 	for _, r := range []string{resultPass, resultWarn, resultFail, resultError} {
 		assert.Contains(t, doc, `"result":"`+r+`"`, "the document holds every result")
 	}
+}
+
+// TestDoctorListsALeftoverWhoseNameIsNotUTF8: a leftover whose name holds
+// a byte that is not UTF-8 is listed with U+FFFD in its place, so the
+// JSON report is still written whole.
+func TestDoctorListsALeftoverWhoseNameIsNotUTF8(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.store(t)
+	err := os.WriteFile(filepath.Join(f.stateDir(), "projects", ".bad\xff.json1"), []byte("{"), 0o600)
+	if errors.Is(err, syscall.EILSEQ) {
+		// A filesystem that refuses a name that is not UTF-8 (APFS on
+		// macOS) cannot hold such a leftover, so there is nothing to clean.
+		return
+	}
+	require.NoError(t, err)
+
+	rep, out, err := f.output(t)
+
+	require.NoError(t, err, out)
+	assert.Equal(t, []string{filepath.Join(f.stateDir(), "projects", ".bad\uFFFD.json1")}, rep.Leftovers)
 }
