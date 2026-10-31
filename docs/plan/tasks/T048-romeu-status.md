@@ -18,6 +18,9 @@ owns:
   - internal/cmd/romeu/version/versions.go
   - internal/cmd/romeu/all/import_status.go
   - e2e/status_test.go
+  - internal/gitsafe/version.go
+  - internal/gitsafe/version_test.go
+  - internal/gitsafe/floor.go
 needs:
   - T043
   - T103
@@ -26,6 +29,7 @@ ask_first:
   - gates
   - contracts
   - formats
+  - gitsafe
 sitting: none
 ---
 

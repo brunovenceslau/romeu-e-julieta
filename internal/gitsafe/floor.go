@@ -138,13 +138,9 @@ func quoteVersion(out string) string {
 // it can trust. A command that starts git checks it before gate 1
 // (04 4.2).
 func (r *Runner) CheckFloor(ctx context.Context) error {
-	out, err := r.output(ctx, "", nil, "version")
+	v, err := r.readVersion(ctx)
 	if err != nil {
 		return err
-	}
-	v, err := parseVersion(out)
-	if err != nil {
-		return &FloorError{Found: quoteVersion(out), err: err}
 	}
 	if !atFloor(v) {
 		return &FloorError{Found: v.String()}
