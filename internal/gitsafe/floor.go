@@ -23,7 +23,9 @@ type version struct {
 	rc                  bool
 }
 
-// String returns the version as git writes it, without a build suffix.
+// String returns the parsed version the floor compares: major.minor.patch,
+// with ".rc" for a release candidate and no rc number or build suffix, so
+// it is not always the text git prints (Version returns that).
 func (v version) String() string {
 	s := fmt.Sprintf("%d.%d.%d", v.major, v.minor, v.patch)
 	if v.rc {
