@@ -23,6 +23,7 @@ owns:
   - internal/gitsafe/version_test.go
   - internal/gitsafe/floor.go
   - tools/ci/internal/schema/status.go
+  - schemas/romeu-status.v1.json
   - .gitattributes
 needs:
   - T043
@@ -79,15 +80,6 @@ once the report is whole; and the text of REQ-0327, REQ-0329 and the
 RJ-359 row amended for what slice C put at the head of the report (the
 toolchain, its warnings and the failed reads outside a project's
 block). The
-Slice D2 (2026-10-31): `romeu version --json` reads its `versions` object
-with no lock and exits 0 whatever fails, each failed read listed by its
-error id inside the object, since its row of 04 4.2 has exit 0 alone;
-the macOS version comes from the sysctl `kern.osproductversion`, which
-starts no program, so romeu still runs sbx and git alone (REQ-0296);
-the git version comes from `gitsafe.Runner.Version`, which `CheckFloor`
-shares. The J10 line waits: it needs the `createdAt` of the newest
-`snapshot/heads.json` (T174) and when `refs/sandboxes/<name>/*` was last
-fetched (slice B2). The
 command file reads the host settings through the shared host paths of
 T169 and waits for it, so no third copy of the settings path exists;
 the newest stamp's dirty and stash counts (03 3.10) wait for T174,
@@ -96,6 +88,16 @@ compatibility check before julieta's read are T066's
 (`status/julieta_fields.go`). The orphan scan and `envDirs` of `sync`
 sit in files T055 and T169 own, so slice B copies the small part it
 needs and names who unifies it.
+
+Slice D2 (2026-10-31): `romeu version --json` reads its `versions` object
+with no lock and exits 0 whatever fails, each failed read listed by its
+error id inside the object, since its row of 04 4.2 has exit 0 alone;
+the macOS version comes from the sysctl `kern.osproductversion`, which
+starts no program, so romeu still runs sbx and git alone (REQ-0296);
+the git version comes from `gitsafe.Runner.Version`, which `CheckFloor`
+shares. The J10 line waits: it needs the `createdAt` of the newest
+`snapshot/heads.json` (T174) and when `refs/sandboxes/<name>/*` was last
+fetched (slice B2).
 
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4),
   REQ-0065 (01 1.4), REQ-0087 (01 1.6), REQ-0107 (01 1.6), REQ-0327 (04
