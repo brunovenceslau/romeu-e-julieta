@@ -34,7 +34,7 @@ var (
 var notDefinedYet = map[string]string{
 	"run": "T066", "adopt": "T050",
 	"stop": "T067", "pull": "T067", "salvage": "T068", "rm": "T068", "recreate": "T068",
-	"retire": "T069", "status": "T048", "handoff": "T070",
+	"retire": "T069", "handoff": "T070",
 }
 
 // TestRomeuCommands_lock is the table over the command definitions of

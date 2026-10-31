@@ -257,3 +257,43 @@ func TestRunGoesOnPastAnUnlistedProjectsDir(t *testing.T) {
 	require.Len(t, rep.Errors, 1)
 	assert.Equal(t, "project records", rep.Errors[0].Read)
 }
+
+func TestRunFloorCheckFails(t *testing.T) {
+	t.Parallel()
+	records := map[string]*state.Project{"shop": state.NewProject(), "acme": state.NewProject()}
+	dir := stateDir(t, records, nil)
+	store, err := state.OpenRead(dir)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, store.Close()) }()
+	calls := &sbxCalls{}
+	below := sbxdrv.Release{Minor: 48}
+	floor := sbxdrv.SbxFloor.New("sbx 0.48.0 is below the floor 0.49.2")
+	sbx := fakeSbx{version: below, versionErr: floor, calls: calls}
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
+	err = run(t.Context(), env, host{store: store, sbx: sbx, measure: measureFails}, nil)
+	require.Error(t, err)
+	assert.Equal(t, 1, cli.ExitCode(err))
+	assert.Contains(t, err.Error(), "1 read(s) failed", "one floor check, though the head and each block show it")
+	assert.Equal(t, sbxCalls{floor: 1}, *calls, "the floor check runs once, and nothing lists after it fails")
+	rep := decode(t, out.String())
+	assert.Equal(t, "0.48.0", rep.Toolchain.Sbx, "the version below the floor is shown")
+	require.Len(t, rep.Errors, 1)
+	assert.Equal(t, "sbx version", rep.Errors[0].Read)
+	require.Len(t, rep.Projects, 2)
+	for _, p := range rep.Projects {
+		require.Len(t, p.Errors, 1, p.Name)
+		assert.Equal(t, sbxdrv.SbxFloor.ID, p.Errors[0].ID)
+		assert.Equal(t, "sbx ls", p.Errors[0].Read)
+		assert.Equal(t, SandboxUnknown, p.Sandbox)
+	}
+}
+
+func TestRunCallsNoSbxWithoutHostState(t *testing.T) {
+	t.Parallel()
+	calls := &sbxCalls{}
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out)}
+	require.NoError(t, run(t.Context(), env, host{sbx: fakeSbx{calls: calls}, measure: measureFails}, nil))
+	assert.Equal(t, sbxCalls{}, *calls)
+}
