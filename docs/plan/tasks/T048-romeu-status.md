@@ -22,6 +22,8 @@ owns:
   - internal/gitsafe/version.go
   - internal/gitsafe/version_test.go
   - internal/gitsafe/floor.go
+  - tools/ci/internal/schema/status.go
+  - .gitattributes
 needs:
   - T043
   - T103
@@ -31,6 +33,7 @@ ask_first:
   - contracts
   - formats
   - gitsafe
+  - checks
 sitting: none
 ---
 

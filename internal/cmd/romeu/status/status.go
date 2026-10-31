@@ -66,7 +66,7 @@ func run(ctx context.Context, env *cli.Env, h host, names []string) error {
 			return cli.Usage.New(fmt.Sprintf("%q is not a project name (03 3.1)", name))
 		}
 	}
-	rep := Report{Warnings: []Finding{}, Errors: []ReadError{}, Projects: []Project{}}
+	rep := Report{Warnings: []Finding{}, Errors: []ReadError{}, Projects: []Project{}, Schema: Schema}
 	failed := 0
 	note := ""
 	switch {
