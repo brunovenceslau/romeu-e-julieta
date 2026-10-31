@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gitsafe"
@@ -25,6 +26,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/sbxdrv"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // Versions is the versions object of romeu version --json (04 4.1,
@@ -83,7 +85,8 @@ type ReadError struct {
 	Slug string `json:"slug"`
 	// Read names what was read, such as git version.
 	Read string `json:"read"`
-	// Message is the error's message.
+	// Message is the error's message, cut to its first maxMessage bytes
+	// and escaped (I29).
 	Message string `json:"message"`
 }
 
@@ -282,12 +285,19 @@ type identified interface {
 	Slug() string
 }
 
+// maxMessage is how many bytes of an error's message a ReadError keeps,
+// before the escape: a message can quote what a file holds, such as a
+// member name of render.json, at any length.
+const maxMessage = 512
+
 // readError returns the failed read of what by its error: the error's
 // own row, or internal (RJ-348) for an error that carries none, as
-// cli.Main reports such an error. The message is made valid UTF-8, since
-// a byte that is not would stop the JSON encoder and lose the document.
+// cli.Main reports such an error. The message is cut to maxMessage bytes
+// and escaped (termsafe.Escape, I29): it can quote a file's text, and
+// the escape also makes it valid UTF-8, since a byte that is not would
+// stop the JSON encoder and lose the document.
 func readError(what string, err error) ReadError {
-	r := ReadError{Read: what, Message: strings.ToValidUTF8(err.Error(), "�")}
+	r := ReadError{Read: what, Message: message(err.Error())}
 	if e, ok := errors.AsType[*cli.Error](err); ok && e != nil {
 		r.ID, r.Slug = e.ID, e.Slug
 		return r
@@ -298,4 +308,17 @@ func readError(what string, err error) ReadError {
 	}
 	r.ID, r.Slug = cli.Internal.ID, cli.Internal.Slug
 	return r
+}
+
+// message returns msg cut to maxMessage bytes, on a code point's first
+// byte, and escaped, with "..." after a message that was cut.
+func message(msg string) string {
+	if len(msg) <= maxMessage {
+		return termsafe.Escape(msg)
+	}
+	i := maxMessage
+	for i > maxMessage-utf8.UTFMax && !utf8.RuneStart(msg[i]) {
+		i--
+	}
+	return termsafe.Escape(msg[:i]) + "..."
 }

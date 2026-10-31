@@ -340,6 +340,35 @@ func TestReadVersions(t *testing.T) {
 	}
 }
 
+// TestReadVersionsEscapesAHostileRender: a render.json whose spec
+// source kind holds code points that Go's %q keeps (a Hangul filler,
+// the braille blank, a combining grapheme joiner) and 3000 more bytes
+// reaches the document escaped (I29) and cut, as the record's check
+// quotes the kind in its error.
+func TestReadVersionsEscapesAHostileRender(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, map[string]*state.Project{"shop": state.NewProject()})
+	liveRender(t, f.root, nil)
+	path := filepath.Join(f.root, "shop-env", render.LiveRecord)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	hostile := "\u3164\u2800\u034f" + strings.Repeat("D", 3000)
+	edited := strings.Replace(string(data), `"kind": "origin"`, `"kind": "`+hostile+`"`, 1)
+	require.NotEqual(t, string(data), edited, "the fixture names its spec source kind")
+	require.NoError(t, os.WriteFile(path, []byte(edited), 0o600))
+	var c calls
+	got := f.read(t, f.seamsOf(&c, "0.49.2", "2.53.0", "15.1", nil, nil, nil))
+	require.Len(t, got.Projects, 1)
+	require.Len(t, got.Projects[0].Errors, 1)
+	msg := got.Projects[0].Errors[0].Message
+	for _, raw := range []string{"\u3164", "\u2800", "\u034f"} {
+		assert.NotContains(t, msg, raw, "%q", raw)
+	}
+	assert.Contains(t, msg, `\u3164\u2800\u034f`, "each code point of I29 is shown as its escape")
+	assert.True(t, strings.HasSuffix(msg, "..."), "the message is cut")
+	assert.LessOrEqual(t, len(msg), 2*maxMessage)
+}
+
 // TestReadVersionsWritesNothing: the versions are read without a lock
 // and leave the state directory and the tree as they were.
 func TestReadVersionsWritesNothing(t *testing.T) {
@@ -422,4 +451,15 @@ func TestParseMacOS(t *testing.T) {
 		assert.NotContains(t, err.Error(), "\x1b", "%q", bad)
 		assert.LessOrEqual(t, len(err.Error()), 200, "%q", bad)
 	}
+}
+
+// TestMessage: a long message is cut on a code point's first byte, so
+// the cut leaves no broken byte to escape as \x.
+func TestMessage(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "short", message("short"))
+	long := "a" + strings.Repeat("é", maxMessage)
+	got := message(long)
+	assert.NotContains(t, got, `\x`)
+	assert.Equal(t, "a"+strings.Repeat("é", (maxMessage-1)/2)+"...", got)
 }
