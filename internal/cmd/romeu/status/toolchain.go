@@ -6,7 +6,6 @@
 package status
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -28,16 +27,19 @@ const (
 // (approve.Changes, REQ-0062) of the live toolchain with the record,
 // which status reports and does not stop on, and the warning
 // sbx-untested for a live sbx outside the tested window (REQ-0063,
-// REQ-0933). It returns how many reads failed.
-func readToolchain(ctx context.Context, h host, rep *Report) int {
+// REQ-0933), with v the sbx version the floor check read. A failed floor
+// check, floorErr, is shown here and counted by run. It returns how many
+// other reads failed.
+func readToolchain(h host, rep *Report, v sbxdrv.Release, floorErr error) int {
 	tc := &Toolchain{State: ToolchainUnknown, Changes: []ToolchainChange{}}
 	rep.Toolchain = tc
-	// A failed sbx version often comes with a failed sbx ls; each is a
-	// read of its own and counts as one.
-	v, err := h.sbx.Version(ctx, sbxdrv.Opts{Step: "status"})
-	if err != nil {
-		rep.Errors = append(rep.Errors, readError(readSbxVersion, err))
-		return 1
+	if floorErr != nil {
+		// A version below the floor was read: show it beside the error.
+		if v != (sbxdrv.Release{}) {
+			tc.Sbx = v.String()
+		}
+		rep.Errors = append(rep.Errors, readError(readSbxVersion, floorErr))
+		return 0
 	}
 	tc.Sbx = v.String()
 	if !slices.Contains(sbxdrv.RecordedVersions, tc.Sbx) {
