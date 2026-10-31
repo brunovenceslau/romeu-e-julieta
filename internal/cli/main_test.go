@@ -283,7 +283,7 @@ func TestMainHelpOnEveryLevel(t *testing.T) {
 		args   [][]string
 		want   string
 	}{
-		{"romeu", [][]string{{"--help"}, {"-h"}, {"help"}}, "Usage: romeu <command> [flags]\n\nthe commands that run on the host\n\nCommands:\n  approve     acknowledge the toolchain of this machine (gate 1)\n  completion  print the shell completion script\n  fixture     a command of the tests\n  help        print the help of a command\n"},
+		{"romeu", [][]string{{"--help"}, {"-h"}, {"help"}}, "Usage: romeu <command> [flags]\n\nthe commands that run on the host\n\nCommands:\n  approve     acknowledge the toolchain of this machine (gate 1)\n  completion  print the shell completion script\n  doctor      check the health and the security of this host\n  fixture     a command of the tests\n  help        print the help of a command\n"},
 		{"julieta", [][]string{{"fixturegroup", "--help"}, {"fixturegroup", "-h"}, {"help", "fixturegroup"}}, "Usage: julieta fixturegroup <command> [flags]\n\nthe fixturegroup commands\n\nCommands:\n  one  the first subcommand\n  two  the second subcommand\n"},
 		{"julieta", [][]string{{"fixturegroup", "one", "--help"}, {"fixturegroup", "one", "-h"}, {"help", "fixturegroup", "one"}}, "Usage: julieta fixturegroup one [arg] [flags]\n\nthe first subcommand\n\nFlags:\n      --count int   how many (default 3)\n  -h, --help        help for one\n      --repo dir    the dir of the repository (default \"/work\")\n\nExamples:\n  julieta fixturegroup one --repo /x\n"},
 	}

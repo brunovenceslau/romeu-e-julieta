@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
-	"slices"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 )
@@ -27,33 +25,17 @@ func CheckDrift(envDir string) ([]string, error) {
 		return nil, fmt.Errorf("render: %w", err)
 	}
 	defer func() { _ = root.Close() }()
-	rec, found, err := readLiveRecord(root)
+	rec, found, err := readLive(root)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		// A live sbxenv.yaml that no render.json records is drift: no
-		// digest says what it should hold.
-		ok, err := liveExists(root, LiveEnvFile)
-		if err != nil || !ok {
-			return nil, err
-		}
-		return []string{LiveEnvFile}, nil
+		return drift(root, nil)
 	}
 	if rec.Promoting != nil {
 		return nil, ErrPromotionInterrupted
 	}
-	var drifted []string
-	for _, p := range slices.Sorted(maps.Keys(rec.Files)) {
-		ok, err := liveMatches(root, p, rec.Files[p])
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			drifted = append(drifted, p)
-		}
-	}
-	return drifted, nil
+	return drift(root, &rec)
 }
 
 // liveMatches reports whether the live path p holds the digest want; a
@@ -75,7 +57,7 @@ func liveDigest(root *os.Root, p string) (string, error) {
 		d, err := kitDirDigest(root, p)
 		return d, err
 	}
-	data, err := root.ReadFile(p)
+	data, err := readRegular(root, p, 0)
 	if err != nil {
 		return "", err
 	}

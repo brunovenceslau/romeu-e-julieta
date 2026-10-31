@@ -13,14 +13,16 @@ owns:
   - e2e/julieta_pin_test.go
   - e2e/scenarios/j2/step1_*.go
   - examples/.github/workflows/validate.yml
+  - internal/cmd/romeu/sync/step10_report.go
+  - internal/cmd/romeu/sync/step10_report_test.go
 needs:
   - T021
   - T032
   - T031
   - T036
   - T051
-after:
   - T043
+after: []
 ask_first: []
 sitting: none
 ---
@@ -32,7 +34,8 @@ Goal: `julieta spec validate` and `julieta pin`.
 Re-plan (2026-10-12): Kept. It feeds the config repo's `validate.yml`.
 Its J2 step lives in its own file, `e2e/scenarios/j2/step1_*.go`, in the
 directory T043 owns, so this task comes `after` T043 (rule 1 of
-`docs/plan.md`).
+`docs/plan.md`). Since 2026-10-30 T043 is in `needs` instead
+(the re-plan below).
 
 Re-plan (2026-10-22): Changed, decided by the maintainer. This task
 takes from T021 the example workflow
@@ -43,6 +46,13 @@ fixture of that check's test. It moved because no julieta release
 exists to pin yet and this task builds `julieta pin check`. The file is
 a YAML file under `examples/`, so the hint rule of REQ-0836 applies to
 it; this task settles how it meets it.
+
+Re-plan (2026-10-30): takes from T043 the warning
+`julieta-pin-mismatch` of step 10 of 04 4.2 (REQ-0345), since it reads
+the pin of `validate.yml` whose format and reader this task defines;
+it owns `step10_report.go` of `sync` and its test for it, and T043
+moves from `after` to `needs`. Decided by the operator on 2026-10-30,
+scope this repository.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03
@@ -69,6 +79,10 @@ it; this task settles how it meets it.
     workflows (04 4.3), reading
     `examples/.github/workflows/validate.yml` (T021) as its fixture; it
     exits 6 (`check-findings`) when it reports one.
+  - `romeu sync` warns `julieta-pin-mismatch` when the julieta release
+    the config repo's `validate.yml` pins is not the version romeu
+    embeds, through the reader of `pin check --workflows`, and does not
+    warn when they are equal (from T043, 2026-10-30).
   - The J2 scenario function gains its step 1, `julieta spec validate`
     in the config project's sandbox, at the hybrid level.
 - Verify: `go test ./internal/... -run '^Test(SpecValidate|Pin)'`, which

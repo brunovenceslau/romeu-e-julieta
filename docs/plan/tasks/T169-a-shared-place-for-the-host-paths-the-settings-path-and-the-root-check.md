@@ -3,13 +3,19 @@ id: T169
 title: "A shared place for the host paths: the settings path and the root check"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/hostpaths/**
   - internal/cmd/romeu/init/**
   - internal/cmd/romeu/approve/**
   - internal/cmd/romeu/sync/step1_lock.go
   - docs/spec/02-layouts.md
+  - docs/spec/12-engineering.md
+  - docs/spec/10-testing-style.md
+  - tools/ci/internal/imports/rows.go
+  - internal/spec/settings_path.go
+  - internal/spec/settings_path_test.go
+  - internal/cmd/romeu/all/memory_push.go
 needs:
   - T041
   - T042
@@ -18,8 +24,11 @@ after:
   - T165
   - T043
 ask_first:
+  - checks
   - contracts
 sitting: none
+merged: 2026-10-30
+pr: 355
 ---
 
 # T169 - A shared place for the host paths: the settings path and the root check
@@ -48,6 +57,45 @@ directory, and a root or `<root>/<cfg>-env` that is a symlink, not
 owned by the user or writable by its group or others. `init` and
 `approve` call it and delete their copies; `doctor` (T049) calls it for
 its `root-unsafe` row.
+
+Decided on 2026-10-30, scope this repository, written here, and
+superseded the same day by the operator's decision below (hostpaths
+absorbs the settings path): the
+settings path stays built by `spec.SettingsPath` (`internal/spec`,
+T041) and the state directory by `state.DefaultDir`, which predate the
+package and which `hostpaths` imports, so neither is a copy;
+`hostpaths.SettingsPath` adds the path `cli.Env` holds, and every
+command takes the path from it. The package's path joins the
+`romeu-cli` row of the module table of 12 12.2, which the tree check
+requires of a package under `internal/`. The memory push
+(`internal/cmd/romeu/all/memory_push.go`, T175), outside this file set,
+still builds the settings path; the call-site test lists it as
+pending, and its one-line move to `hostpaths.SettingsPath` lands in a
+change of its own.
+
+Re-plan (2026-10-30, scope this repository): the new package needs its
+row in the import table of 10 10.7 (REQ-0972), so T169 also owns the
+REQ-0968 row of `docs/spec/10-testing-style.md`, which T170 owns too,
+and `tools/ci/internal/imports/rows.go` (ask-first `checks`), which
+mirrors that table; the change only adds `hostpaths` to the row. T170
+now comes `after` T169 for that file.
+
+Decided by the operator on 2026-10-30, scope this repository, written
+here, in place of the first decision above that the settings path stays
+in `internal/spec`: `hostpaths` absorbs `SettingsEnv` and
+`SettingsPath`, so it alone builds the settings path from the
+environment and only romeu links it; `internal/spec/settings_path.go`
+and its test go (added by T042, merged), and the memory push
+(`internal/cmd/romeu/all/memory_push.go`, T175, merged) takes the path
+from `hostpaths.SettingsPath`, so the call-site test has no pending
+site. The state directory stays built by `state.DefaultDir`.
+
+Decided by the operator on 2026-10-30, scope this repository, written
+here: init checks the root again through the handle it opens
+(`os.OpenRoot`), before anything is written under it: a directory the
+user owns and neither the group nor others can write, and the same
+file as the root it checked, so a root swapped between the check and
+the open is refused (root-unsafe).
 
 - Implements: REQ-1277 (04 4.2), REQ-1281 (05 5.2), REQ-1282 (05 5.2).
 - Operator: no.
