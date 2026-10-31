@@ -35,6 +35,11 @@ write rule 1 allows outside its own file.
     the status line and themes, and the context-usage tools.
   - The settings merge keeps the hooks and the plugins of
     `julieta-claude` (06 6.5).
+  - It carries the skill-router hook that the interim payload it
+    replaces gained on 2026-10-31: the line that points every session
+    and subagent at `agent-skills:using-agent-skills` (SessionStart,
+    SubagentStart) and the local usage log of starts and Skill calls
+    (PostToolUse on `Skill`), with its `--report`.
 - Verify: one daily sandbox, read at sitting M2: its SessionStart output
   shows the instructions and the status line, `julieta status --json`
   reports no `agent-hooks-missing`, and the plugin list shows the pinned
