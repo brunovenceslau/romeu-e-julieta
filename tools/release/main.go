@@ -6,6 +6,11 @@
 //
 //	go run ./tools/release build --version v1.0.0 --dry-run [--out dir]
 //	go run ./tools/release build --host --out path
+//	go run ./tools/release changelog --version v1.0.0-alpha.1 [--stdout]
+//
+// changelog writes the section of a tag to CHANGELOG.md, by the
+// git-cliff that mise.toml pins, or prints it with --stdout (12 12.6;
+// tools/release/internal/changelog says what it checks).
 //
 // --host is the host-native build: one romeu for the platform it runs
 // on, embedding the julieta linux binary of the same GOARCH, written to
@@ -40,7 +45,9 @@ import (
 	"slices"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/ci/pinned"
 	"github.com/brunovenceslau/romeu-e-julieta/tools/release/internal/build"
+	"github.com/brunovenceslau/romeu-e-julieta/tools/release/internal/changelog"
 )
 
 const (
@@ -61,14 +68,63 @@ func start(args []string, stdout, stderr io.Writer) int {
 }
 
 const usage = "usage:\n  go run ./tools/release build --version <v> [--dry-run [--allow-dirty]] [--out <dir>] [--api-host <host>]\n" +
-	"  go run ./tools/release build --host --out <path>\n"
+	"  go run ./tools/release build --host --out <path>\n" +
+	"  go run ./tools/release changelog --version <v> [--stdout]\n"
 
 // run parses args and calls the command they name.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	if len(args) == 0 || args[0] != "build" {
-		say(stderr, "release: expected the command build\n%s", usage)
+	if len(args) == 0 {
+		say(stderr, "release: expected the command build or changelog\n%s", usage)
 		return exitUsage
 	}
+	switch args[0] {
+	case "build":
+		return runBuild(ctx, args, stdout, stderr)
+	case "changelog":
+		return runChangelog(ctx, args, stdout, stderr)
+	}
+	say(stderr, "release: expected the command build or changelog\n%s", usage)
+	return exitUsage
+}
+
+// runChangelog is the changelog command: the section of --version
+// prepended to CHANGELOG.md, or printed with --stdout (changelog.Run),
+// by the git-cliff that mise.toml pins.
+func runChangelog(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("changelog", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	version := fs.String("version", "", "the tag whose section is written")
+	toStdout := fs.Bool("stdout", false, "print the section and write nothing")
+	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 || *version == "" {
+		say(stderr, "release changelog: --version is required and takes no argument but its flags\n%s", usage)
+		return exitUsage
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		say(stderr, "release changelog: %v\n", err)
+		return exitError
+	}
+	cliff, err := pinned.Which(ctx, root, "git-cliff")
+	if err != nil {
+		say(stderr, "release changelog: no git-cliff: %v\n", err)
+		return exitError
+	}
+	err = changelog.Run(ctx, changelog.Options{Root: root, Version: *version, Cliff: cliff, Stdout: *toStdout, Out: stdout})
+	if err != nil {
+		// After a signal procgroup.Main says the run was interrupted.
+		if ctx.Err() == nil {
+			say(stderr, "release changelog: %v\n", err)
+		}
+		return exitError
+	}
+	if !*toStdout {
+		say(stdout, "%s: the section of %s\n", changelog.File, *version)
+	}
+	return exitOK
+}
+
+// runBuild is the build command.
+func runBuild(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	version := fs.String("version", "", "the tag to build, v<major>.<minor>.<patch>")

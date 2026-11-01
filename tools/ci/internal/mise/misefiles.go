@@ -257,13 +257,15 @@ const (
 // which all starts by the path "mise which" resolves (the
 // vulnerabilities check), gh, for
 // the release tool (decision DR7 of review round 8: gh is locked, and the
-// tool starts it by its resolved path), and gopls, the Go language server
+// tool starts it by its resolved path), git-cliff, which tools/release
+// changelog starts the same way to write CHANGELOG.md (12 12.6, since
+// 2026-11-01), and gopls, the Go language server
 // that editors and agents use to navigate the code, which no step of
 // tools/ci starts. This is the one list of what mise may install, and the
 // one that 12 12.1 of the specification points at: WhichPinned resolves
 // no tool that is not on it, and the lint tests (allowedMiseTables,
 // TestLockedVersions and TestMiseConfigs) read it.
-var PinnedTools = []string{GoTool, "gh", LintTool, GovulncheckLock, "go:golang.org/x/tools/gopls"}
+var PinnedTools = []string{GoTool, "gh", "git-cliff", LintTool, GovulncheckLock, "go:golang.org/x/tools/gopls"}
 
 // miseNoGlobalConfig is the path MiseEnv gives MISE_GLOBAL_CONFIG_FILE,
 // so that mise reads no global configuration: its [env] table (a
