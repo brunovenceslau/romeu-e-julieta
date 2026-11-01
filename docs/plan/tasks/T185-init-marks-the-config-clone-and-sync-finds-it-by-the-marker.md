@@ -44,6 +44,27 @@ breaks once the config project has a second repo. Decided on
    2026-10-29, scope this repository: an existing project keeps
    working with no step of the operator, and the guess fails closed.
 
+Built on 2026-11-01 (scope this repository): the marker's name is a
+constant of each of the two command packages (`MarkerName` of `init`,
+`markerName` of `sync`), since a command package imports no other (10
+10.7); `sync` holds the marker's line to the rule `repo-dir` of 03 3.1
+read from `spec.Rules`, so the two cannot drift; `init` refuses a
+marker that is already there by the slug `config-marker`, as it refuses
+a clone that exists (checked before the clone, so none is made and
+removed for it, and again by the create-only write), and writes the
+marker after the clone and before the settings, so a failure of either
+leaves none: the removal is a step of `made.undo`, the one deletion
+site of `init` the call-site table of I16 admits, so the table of
+`tools/ci/internal/callsites`, which T195 owns, is not touched; `sync`
+opens the marker without following a link and judges the open file, so
+nothing swapped between a check and the read is read; the tests of `sync`
+live in `step2_fetch_test.go`, the test file of the one file this task
+owns there, and the warning slug joins the list of 04 4.1, which the
+`cli.Warn` test reads; neither spec page is on an ask-first surface.
+The e2e of J1 step 3 (`e2e/init_test.go`, T041's) counted the entries
+of `<cfg>-env/` after `init`; it reads the marker now, the one edit
+outside `owns` the marker forced.
+
 - Implements: none: a layout rule of 02 2.3 that this task writes.
 - Operator: no.
 - Acceptance:

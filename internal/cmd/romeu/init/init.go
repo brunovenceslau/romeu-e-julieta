@@ -195,11 +195,32 @@ func run(cmd *cobra.Command, env *cli.Env, o options) error {
 		return err
 	}
 	defer func() { _ = pending.Cleanup() }()
+	// A marker that is already there is refused before the clone, so no
+	// clone is made and removed for it; the create-only write below is
+	// the check that holds against a race.
+	if _, err := rt.Lstat(filepath.Join(filepath.Base(envDir), MarkerName)); err == nil {
+		made.undo(rt, filepath.Base(envDir), h.Root)
+		return refuse(cmd, "config-marker", filepath.Join(envDir, MarkerName)+" exists already; move it away and run init again")
+	}
 	dest, err := cloneConfig(ctx, cmd, g, h, rt, envDir)
 	if err != nil {
 		// Nothing of this run is left: the env dir and the root, when
 		// this run made them and they are empty (a decision of
 		// 2026-10-23).
+		made.undo(rt, filepath.Base(envDir), h.Root)
+		return err
+	}
+	// The marker names the clone for sync (02 2.3); it is written after
+	// the clone and before the settings, so a failure of either leaves
+	// no marker: the marker goes with the clone, which absent proved
+	// to be this run's.
+	created, err := writeMarker(rt, filepath.Base(envDir), filepath.Base(dest))
+	made.marker = created
+	if err != nil {
+		if errors.Is(err, errMarkerExists) {
+			err = refuse(cmd, "config-marker", filepath.Join(envDir, MarkerName)+" exists already; move it away and run init again")
+		}
+		err = errors.Join(err, os.RemoveAll(dest))
 		made.undo(rt, filepath.Base(envDir), h.Root)
 		return err
 	}
@@ -454,24 +475,28 @@ func openTree(root, envName string) (*os.Root, string, made, error) {
 	return rt, filepath.Join(root, envName), m, nil
 }
 
-// made says which directories of the tree this run of init created, by
-// a Mkdir that succeeded: the last element of the root, and the env dir.
+// made says what of the tree this run of init created: the last
+// element of the root and the env dir, by a Mkdir that succeeded, and
+// the marker of the clone (writeMarker), by a create that did.
 type made struct {
-	root, env bool
+	root, env, marker bool
 }
 
-// undo removes the env dir and then the root, each only when this run
-// made it, it is still a directory (Lstat, so a link is never followed
-// or removed) and it is empty: os.Remove refuses a directory that is
-// not, so nothing that appeared in it meanwhile goes with it. The env
-// dir goes through rt. Its failures are not the command's: the error
-// that led here is.
+// undo removes the marker, the env dir and then the root, each only
+// when this run made it; a directory only when it is still a directory
+// (Lstat, so a link is never followed or removed) and it is empty:
+// os.Remove refuses a directory that is not, so nothing that appeared
+// in it meanwhile goes with it. The marker and the env dir go through
+// rt. Its failures are not the command's: the error that led here is.
 //
 // A race remains between the Lstat and the Remove: a process of the
 // user's could replace the directory with another empty directory or a
 // link in between. Remove takes an empty directory, which holds nothing
 // to lose, or the link itself, never its target.
 func (m made) undo(rt *os.Root, envName, root string) {
+	if m.marker {
+		_ = rt.Remove(filepath.Join(envName, MarkerName))
+	}
 	if m.env {
 		if fi, err := rt.Lstat(envName); err == nil && fi.IsDir() {
 			_ = rt.Remove(envName)
