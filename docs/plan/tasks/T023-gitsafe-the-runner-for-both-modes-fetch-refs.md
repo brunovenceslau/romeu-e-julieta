@@ -49,6 +49,12 @@ neutralized-key list test, nothing ambient passes (bar the sandbox
 network list), `git://` and
 `file://` refused.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0296 (04 4.1) now admits `gh` in `upgrade` and `doctor` by the host
+setting `tools.gh`, and REQ-0309 (04 4.2) has `init` resolve `gh` on
+`PATH`; T195 and T196 carry both, and the hardened git of this task is
+unchanged.
+
 - Implements: REQ-0017 (index), REQ-0053 (01 1.3), REQ-0143 (02 2.3),
   REQ-0146 (02 2.3), REQ-0208 (03 3.4), REQ-0222 (03 3.6), REQ-0296 (04
   4.1), REQ-0297 (04 4.1), REQ-0302 (04 4.1), REQ-0364 (04 4.2),

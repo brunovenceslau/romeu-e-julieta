@@ -87,6 +87,10 @@ Decided on 2026-10-13, when the task started:
   (b) in 04 4.1, the switch to `internal/procgroup` with the removal of
   `tools/ci/procgroup/`, and then the registration by file.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1051 (12 12.1) gained git-cliff; T192 pins it and adds it to
+`PinnedTools`.
+
 - Implements: REQ-0006 (index), REQ-0021 (index), REQ-0037 (00 0.4),
   REQ-0040 (01 1.1), REQ-0121 (02 2.1), REQ-0307 (04 4.1), REQ-0473 (05
   5.2), REQ-0770 (10 10.1), REQ-0821 (10 10.2), REQ-0855 (10 10.2),

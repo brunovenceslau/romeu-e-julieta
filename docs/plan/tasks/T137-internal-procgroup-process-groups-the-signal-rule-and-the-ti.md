@@ -40,6 +40,10 @@ version, so daily use does not wait for it. Where two proposed timeout
 tables differed, the longer value is the starting value (a first daily
 use suffers a timeout more than a wait).
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0500 (05 5.2) now lists `syscall.Exec` in the scan, admitted in the
+swap step of `upgrade`; T196 adds the admission and the fixture.
+
 - Implements: REQ-0274 (04 4.1), REQ-0298 (04 4.1), REQ-0299 (04 4.1),
   REQ-0301 (04 4.1), REQ-0302 (04 4.1), REQ-0303 (04 4.1), REQ-0304 (04
   4.1), REQ-0305 (04 4.1), REQ-0307 (04 4.1), REQ-0500 (05 5.2),

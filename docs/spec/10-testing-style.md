@@ -906,9 +906,26 @@ with that limit known (decided in
 `v<major>.<minor>.<patch>` is a release; the same with a suffix is a
 prerelease, which is what the release candidate of block B is
 ([11 11.2](11-host-probes.md#112-block-b---acceptance-on-real-hosts-last)).
-How the workflow is started, so that its own file does not come from
-the tagged commit, is a
-[deferred decision](../spec.md#in-how-this-repository-is-run).
+`REQ-1337` Every tag before v1.0.0 is a prerelease of it, since `VERSION`
+names v1.0.0 as the next release (02 2.1, REQ-1249): `v1.0.0-alpha.<n>`,
+`<n>` counting up, then `v1.0.0-rc.<n>`, block B's candidate (decided on
+2026-11-01). `REQ-1338`
+The workflow starts by `workflow_dispatch` with the tag as its one
+input, which it checks against the tag form above before any step uses
+it; a first job refuses unless the workflow's ref is `refs/heads/main`,
+the tag exists on the repository and the commit it names is the `main`
+commit the run started on. That job is a guard against a mistake, not
+the enforcement: `workflow_dispatch` takes any ref, and a copy of the
+file on a branch can omit the job; what holds is the consumer side, the
+`--source-ref refs/heads/main` of the verification contract below
+(REQ-1339), which refuses an archive attested from any other ref, and
+the signer workflow path, so the file that built a release is the one
+on `main`. An ancestor is not enough: the attestation records the commit and the ref
+the run started on, so the commit of the tag must be that one for
+`--source-digest` below to hold; when `main` moved between the tag and
+the start, the release is refused and the fix is a new tag (decided on
+2026-10-31, [ADR 0045, release from main by workflow_dispatch and upgrade romeu by one command that verifies through gh](../adr/0045-release-from-main-by-workflow-dispatch-and-upgrade-romeu-by-one-command-that-verifies-through-gh.md);
+`tools/release tag` starts it, 12 12.6).
 The workflow has two kinds of job:
 
 - `REQ-0900` The test jobs run `tools/ci all` on the commit the tag names, one
@@ -922,7 +939,8 @@ The workflow has two kinds of job:
   (`GOPROXY` and `GOSUMDB` set), installs the pinned tools and fills
   the module cache. The release steps then run in the steps'
   environment, `GOPROXY=off`. Its steps, in order:
-  1. `REQ-0902` `tools/release build`, unless it is called with `--dry-run`,
+  1. `REQ-0902` `tools/release build`, unless it is called with `--dry-run`
+     or for a prerelease tag while `fuzz.yml` does not exist,
      refuses to build when the latest scheduled `fuzz.yml` run on
      `main` is not `success`, or when that run's head commit is not an
      ancestor of the release commit, or when a file that holds a guard
@@ -955,17 +973,15 @@ The workflow has two kinds of job:
   3. `REQ-1226` `tools/release verify` checks each archive against the
      verification contract below, with the `gh` that `mise which`
      resolves ([12 12.1](12-engineering.md#121-tech-stack)).
-  4. `REQ-1227` `tools/release notes` generates the release notes
-     ([12 12.6](12-engineering.md#126-release-notes)); it reads the
-     merged pull requests, their authors and the issues they close
-     through the GitHub API with the step's `GH_TOKEN` and the job's
-     `pull-requests: read` and `issues: read` permissions (the
-     permissions are inferred until the first `release.yml` run reads
-     each endpoint; its log goes under that PR's Evidence).
+  4. `REQ-1227` `tools/release notes` prints the section of the tag from
+     `CHANGELOG.md` and refuses when it differs from what `git-cliff`
+     renders at the tag ([12 12.6](12-engineering.md#126-release-notes));
+     it reads git only, so the job needs no `pull-requests` or `issues`
+     permission.
   5. `REQ-0907` `tools/release publish` creates the release as a draft, uploads
-     every asset and publishes it, in one call, and marks it a
-     prerelease when the tag has a suffix after the patch number
-     (`v1.0.0-rc.1`).
+     every asset and publishes it, in one call, with the section of
+     step 4 as its body, and marks it a prerelease when the tag has a
+     suffix after the patch number (`v1.0.0-alpha.1`, `v1.0.0-rc.1`).
 
 `REQ-0908` A published release never changes; a fix is a new version. GitHub's
 immutable releases setting (item f of the maintainer block) refuses a
@@ -975,8 +991,10 @@ runner image beyond the shell and git, and it restores no cache.
 `REQ-0909` **Verification contract.** One list, from which J1 step 2, J9, B1, the
 README and `tools/release verify` derive: the repository; the signer
 workflow `release.yml`; the commit the tag names; hosted runners only.
-The ref that started the workflow joins the list when the deferred
-decision above is made. `REQ-0910` The commands that check it are written once, as
+`REQ-1339` The ref that started the workflow, `refs/heads/main`, joins
+the list with `release.yml` (REQ-0899), checked by `--source-ref`, which
+the `gh` floor of 12 12.1 has (read on 2026-10-31 in
+`pkg/cmd/attestation/verify/verify.go` of `cli/cli` at the tag v2.68.0). `REQ-0910` The commands that check it are written once, as
 J1 step 2's entry of `e2e/scenarios/j1/commands.yaml`, one file per
 journey; J9, B1 and the README show that entry, the one entry a page may
 show from another journey. The attestation entry is
@@ -985,13 +1003,15 @@ show from another journey. The attestation entry is
 gh api repos/<owner>/romeu-e-julieta/commits/<tag> --jq .sha
 gh attestation verify <archive> --repo <owner>/romeu-e-julieta \
   --signer-workflow <owner>/romeu-e-julieta/.github/workflows/release.yml \
-  --source-digest <commit> --deny-self-hosted-runners
+  --source-digest <commit> --source-ref refs/heads/main \
+  --deny-self-hosted-runners
 ```
 
 The first line reads the commit the tag names from the repository on
 GitHub, and `<commit>` is its output. `--repo` and `--signer-workflow`
-hold the first two items of the list, `--source-digest` the commit and
-`--deny-self-hosted-runners` the hosted runners. The `gh` pinned in
+hold the first two items of the list, `--source-digest` the commit,
+`--source-ref` the ref and `--deny-self-hosted-runners` the hosted
+runners. The `gh` pinned in
 `mise.toml` fixes the flags in the development sandbox and in
 `tools/release verify`, as its `gh attestation verify --help` shows
 them; the `gh` floor of [12 12.1](12-engineering.md#121-tech-stack)
@@ -1015,10 +1035,10 @@ this workflow has ended (10.5).
 
 `REQ-0914` The development sandbox's token (the operator's) can push a `v*` tag
 ([05 5.4](05-security.md#risks-of-how-this-repository-is-developed)), so
-the pull request that adds `release.yml` decides how releases come from
-`main` only, and one constraint is fixed now: the release workflow file
-must not come from the tagged commit. Releasing from `main` only blocks
-a stray tag and not the token, which merges through the API.
+releases come from `main` only, by the `workflow_dispatch` start and
+the `--source-ref` of REQ-1338 and REQ-1339, so the release workflow
+file never comes from the tagged commit. Releasing from `main` only blocks a stray tag and not the
+token, which merges through the API.
 
 `REQ-0915` `ci-bootstrap` (first plan task), in this order:
 

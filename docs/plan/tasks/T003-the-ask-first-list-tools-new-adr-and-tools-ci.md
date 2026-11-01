@@ -19,6 +19,10 @@ pr: 19
 Merged on 2026-10-08 in pull request #19. The text below is the one
 written before the re-plan.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1131 (12 12.4) now asks the four body sections as level-2 headings
+(`## Why`); T194 lands that check.
+
 - Implements: REQ-0021 (index), REQ-0025 (index), REQ-0030 (index),
   REQ-0046 (01 1.2), REQ-0125 (02 2.1), REQ-0126 (02 2.1), REQ-0535 (05
   5.3), REQ-0539 (05 5.3), REQ-0543 (05 5.3), REQ-0822 (10 10.2),

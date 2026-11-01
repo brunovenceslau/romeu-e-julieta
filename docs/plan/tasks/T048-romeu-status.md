@@ -66,8 +66,8 @@ project. Slice D1: the command file over T169's `hostpaths`, which
 runs the sbx floor check once before any other sbx call, as the driver
 requires, `import_status.go` and the e2e cases `TestStatus*`. Slice D2:
 the `versions` object of `romeu version --json` (which reads the
-settings too), the J10 line and the schema `romeu-status.v1` (`formats`),
-once the report is whole; and the text of REQ-0327, REQ-0329 and the
+settings too), with its schema `romeu-version.v1` (`formats`), once the
+report is whole; and the text of REQ-0327, REQ-0329 and the
 RJ-359 row amended for what slice C put at the head of the report (the
 toolchain, its warnings and the failed reads outside a project's
 block). The
@@ -79,6 +79,18 @@ compatibility check before julieta's read are T066's
 (`status/julieta_fields.go`). The orphan scan and `envDirs` of `sync`
 sit in files T055 and T169 own, so slice B copies the small part it
 needs and names who unifies it.
+
+Re-plan (2026-10-31, decided by the operator, scope this repository):
+T048 closes with slice D2, so it reads merged and T066 can start; slice
+B2 and the J10 line move to T197, after M3 and after T185. In D2 a
+`sysctl` that fails or a macOS version that does not parse is
+`upstream-shape` (RJ-310), not `internal`; the git version keeps
+`HostGitFetch`, and a later table-only pull request adds a short class
+row to 04 4.1; D2 generates `schemas/romeu-version.v1.json` (REQ-0268)
+under the `formats` line, and `formats` joins the forecast of T066, T080
+and T197, since `romeu-status.v1` is closed. D2 edits the text of
+REQ-0327, REQ-0329 and the RJ-359 row in `docs/spec/04-cli.md`, outside
+`owns`, on the precedent of T055 slice A.
 
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4),
   REQ-0065 (01 1.4), REQ-0087 (01 1.6), REQ-0107 (01 1.6), REQ-0327 (04
