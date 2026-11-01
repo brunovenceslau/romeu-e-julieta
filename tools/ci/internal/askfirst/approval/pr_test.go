@@ -78,9 +78,10 @@ func mustList(t *testing.T, src string) *List {
 	return l
 }
 
-// alert wraps lines in the approval alert.
+// alert wraps lines in the approval alert, after the four sections of
+// REQ-1131 with text under each.
 func alert(lines ...string) string {
-	return alertLine + "\n" + strings.Join(lines, "\n") + "\n"
+	return fullBody + "\n" + alertLine + "\n" + strings.Join(lines, "\n") + "\n"
 }
 
 const validLine = "> - [x] Approval: decisions - amend rule 8"
@@ -244,6 +245,11 @@ func prRepo(t *testing.T) (*gittest.Repo, string) {
 // judge runs Judge on the fixture, with no fetch, and returns the messages.
 func judge(t *testing.T, r *gittest.Repo, pr PR) []string {
 	t.Helper()
+	if pr.Body == "" {
+		// The sections of REQ-1131, so that a case about the range or
+		// the head reads no section finding.
+		pr.Body = fullBody
+	}
 	findings, err := Judge(context.Background(), r.Repo, pr, false)
 	require.NoError(t, err)
 	var msgs []string

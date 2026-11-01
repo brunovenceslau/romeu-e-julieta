@@ -30,6 +30,22 @@ commits carry the heading). T005 keeps the rest of its list (the
 Middleware line, the goldens under Evidence, the `Fixes-release:`
 trailer). The pull request template already carries the four headings.
 
+Built on 2026-11-01 (scope this repository): the check is
+`sectionFindings` of `sections.go`, called from `Judge` in `pr.go`, one
+line outside `owns`, accepted on the precedent of T055 slice A and
+T048 (an edit outside `owns` named in the task file); the package has no
+registration by file, and the approval review of `approvals.go` is not
+touched. The lines of each approval alert, read by the rule of
+`readAlert` (the exact line `> [!IMPORTANT]` and the lines after it
+that start with `>`), belong to no section wherever the alert sits (the
+template puts it inside What changed), so a section whose only text is
+the alert is empty; a heading indented or inside a fenced code block is
+read as the rules of 12 12.4 say, which name no fence. The fixtures of the
+package's other tests, which judged bodies that held the alert alone,
+carry the four sections now (`pr_test.go`, `head_test.go`,
+`askfirst_test.go` and the test of `cmd/ask-first`): the one edit the
+check forces outside `owns`, each a test helper or one body.
+
 - Implements: REQ-1131 (12 12.4).
 - Operator: no.
 - Acceptance:
