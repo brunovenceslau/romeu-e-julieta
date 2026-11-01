@@ -46,6 +46,11 @@ surface. T019 derives its table from the list of sessions when it lands
 adds its own `internal/sbxdrv/julieta*.go` files under rule 1 of
 `docs/plan.md`.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0296 (04 4.1) now admits `gh` in `upgrade` and `doctor` by the host
+setting `tools.gh`; T195 and T196 carry it, and the driver of this task
+is unchanged.
+
 - Implements: REQ-0017 (index), REQ-0027 (index), REQ-0054 (01 1.3),
   REQ-0064 (01 1.4), REQ-0074 (01 1.5), REQ-0083 (01 1.6), REQ-0102 (01
   1.6), REQ-0120 (02 2.1), REQ-0170 (03 (opening)), REQ-0263 (03 3.13),

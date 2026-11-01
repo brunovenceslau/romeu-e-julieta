@@ -60,6 +60,9 @@ with a stable id on each obligation a test, a check, a generator, a
 probe or a task's acceptance can verify, so the plan can cite it by id
 and a check can hold both directions.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1051 (12 12.1) gained git-cliff; T192 pins it.
+
 - Implements: REQ-0024 (index), REQ-1040 (12 12.1), REQ-1051 (12 12.1),
   REQ-1101 (12 12.2), REQ-1105 (12 12.3), REQ-1108 (12 12.3), REQ-1148
   (12 12.4), REQ-1159 (12 12.4), REQ-1198 (12 12.11).

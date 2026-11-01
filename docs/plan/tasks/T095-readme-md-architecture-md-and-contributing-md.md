@@ -21,6 +21,11 @@ adopter other than the maintainer; or the maintainer's environments all
 on the new tools. The text below is the one written before the re-plan;
 `owns` is written when the task reopens.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0909 (10 10.2) gained `--source-ref refs/heads/main`, and REQ-1058
+(12 12.1) names `romeu upgrade` beside J1 as what needs the `gh` floor;
+the README's entry comes from J1's `commands.yaml` (T088).
+
 - Implements: REQ-0015 (index), REQ-0909 (10 10.2), REQ-1058 (12 12.1),
   REQ-1087 (12 12.2), REQ-1088 (12 12.2), REQ-1182 (12 12.8), REQ-1183
   (12 12.8), REQ-1184 (12 12.8), REQ-1185 (12 12.8), REQ-1223 (10 10.2).

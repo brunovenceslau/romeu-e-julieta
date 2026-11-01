@@ -9,6 +9,7 @@ and julieta's setup. Type: reference.
 romeu-e-julieta/
 ├─ go.mod                      module github.com/<owner>/romeu-e-julieta
 ├─ VERSION                     the next release, `<major>.<minor>.<patch>` and a newline; the `$schema` hints under examples/ and tools/release read it
+├─ CHANGELOG.md, changelog.go  the generated changelog (12 12.6) and the one root package, which embeds it for `romeu upgrade`
 ├─ mise.toml, mise.lock        dev tools for this repo (go, golangci-lint, ...); lock for linux-x64, linux-arm64, macos-x64, macos-arm64
 ├─ ARCHITECTURE.md             one page: components, trust boundaries, the state machines
 ├─ CONTRIBUTING.md             dev loop; how to add a command, invariant, probe or kit via tools/new
@@ -184,7 +185,10 @@ which files are generated is the inventory of
 each embedded input sits beside the package that embeds it. `REQ-0129` `romeu`
 embeds the catalog (`internal/catalog/egress/*.yaml`, from
 `internal/catalog`), the product kit directories through `kits/embed.go`
-(package `kits`, one `embed.FS`, `pins.yaml` excluded) and, at release
+(package `kits`, one `embed.FS`, `pins.yaml` excluded), `CHANGELOG.md`
+through `changelog.go` at the root of the repository, the one package
+there, since the file is read at the root by people and by git-cliff
+(12 12.6; added on 2026-11-01) and, at release
 time, the `julieta` linux binary of romeu's own `GOARCH`, which
 `tools/release build` maps onto the empty placeholder
 `internal/embedded/julieta` with a `go build` overlay, writing nothing

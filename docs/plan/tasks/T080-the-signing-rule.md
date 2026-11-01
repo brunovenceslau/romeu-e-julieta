@@ -19,6 +19,7 @@ needs:
 after: []
 ask_first:
   - sbxdrv
+  - formats
 sitting: none
 ---
 
@@ -40,6 +41,10 @@ risks in `docs/plan.md`); that row closes when this task lands. Its four
 files plug into the named seams of rule 14: `doctor/rows.go`,
 `preflight/step5.go`, `sync/rules.go` and `sbxdrv/env.go`'s `register`.
 The `sbxdrv` forecast is for `env_signing.go`.
+
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0296 (04 4.1) now admits `gh` in `upgrade` and `doctor`; nothing
+changes for the signing rule.
 
 - Implements: REQ-0075 (01 1.5), REQ-0296 (04 4.1), REQ-0384 (04 4.2),
   REQ-0520 (05 5.2), REQ-0549 (05 5.4), REQ-0600 (06 6.4), REQ-0601 (06

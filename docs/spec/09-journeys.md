@@ -53,7 +53,7 @@ which names each step's command and output path.
    sbx floor of [12 12.1](12-engineering.md#121-tech-stack), git at or
    above the floor of
    [05 5.1](05-security.md#51-hardened-git-internalgitsafe), and `gh` at
-   or above the `gh` floor of 12 12.1 (the first release with both flags
+   or above the `gh` floor of 12 12.1 (the first release with the flags
    of the `gh attestation verify` line of step 2). The verification of
    step 2 needs network access and a `gh` logged in to GitHub.
 2. [O] Download the `romeu` darwin archive for the host arch and
@@ -65,7 +65,8 @@ which names each step's command and output path.
    .sha` and verify with `gh attestation verify <archive> --repo
    <owner>/romeu-e-julieta --signer-workflow
    <owner>/romeu-e-julieta/.github/workflows/release.yml --source-digest
-   <commit> --deny-self-hosted-runners`, `<commit>` being that output
+   <commit> --source-ref refs/heads/main --deny-self-hosted-runners`,
+   `<commit>` being that output
    (both checks required; the verification contract of
    [10 10.2](10-testing-style.md#release-and-bootstrap): one entry of
    `e2e/scenarios/j1/commands.yaml`, which J9 reads too, gives the three
@@ -262,13 +263,20 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
 
 ## J9 Kit or workload bump
 
-- romeu release: install and verify it with the same
-  `e2e/scenarios/j1/commands.yaml` entry as J1 step 2 -> `romeu approve
-  --toolchain` (gate 1, once per machine; it prints the julieta version
-  change and the catalog diff per affected project) -> `romeu sync
-  --all`; julieta binaries update through the read-only mount without
-  recreate; only projects whose kit content or capabilities changed see
-  gate 2 and need `romeu recreate <name>`.
+- romeu release: [O] `romeu upgrade` ([04 4.2](04-cli.md#42-romeu-host),
+  amended on 2026-10-31) -> [H] downloads the newest release, checks it
+  as J1 step 2 does (the checksum and the attestation, through the `gh`
+  of `tools.gh`), runs the new binary once to print the changelog
+  sections since the running version and what `romeu approve
+  --toolchain` prints (the julieta version change and the catalog diff
+  per affected project), and asks one confirmation; a `no` leaves
+  everything as it was -> [H] on `yes`, swaps the binary, records gate
+  1 (once per machine) and runs `romeu sync --all`; julieta binaries update
+  through the read-only mount without recreate; only projects whose kit
+  content or capabilities changed see gate 2 and need `romeu recreate
+  <name>`. Installing by hand with the `e2e/scenarios/j1/commands.yaml`
+  entry of J1 step 2, then `romeu approve --toolchain` and `romeu sync
+  --all`, stays the path for a host without `tools.gh`.
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config
   sandbox, whose `egress.extra` holds the registry hosts
   ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)) -> PR -> merge -> [O] `romeu sync foo` (gate: new digest) ->

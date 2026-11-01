@@ -23,6 +23,11 @@ re-plan; `needs` lists its earlier dependencies with a folded id
 replaced by the id that absorbed it, and `owns` is written when the task
 reopens.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0909 (10 10.2) gained the ref that started the workflow,
+`refs/heads/main`, checked by `--source-ref`; the entry this task shows
+comes from J1's `commands.yaml` (T088).
+
 - Implements: REQ-0006 (index), REQ-0008 (index), REQ-0010 (index),
   REQ-0012 (index), REQ-0013 (index), REQ-0548 (05 5.4), REQ-0603 (06
   6.4), REQ-0604 (06 6.4), REQ-0627 (07 7.4), REQ-0674 (08 8.2),
