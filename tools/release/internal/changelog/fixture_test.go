@@ -208,6 +208,19 @@ func scripted(t *testing.T) *repo {
 	r.git("checkout", "-q", "main")
 	r.merge("feat(doctor): the gh-floor row (#6)", "## Why\n\nThe floor is checked. See #12 and #6.\n", "pr-6")
 	r.pr(7, "refactor: one place for the host paths", "Something that is not a Why section.\n", map[string]string{"g.txt": "g\n"})
+	// Two merges under GitHub's default subject, as the first pull
+	// requests of the repository were merged: the title in the body is
+	// conventional in one, which is an entry, and plain in the other.
+	r.git("checkout", "-q", "-b", "pr-11")
+	r.write(map[string]string{"j.txt": "j\n"})
+	r.commit("the change of pr-11")
+	r.git("checkout", "-q", "main")
+	r.merge("Merge pull request #11 from owner/feat/t011-hooks", "feat(hooks): the hook dispatcher of the sandbox", "pr-11")
+	r.git("checkout", "-q", "-b", "pr-12")
+	r.write(map[string]string{"k.txt": "k\n"})
+	r.commit("the change of pr-12")
+	r.git("checkout", "-q", "main")
+	r.merge("Merge pull request #12 from owner/docs/prologue", "Add the prologue", "pr-12")
 	r.pr(10, "docs(adr): the alternative not taken", "<!-- the template's comment -->\n\n## Why not\n\nThe alternative.\n\n## Why\n\nThe reason. <!-- an aside -->\n\n## Why\n\nA second Why, not read.\n", map[string]string{"i.txt": "i\n"})
 	return r
 }

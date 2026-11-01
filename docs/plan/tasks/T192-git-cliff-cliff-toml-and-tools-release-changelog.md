@@ -53,9 +53,13 @@ outside `tools/ci`, and this task owns it; an in-branch merge of a
 session carries the type `merge` (`merge: main into <branch> for
 ...`), which is in Conventional Commit form, so `cliff.toml` skips that
 type too, and the entries of a section are exactly the first-parent
-pull request merges (212 on `main` at 1dbc34b4, the 49 early ones under
-git's default subject `Merge pull request #<n>` skipped as
-non-conventional); `--prepend` writes the header of the configuration,
+pull request merges (258 on `main` at 1dbc34b4: a merge under GitHub's
+default subject `Merge pull request #<n> from <owner>/<branch>`, the
+form of the first 49, holds the pull request's title as the first line
+of its body, and a preprocessor makes that title the subject with the
+number, so the 46 whose title is conventional are entries and the 3
+whose title is plain are skipped; decided on 2026-11-01, so the first
+section holds the foundation pull requests); `--prepend` writes the header of the configuration,
 the section and two newlines before what followed the marker, so the
 command normalizes the seams after it (one blank line after the marker,
 one between sections, one newline at the end) and nothing inside a

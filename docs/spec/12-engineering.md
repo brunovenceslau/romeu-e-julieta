@@ -852,8 +852,11 @@ one line. `REQ-1346` The entries follow, one per merged pull request,
 grouped by Conventional Commit type: `cliff.toml` keeps the merge
 commits of `main` and skips every other commit (the repository merges
 by merge commit only, so each one's subject is the PR title with its
-number and its body the PR body), skips a merge whose subject is not in
-Conventional Commit form (a `Merge origin/main into <branch>` inside a
+number and its body the PR body; a merge under GitHub's default
+subject, `Merge pull request #<n> from <owner>/<branch>`, the form of
+the first 49, holds the title as the first line of its body, which
+`cliff.toml` makes the subject, decided on 2026-11-01), skips a merge
+whose subject is not in Conventional Commit form (a `Merge origin/main into <branch>` inside a
 branch), and skips the release pull request by its subject,
 `^chore\(release\)`. Each entry holds the subject, the `## Why` section
 of the body (12.4) and the issues the body names, as links; the author
