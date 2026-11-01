@@ -48,6 +48,8 @@ func TestRunRendersTheSection(t *testing.T) {
 	assert.NotContains(t, out.String(), "A second Why", "the first Why section is the one read")
 	assert.NotContains(t, out.String(), "<!--", "an HTML comment of the body is not read")
 	assert.Contains(t, out.String(), "\n  The reason.\n")
+	assert.Contains(t, out.String(), "- hooks: the hook dispatcher of the sandbox ([#11](", "a merge under GitHub's default subject is an entry by the title of its body")
+	assert.NotContains(t, out.String(), "prologue", "and not when that title is not conventional")
 }
 
 // TestRunWritesTheFile prepends the section to CHANGELOG.md: the header

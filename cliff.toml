@@ -51,9 +51,16 @@ filter_unconventional = true
 require_conventional = false
 split_commits = false
 commit_preprocessors = [
-    # An HTML comment of the body is not read (REQ-1146), nor a carriage return.
-    { pattern = '(?s)<!--.*?-->', replace = "" },
+    # A carriage return is dropped first, so the rules below see LF alone.
     { pattern = '\r', replace = "" },
+    # A merge under GitHub's default subject, "Merge pull request #<n> from
+    # <owner>/<branch>", holds the pull request's title as the first line of
+    # its body: the title becomes the subject, with the number, so the pull
+    # requests merged before the title rule of 12 12.4 are entries when their
+    # title is in Conventional Commit form (the first 49 of this repository).
+    { pattern = '(?s)\AMerge pull request #([0-9]+) from [^\n]+\n\n([^\n]+)', replace = "${2} (#${1})" },
+    # An HTML comment of the body is not read (REQ-1146).
+    { pattern = '(?s)<!--.*?-->', replace = "" },
     { pattern = '(^|[^\[\w])#([0-9]+)\b', replace = "${1}[#${2}](https://github.com/brunovenceslau/romeu-e-julieta/issues/${2})" },
 ]
 protect_breaking_commits = true
