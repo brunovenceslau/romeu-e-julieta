@@ -256,6 +256,7 @@ $ROMEU_ROOT/                            default $HOME/Developer; never a VS Code
 ├─ .attic/<name>/<UTC-ts>/              retired projects (moved, never deleted by romeu); .attic/ is mode 0700
 └─ <name>-env/                          one per project; <name> = sandbox name; mode 0700
    ├─ .metadata_never_index             written by sync, outside every mount; keeps Spotlight from parsing agent-written files (probe A17)
+   ├─ .romeu-config                      the config project's env only: one line, the dir of the config repo's clone; written by init, mode 0600, outside the clone; sync step 2 finds the clone by it (decided on 2026-10-29)
    ├─ sbxenv.yaml                       derived, never hand-edited; the promotion commit point
    ├─ .romeu/
    │  ├─ render.json                    derived: spec source, SHAs, file digests, egress, digests, promotion marker

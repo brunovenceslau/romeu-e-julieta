@@ -64,7 +64,14 @@ func TestInitJ1Step3(t *testing.T) {
 	assert.Empty(t, e.SbxCalls(t), "init calls no sbx")
 	entries, err := os.ReadDir(filepath.Join(e.Root, "cfg-env"))
 	require.NoError(t, err)
-	assert.Len(t, entries, 1, "no staging directory is left behind")
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.Name()
+	}
+	assert.Equal(t, []string{".romeu-config", "cfg"}, names, "the marker and the clone, and no staging directory left behind")
+	marker, err := os.ReadFile(filepath.Join(e.Root, "cfg-env", ".romeu-config"))
+	require.NoError(t, err)
+	assert.Equal(t, "cfg\n", string(marker), "the marker names the clone (02 2.3)")
 }
 
 // TestInitCloneDirIsTheSpecs: the clone goes to the dir the config
