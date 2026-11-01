@@ -66,6 +66,7 @@ func TestRunRefusals(t *testing.T) {
 	}{
 		{"another_version", []string{"build", "--version", "v2.0.0", "--dry-run", "--allow-dirty"}, "is not a build of VERSION"},
 		{"release_build_without_the_gate_inputs", []string{"build", "--version", "v1.0.0"}, "release build:"},
+		{"changelog_of_a_suffix_that_is_not_alpha_or_rc", []string{"changelog", "--version", "v1.0.0-beta.1"}, "suffix is not alpha.<n> or rc.<n>"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -97,6 +98,9 @@ func TestRunUsage(t *testing.T) {
 		{"host_without_out", []string{"build", "--host"}},
 		{"host_with_a_version", []string{"build", "--host", "--out", "x", "--version", "v1.0.0"}},
 		{"host_dry_run", []string{"build", "--host", "--out", "x", "--dry-run"}},
+		{"changelog_without_version", []string{"changelog", "--stdout"}},
+		{"changelog_extra_argument", []string{"changelog", "--version", "v1.0.0-alpha.1", "extra"}},
+		{"changelog_unknown_flag", []string{"changelog", "--version", "v1.0.0-alpha.1", "--now"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

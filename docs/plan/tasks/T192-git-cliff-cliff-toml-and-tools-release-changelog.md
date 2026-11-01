@@ -10,6 +10,7 @@ owns:
   - mise.toml
   - mise.lock
   - tools/ci/internal/mise/**
+  - tools/ci/pinned/**
   - tools/release/internal/changelog/**
   - tools/release/main.go
 needs:
@@ -44,6 +45,30 @@ T193 (prepare, tag) and T088 (release.yml, notes) build on this task.
 The template of `cliff.toml` is a reviewed part of this task, since its
 output is read at every upgrade.
 
+Built on 2026-11-01 (scope this repository), what the build measured
+with git-cliff 2.14.2 and decided: `tools/release` cannot import the
+mise package of `tools/ci` (the internal rule of Go), so the public
+package `tools/ci/pinned` is the door to `WhichPinned` for the trees
+outside `tools/ci`, and this task owns it; an in-branch merge of a
+session carries the type `merge` (`merge: main into <branch> for
+...`), which is in Conventional Commit form, so `cliff.toml` skips that
+type too, and the entries of a section are exactly the first-parent
+pull request merges (212 on `main` at 1dbc34b4, the 49 early ones under
+git's default subject `Merge pull request #<n>` skipped as
+non-conventional); `--prepend` writes the header of the configuration,
+the section and two newlines before what followed the marker, so the
+command normalizes the seams after it (one blank line after the marker,
+one between sections, one newline at the end) and nothing inside a
+section, and `--current --strip all` at the tag renders the same bytes
+as `--unreleased --tag` before it; a prerelease suffix must be
+`alpha.<n>` or `rc.<n>` (REQ-1337); the command refuses a render with
+no entry (no merged pull request since the previous tag; the bullets of
+the Upgrading part are not entries) and a repository without the remote
+`origin`, where the tag is checked. The template reads the first `##
+Why` section of the body, by its exact heading, after the HTML comments
+of the body are removed as REQ-1146 reads it; a removed error id or kit
+is not listed, since REQ-1175 asks for what was added or changed.
+
 - Implements: REQ-1051 (12 12.1), REQ-1062 (12 12.1), REQ-1340 (12
   12.1), REQ-1173 (12 12.6), REQ-1174 (12 12.6), REQ-1175 (12 12.6),
   REQ-1176 (12 12.6), REQ-1177 (12 12.6), REQ-1341 (12 12.6), REQ-1344
@@ -58,7 +83,8 @@ output is read at every upgrade.
   - `cliff.toml`: one entry per merge commit of `main`, every other
     commit skipped (`{ field = "merge_commit", pattern = "false", skip =
     true }`), a merge whose subject is not in Conventional Commit form
-    skipped too (`Merge origin/main into <branch>`, a fixture); the
+    skipped too (`Merge origin/main into <branch>`, a fixture), and one
+    of the type `merge` (the in-branch merge of a session); the
     release pull request skipped by its subject (`^chore\(release\)`);
     the section heading is `## <tag>` and the static header holds no
     level-2 heading and the SPDX lines REUSE asks of the file; no date
@@ -83,7 +109,12 @@ output is read at every upgrade.
     `--offline --no-exec --tag <tag> --unreleased --prepend CHANGELOG.md
     --with-tag-message <upgrading>`; exits non-zero with git-cliff's
     output, escaped, when it fails; with `--stdout` prints the section
-    and writes nothing. Its Upgrading part lists the error ids and exit
+    and writes nothing; refuses a file that already holds the section,
+    a render with no entry and a repository without `origin`; after
+    `--prepend` it rewrites the seams of the file alone (one blank line
+    after the marker and between sections, one newline at the end), so
+    `Section` of the package, which `notes` reads by (REQ-1350), finds
+    the rendered bytes. Its Upgrading part lists the error ids and exit
     codes added or changed, the format versions changed and the kits
     whose digest changed between the previous tag and `HEAD`, and for
     the first tag one line saying there is no previous tag; a fixture
