@@ -19,6 +19,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/google/renameio/v2"
@@ -333,6 +334,34 @@ func validate(cmd *cobra.Command, h spec.HostSettings) error {
 	return usage(cmd, "the settings init would write are invalid: "+termsafe.Escape(err.Error()))
 }
 
+// resolveGh returns the absolute path of the gh on PATH when it meets
+// the rule of tools.gh (REQ-1319: the path form of the rule tool-gh,
+// and the file rule of the credential helper, since this gh is what
+// verifies a release), and "" otherwise: only romeu upgrade needs gh,
+// so a host without one, or with one the rule refuses, is set up with
+// tools.gh unset (REQ-1322), and doctor says so (gh-floor).
+func resolveGh() string {
+	p, err := lookPath("gh")
+	if err != nil {
+		return ""
+	}
+	if p, err = filepath.Abs(p); err != nil || !ghPath.MatchString(p) || gitsafe.CheckCredentialHelperFile(p) != nil {
+		return ""
+	}
+	return p
+}
+
+// ghPath is the path form of the rule tool-gh (REQ-1319), read from
+// the rule table so the two cannot drift.
+var ghPath = func() *regexp.Regexp {
+	for _, rule := range spec.Rules() {
+		if rule.Slug == "tool-gh" {
+			return regexp.MustCompile(rule.Pattern)
+		}
+	}
+	panic("spec.Rules holds no rule tool-gh")
+}()
+
 // tools resolves the absolute paths of sbx and git into h, validates h
 // and returns the hardened git runner for the config clone.
 func tools(cmd *cobra.Command, h *spec.HostSettings, home string) (*gitsafe.Runner, error) {
@@ -349,6 +378,7 @@ func tools(cmd *cobra.Command, h *spec.HostSettings, home string) (*gitsafe.Runn
 		}
 		*t.to = p
 	}
+	h.Tools.Gh = resolveGh()
 	if err := validate(cmd, *h); err != nil {
 		return nil, err
 	}

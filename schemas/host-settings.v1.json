@@ -106,6 +106,10 @@
     "tools": {
       "additionalProperties": false,
       "properties": {
+        "gh": {
+          "pattern": "^/[A-Za-z0-9._/+-]+$",
+          "type": "string"
+        },
         "git": {
           "pattern": "^/.*$",
           "type": "string"

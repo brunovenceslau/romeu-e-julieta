@@ -73,6 +73,8 @@ var Admitted = []Site{
 	{KindRunner, "internal/mise", AnyFunc},
 	{KindRunner, "internal/hooks", AnyFunc},
 	{KindRunner, "internal/cmd/romeu/doctor", "runSecretArgv"},
+	// gh --version of the gh-floor row of doctor (REQ-1320, T195).
+	{KindRunner, "internal/cmd/romeu/doctor", "runGhVersion"},
 
 	// I16 (05 5.2): the functions that remove temp files, candidate dirs,
 	// kit dirs no longer referenced by the live sbxenv.yaml and what the
