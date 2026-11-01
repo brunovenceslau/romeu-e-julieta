@@ -60,7 +60,7 @@ func TestRun(t *testing.T) {
 		status int
 		out    string
 	}{
-		{"a pull request that passes", []string{payload(`"> [!IMPORTANT]\n> - [x] Approval: decisions - add a record\n"`)}, 0, "ask-first: ok\n"},
+		{"a pull request that passes", []string{payload(`"## Why\n\nA reason.\n\n## What changed\n\n- a file\n\n## Evidence\n\nok\n\n## Lessons\n\nnone\n\n> [!IMPORTANT]\n> - [x] Approval: decisions - add a record\n"`)}, 0, "ask-first: ok\n"},
 		{"a pull request with a finding", []string{payload(`null`)}, 1, "has no approval line for it"},
 		{"no argument", nil, 2, ""},
 		{"two arguments", []string{"a", "b"}, 2, ""},

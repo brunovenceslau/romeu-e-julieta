@@ -238,6 +238,7 @@ func Judge(ctx context.Context, r git.Repo, pr PR, fetch bool) ([]Finding, error
 		findings = append(findings, Finding{Where: GrantsPath, Msg: "at the head: " + err.Error()})
 	}
 	rv := review{body: pr.Body, base: baseList, head: headList, changed: changed, grants: grants}
+	findings = append(findings, sectionFindings(pr.Body)...)
 	return append(findings, rv.findings()...), nil
 }
 
