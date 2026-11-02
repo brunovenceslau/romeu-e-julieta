@@ -75,6 +75,37 @@ func checkGhFloor(ctx context.Context, h *host) Check {
 	return pass(slug, fmt.Sprintf("gh %s, floor %s", v, GhFloor))
 }
 
+// GhAtFloor is the reader of this row for romeu upgrade (04 4.2,
+// REQ-1326, T196): it judges the gh at path gh as the row does, running
+// gh --version through the same call site with HOME home, and returns
+// the version gh printed, or an error that says why upgrade cannot use
+// it: tools.gh unset, a file that is not an executable regular file or
+// that the file rule of the credential helper refuses, a gh that does
+// not run or prints another line, or a version below GhFloor.
+func GhAtFloor(ctx context.Context, gh, home string) (string, error) {
+	if gh == "" {
+		return "", errors.New("tools.gh is unset")
+	}
+	if info, err := os.Stat(gh); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		return "", errors.New("tools.gh does not name an executable file: " + termsafe.Escape(gh))
+	}
+	if err := gitsafe.CheckCredentialHelperFile(gh); err != nil {
+		return "", fmt.Errorf("tools.gh is refused: %w", err)
+	}
+	out, err := runGhVersion(ctx, gh, home)
+	if err != nil {
+		return "", fmt.Errorf("gh --version: %w", err)
+	}
+	v, err := parseGhVersion(out)
+	if err != nil {
+		return "", err
+	}
+	if !atGhFloor(v) {
+		return v.String(), fmt.Errorf("gh %s is below the floor %s of 12 12.1", v, GhFloor)
+	}
+	return v.String(), nil
+}
+
 // ghVersionLimit bounds what doctor keeps of gh --version: its first
 // line is under 100 bytes.
 const ghVersionLimit = 4096

@@ -86,6 +86,8 @@ func kindOf(imported, name, module string) (Kind, bool) {
 		return KindSyscall, true
 	case imported == "os/exec" && slices.Contains(execNames, name):
 		return KindExec, true
+	case imported == "syscall" && name == "Exec":
+		return KindSyscallExec, true
 	case imported == module+"/"+procgroupPath && slices.Contains(runnerNames, name):
 		return KindRunner, true
 	}

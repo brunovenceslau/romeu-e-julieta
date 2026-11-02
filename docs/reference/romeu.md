@@ -35,6 +35,7 @@ romeu <command> [flags]
 * [romeu init](romeu/init.md) - write the host settings and clone the config repo
 * [romeu status](romeu/status.md) - report each project's sandbox, generations, tree and toolchain, read only
 * [romeu sync](romeu/sync.md) - render the specs into candidates, run gate 2 and promote
+* [romeu upgrade](romeu/upgrade.md) - install a published release of romeu after showing what changed (gate 1)
 * [romeu version](romeu/version.md) - print the version of romeu
 
 ### Exit codes
