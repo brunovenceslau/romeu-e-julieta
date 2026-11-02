@@ -348,6 +348,7 @@ $XDG_CONFIG_HOME/romeu/settings.yaml    (default $HOME/.config/romeu/settings.ya
 $XDG_STATE_HOME/romeu/                  (default $HOME/.local/state/romeu/), mode 0700
 ├─ romeu.lock                           flock: one mutating romeu at a time
 ├─ toolchain.json                       gate 1 record, including the acknowledged catalog
+├─ upgrade-finish                       one-shot token of the swap of romeu upgrade for its --finish (04 4.2, REQ-1330)
 ├─ projects/<name>.json                 one record per project: approval, generations, applied egress
 ├─ descriptors/<digest>.json            content-addressed cache of parsed workload and kit descriptors
 └─ attic/<name>/<UTC-ts>/               records of retired projects

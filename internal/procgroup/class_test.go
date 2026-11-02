@@ -30,6 +30,7 @@ func TestTimeouts(t *testing.T) {
 		Mise:         30 * time.Minute,
 		Herdr:        30 * time.Second,
 		Gh:           2 * time.Minute,
+		Preview:      2 * time.Minute,
 		Unbounded:    0,
 		ToolStep:     15 * time.Minute,
 		ToolRace:     40 * time.Minute,

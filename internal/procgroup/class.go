@@ -39,6 +39,7 @@ const (
 	ToolGit                   // a git command of tools/ci or tools/mutants
 	ToolProbe                 // a short probe of the tools: uname, sysctl, mise which, mise --version, go list -find
 	Gh                        // gh --version in upgrade and the gh-floor row of doctor, and the two verification commands of gh in upgrade
+	Preview                   // the preview subprocess of upgrade: the new romeu, which reads sbx version itself
 )
 
 // timeouts is the timeout table, keyed by class. The rows of the
@@ -63,6 +64,7 @@ var timeouts = map[Class]time.Duration{
 	Mise:         30 * time.Minute,
 	Herdr:        30 * time.Second,
 	Gh:           2 * time.Minute,
+	Preview:      2 * time.Minute,
 	Unbounded:    0,
 	ToolStep:     15 * time.Minute,
 	ToolRace:     40 * time.Minute,
@@ -84,6 +86,7 @@ var classNames = map[Class]string{
 	Mise:         "mise",
 	Herdr:        "herdr",
 	Gh:           "gh",
+	Preview:      "upgrade-preview",
 	Unbounded:    "unbounded",
 	ToolStep:     "tool-step",
 	ToolRace:     "tool-race",

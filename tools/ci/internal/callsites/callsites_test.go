@@ -355,6 +355,69 @@ func Start(ctx context.Context) error { return procgroup.Run(ctx, procgroup.Comm
 	}, whereMsgs(findings))
 }
 
+// TestCallsitesSyscallExec holds REQ-1336: syscall.Exec is admitted in
+// the function a row names and nowhere else, in any package of the
+// module, procgroup and the tools included; a fixture package that
+// calls it elsewhere fails, whether it calls it, takes it as a value,
+// renames the import or dot-imports syscall; unix.Exec, which no row
+// may admit, stays a finding of the os/exec scan.
+func TestCallsitesSyscallExec(t *testing.T) {
+	files := map[string]string{
+		"internal/swap/swap.go": `package swap
+
+import "syscall"
+
+func swap(path string) error { return syscall.Exec(path, nil, nil) }
+
+func Elsewhere(path string) error { return syscall.Exec(path, nil, nil) }
+`,
+		"internal/fixture/value.go": `package fixture
+
+import sys "syscall"
+
+func Start() { f := sys.Exec; _ = f }
+`,
+		"internal/fixture/dot.go": `package fixture
+
+import . "syscall"
+
+func Dot() { _ = Exec("/bin/true", nil, nil) }
+`,
+		"internal/procgroup/run.go": `package procgroup
+
+import "syscall"
+
+func Run() { _ = syscall.Exec("/bin/true", nil, nil) }
+`,
+		"tools/x/x.go": `package x
+
+import (
+	"syscall"
+
+	"golang.org/x/sys/unix"
+)
+
+func Tool() { _ = syscall.Exec("/bin/true", nil, nil); _ = unix.Exec("/bin/true", nil, nil) }
+`,
+	}
+	table := []Site{{KindSyscallExec, "internal/swap", "swap"}}
+	findings := scanFixture(t, files, []string{"internal/swap", "internal/fixture", "internal/procgroup"}, nil, table)
+	assert.Equal(t, []string{
+		"internal/fixture/dot.go: dot-imports syscall, which hides its calls from this scan",
+		"internal/fixture/dot.go:5: syscall.Exec (dot-imported) (syscall.Exec) in Dot of internal/fixture, which the admitted-call-site table does not name",
+		"internal/fixture/value.go:5: syscall.Exec (syscall.Exec) in Start of internal/fixture, which the admitted-call-site table does not name",
+		"internal/procgroup/run.go:5: syscall.Exec (syscall.Exec) in Run of internal/procgroup, which the admitted-call-site table does not name",
+		"internal/swap/swap.go:7: syscall.Exec (syscall.Exec) in Elsewhere of internal/swap, which the admitted-call-site table does not name",
+		"tools/x/x.go: calls golang.org/x/sys/unix.Exec outside internal/procgroup",
+		"tools/x/x.go:9: syscall.Exec (syscall.Exec) in Tool of tools/x, which the admitted-call-site table does not name",
+	}, whereMsgs(findings))
+
+	bare := scanFixture(t, files, []string{"internal/swap", "internal/fixture", "internal/procgroup"}, nil, nil)
+	assert.True(t, slices.ContainsFunc(bare, func(f check.Finding) bool {
+		return f.Where == "internal/swap/swap.go:5"
+	}), "without the row, the call of swap fails too: %v", whereMsgs(bare))
+}
+
 // TestCallsitesIgnoresWhatTheGoCommandIgnores holds the walk: testdata
 // and directories that start with "." or "_" are left out.
 func TestCallsitesIgnoresWhatTheGoCommandIgnores(t *testing.T) {

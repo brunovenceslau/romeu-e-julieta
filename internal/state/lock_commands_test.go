@@ -17,11 +17,11 @@ import (
 	_ "github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/all"
 )
 
-// The commands of 04 4.1, Locking (REQ-0284): the eleven that take
+// The commands of 04 4.1, Locking (REQ-0284): the twelve that take
 // romeu.lock, and the ones that do not. completion and help are
 // builtins of every tree, which have no definition (cli.Builtins).
 var (
-	lockers  = []string{"init", "approve", "sync", "run", "adopt", "stop", "salvage", "rm", "recreate", "retire", "pull"}
+	lockers  = []string{"init", "approve", "sync", "run", "adopt", "stop", "salvage", "rm", "recreate", "retire", "pull", "upgrade"}
 	lockFree = []string{"status", "doctor", "handoff", "version", "completion", "help"}
 )
 
@@ -42,7 +42,7 @@ var notDefinedYet = map[string]string{
 // its name, and a definition in neither list fails, so a new command
 // states its lock before it is merged.
 func TestRomeuCommands_lock(t *testing.T) {
-	require.Len(t, lockers, 11, "the eleven commands of 04 4.1, Locking")
+	require.Len(t, lockers, 12, "the twelve commands of 04 4.1, Locking")
 	defined := map[string]cli.Command{}
 	for _, c := range cli.Commands("romeu") {
 		defined[c.Name] = c

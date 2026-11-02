@@ -52,6 +52,118 @@ print the toolchain part of the preview; the preview and the `gh` steps
 are admitted call sites of I16, and `syscall.Exec` joins the scan of
 REQ-0500 with the swap step as its one admission.
 
+Built on 2026-11-02 (scope this repository): the root package is
+`changelog` (`changelog.go`, imported as `changelog` by `upgrade`); its
+`Since` cuts the file at the level-2 headings of REQ-1350, the rule
+`tools/release/internal/changelog` reads, written again since a product
+package imports nothing under `tools/`, and the file's own rule, not a
+Markdown parse (ADR 0038); a dev build's own version has no section, so
+it prints none. The command uses the standard library alone (`net/http`,
+`archive/tar`, `compress/gzip`, `crypto/sha256`): no module is added.
+The injected values are three variables of `release.go`, the API host,
+the asset host and a root certificate, which the e2e sets with `-ldflags
+-X`; a release sets none and reads `api.github.com` and
+`release-assets.githubusercontent.com`, the asset host 07 7.4 measured.
+An asset is read by its id on the API host, and the client follows a
+redirect to the asset host alone, over HTTPS. The verification argv is
+two functions of `verify.go`, `tagCommitArgv` and `attestArgv`, which
+follow ADR 0045, decision 1, as merged. These choices are provisional,
+each open to the maintainer's review: the preview prints and the running
+romeu asks, through `gate.Confirm`, so the preview's stdin stays closed
+as REQ-0270 says of every other subprocess; its question, `install this
+romeu and acknowledge this toolchain? [y/N]`, replaces gate 1's at the
+end of what `approve --toolchain` prints; its environment adds
+`ROMEU_SETTINGS` and `XDG_STATE_HOME` to the one of 4.1, so the new
+binary reads the settings and the state the running one read; a preview
+that fails is `upgrade-verify-failed`, since the archive did not prove
+it runs here; `--check` prints a third line, `current`, when the two
+versions are the same; the running romeu holds the lock from after the
+checks of REQ-1326 until the swap, as `run` releases it before its exec.
+The edits outside `owns` the work forced: the class `Preview` (2 min)
+of `internal/procgroup` and its row in the Starting values of 04 4.1,
+since the preview had no class; `doctor.GhAtFloor` in
+`internal/cmd/romeu/doctor/gh_floor.go`, T195's reader exported for
+`upgrade`, with its test; `approve.TextOf` and `approve.Acknowledge` in
+`internal/cmd/romeu/approve/approve.go`, which the preview and the
+finish call and `approve` itself now uses; `upgrade` in the list of
+commands that take the lock (04 4.1, Locking, REQ-0284, whose rule its
+Writes cell meets) and in the list of `internal/state/lock_commands_test.go`;
+`changelog.go` among the files `tools/ci/internal/lint` lets hold a
+`go:embed`, as 02 2.1 (REQ-0129) names it; and the reference pages of
+`docs/reference/`, regenerated, with the line of the new page in
+`.gitattributes`. The gh of the unit tests is the test binary run again
+as a helper process (`TestHelperProcess`, the form of
+`internal/procgroup`), behind a wrapper script that prints its answer,
+since the package's tests may not write to the process's streams. The e2e answers y on a machine with no
+clone of the config repo, so the new binary records gate 1 and the
+steps of `sync --all` stop at step 2 (`config-clone-missing`, exit 2).
+
+Reviewed on 2026-11-02 (code review and security audit; scope this
+repository), and changed so. Three of the provisional choices above are
+now the text of the specification, for the maintainer's approval
+through the `contracts` line: the preview prints and the running romeu
+asks (REQ-1348), the preview's environment adds `ROMEU_SETTINGS` and
+`XDG_STATE_HOME` (REQ-1348, not the general list of REQ-0296), and a
+preview that fails is `upgrade-verify-failed` (REQ-1333, with an archive
+that does not extract); REQ-1327 names the 30 s timeout as built and a
+cap of 1 MiB for `checksums.txt`. `--finish` is bound to the swap that
+just happened (REQ-1330), so a process of the same user cannot run it
+to acknowledge gate 1 with no prompt: it needs a terminal on its stdin
+and stderr, as `install` does, and the finish token. The token is part
+of the interface every later release keeps, as `--preview` and
+`--finish` are, since the old binary writes it and the new one reads
+it: the file `upgrade-finish` of the romeu state directory (02 2.4),
+mode 0600, created with `O_EXCL` and `O_NOFOLLOW` right before the
+exec, in the line format `romeu-upgrade-finish/1`, `version <running
+version>`, `sha256 <hex of the new binary>`, `expires <RFC 3339 UTC>`,
+each line ended by a line feed (`token.go`); `--finish` opens it with
+`O_NOFOLLOW`, deletes it, reads at most 4 KiB, and refuses one that is
+missing, not a regular file of the user with mode 0600, of another
+format, expired or more than 60 s ahead, of another sha256 than its own
+executable, or of another version than its argument. The token stops an
+accidental or non-terminal `--finish`, not a process of the same user,
+which could write a token and open a pty, and could write
+`toolchain.json` itself. Provisional, each
+open to review: the swap writes the token after the rename and before
+the exec, so a token that does not write leaves the new binary
+installed with the message of a failed exec; the swap removes a stale
+token before it writes, and removes its own after a failed exec; the
+token's expiry comes from the command's clock (`env.Now`, 60 s).
+Before the rename the swap checks the temporary file with `Lstat`
+(regular, the user's, mode 0755) and its sha256 against the one
+`extract` computed from the verified archive, or it is
+`upgrade-verify-failed` and deletes it. `runningBinary` refuses a
+directory another user owns or its group or others may write (RJ-365,
+the message naming its mode); the attestation names the archive to gh
+by its absolute path; no URL reaches an error with its query, user or
+fragment, the signed redirect of the asset host included. The captures
+of gh's output take a lock (procgroup copies stdout and stderr in two
+goroutines). The edits outside `owns` this review forced: `checkGhFloor`
+of `internal/cmd/romeu/doctor/gh_floor.go` now calls `GhAtFloor` and
+maps its refusals (unset warns, a refused file or a version below the
+floor fails, any other error is an error, a timeout is
+`subprocess-timeout`), with doctor's tests unchanged; `approve.TextOf`
+takes the record its caller loaded, so `approve` loads it once;
+`releaseLDFlags` of `tools/release/internal/build/build.go`, with
+`TestReleaseLDFlags`, which holds that a release sets `-X` for
+`main.version`, `main.commit` and `main.date` alone; the line of
+`upgrade-finish` in the state tree of 02 2.4 and a sentence on the
+three test seams under REQ-0940 (10 10.4). The recorded fixture of 10
+10.1 is `testdata/releases-recorded.json`, the release list of
+goreleaser/goreleaser read unauthenticated on 2026-11-02 (its
+provenance in `testdata/REUSE.toml`), beside the hand-written
+`testdata/releases-handmade.json` of the draft-first and prerelease
+cases.
+
+Deferred, each with the event that reopens it: a warning or a flag for
+a downgrade, before the first stable tag (v1.0.0); a sweep of
+`.romeu-upgrade-*` files a crash left beside the binary, at the first
+report of one; holding the lock through the exec and keeping
+`.romeu-previous` for a rollback, if a failed exec is ever reported; a
+check at the workflow level that a release build injects nothing but
+the version stamp, beyond `TestReleaseLDFlags`, with T088's build of
+`release.yml`.
+
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-1320 (04 4.1),
   REQ-1321 (04 4.1), REQ-1323 (04 4.2), REQ-1324 (04 4.2), REQ-1325 (04
   4.2), REQ-1326 (04 4.2), REQ-1327 (04 4.2), REQ-1328 (04 4.2),

@@ -1184,6 +1184,12 @@ run, marked interim; S2 still requires a real green run for release.
 
 - `REQ-0940` Injected clock, ULID entropy source and version stamp in every package
   that writes time, ids or versions; tests fix all three.
+  The three injected values of `romeu upgrade`, the releases API host,
+  the asset host and a root certificate, are test seams of
+  `internal/cmd/romeu/upgrade` set with `-ldflags -X` by the e2e alone; a
+  release build sets none of them, and its `-ldflags` set `-X` for
+  `main.version`, `main.commit` and `main.date` only, which a unit test
+  of `tools/release/internal/build` holds (added on 2026-11-02).
 - `REQ-0941` Golden files change only with `-update` locally; `REQ-0942` CI never runs it and
   lists changed goldens, and `tools/ci ask-first` requires them listed under
   the PR's Evidence. A golden, for that check, is a file under a

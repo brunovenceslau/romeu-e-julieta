@@ -118,6 +118,58 @@ func TestDoctorGhFloor(t *testing.T) {
 	}
 }
 
+// TestGhAtFloor holds the reader romeu upgrade calls (REQ-1326, T196):
+// the version of a gh at or above the floor, and an error for unset, a
+// file that is not executable or that the file rule refuses, a gh that
+// fails or prints another shape, and a version below the floor.
+func TestGhAtFloor(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		gh      func(t *testing.T, f *fixture) string
+		version string
+		err     string
+	}{
+		{"unset", func(*testing.T, *fixture) string { return "" }, "", "tools.gh is unset"},
+		{"not there", func(_ *testing.T, f *fixture) string { return filepath.Join(f.tmp, "bin", "none") }, "", "does not name an executable file"},
+		{"others can write it", func(t *testing.T, f *fixture) string {
+			t.Helper()
+			p := ghStub(t, f, "gh version 2.102.0 (2026-09-30)", 0)
+			require.NoError(t, os.Chmod(p, 0o777))
+			return p
+		}, "", "tools.gh is refused: "},
+		{"exits non-zero", func(t *testing.T, f *fixture) string {
+			t.Helper()
+			return ghStub(t, f, "gh version 2.102.0 (2026-09-30)", 1)
+		}, "", "gh --version: "},
+		{"another shape", func(t *testing.T, f *fixture) string {
+			t.Helper()
+			return ghStub(t, f, "github cli 2.102.0", 0)
+		}, "", "not a gh version line"},
+		{"below the floor", func(t *testing.T, f *fixture) string {
+			t.Helper()
+			return ghStub(t, f, "gh version 2.67.0 (2025-02-19)", 0)
+		}, "2.67.0", "gh 2.67.0 is below the floor 2.68.0"},
+		{"at the floor with the scrubbed environment", func(t *testing.T, f *fixture) string {
+			t.Helper()
+			return ghEnvStub(t, f)
+		}, "2.68.0", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixture(t)
+			got, err := GhAtFloor(t.Context(), c.gh(t, f), f.home)
+			assert.Equal(t, c.version, got)
+			if c.err == "" {
+				assert.NoError(t, err)
+				return
+			}
+			assert.ErrorContains(t, err, c.err)
+		})
+	}
+}
+
 // TestGhFloorIsTheSpecs holds GhFloor to the number 12 12.1 states as
 // the initial floor of gh (REQ-1058).
 func TestGhFloorIsTheSpecs(t *testing.T) {
