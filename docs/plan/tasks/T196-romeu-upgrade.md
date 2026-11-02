@@ -3,7 +3,7 @@ id: T196
 title: "romeu upgrade"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/cmd/romeu/upgrade/**
   - internal/cmd/romeu/all/import_upgrade.go
@@ -24,6 +24,8 @@ ask_first:
   - gates
   - checks
 sitting: none
+merged: 2026-11-02
+pr: 369
 ---
 
 # T196 - romeu upgrade
