@@ -38,6 +38,7 @@ const (
 	ToolRace                  // the race step of tools/ci all
 	ToolGit                   // a git command of tools/ci or tools/mutants
 	ToolProbe                 // a short probe of the tools: uname, sysctl, mise which, mise --version, go list -find
+	Gh                        // gh --version in upgrade and the gh-floor row of doctor, and the two verification commands of gh in upgrade
 )
 
 // timeouts is the timeout table, keyed by class. The rows of the
@@ -61,6 +62,7 @@ var timeouts = map[Class]time.Duration{
 	JulietaGit:   5 * time.Minute,
 	Mise:         30 * time.Minute,
 	Herdr:        30 * time.Second,
+	Gh:           2 * time.Minute,
 	Unbounded:    0,
 	ToolStep:     15 * time.Minute,
 	ToolRace:     40 * time.Minute,
@@ -81,6 +83,7 @@ var classNames = map[Class]string{
 	JulietaGit:   "julieta-git",
 	Mise:         "mise",
 	Herdr:        "herdr",
+	Gh:           "gh",
 	Unbounded:    "unbounded",
 	ToolStep:     "tool-step",
 	ToolRace:     "tool-race",

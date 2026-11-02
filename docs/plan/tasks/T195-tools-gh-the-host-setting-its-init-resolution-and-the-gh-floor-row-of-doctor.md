@@ -45,6 +45,24 @@ for the pin. The validation rule of `tools.gh` (REQ-1319) lands in
 line carries it. `init.go` changes by the one line of its tools loop,
 after T185, which owns the file.
 
+Built on 2026-11-01 (scope this repository): the rule `tool-gh` is a
+row of the rule table in `rules.go`, as the task allowed, so the pull
+request carries the `gates` line; `init` reads the rule's pattern from
+`spec.Rules` and `gitsafe.CheckCredentialHelperFile` for the file rule,
+and its tests are in `init_test.go`, the test file of `init.go`; `gh
+--version` runs under a class of its own, `Gh` (04 4.1, 2 min, which
+the two verification commands of T196 share), appended to the class
+list of `internal/procgroup` on the `procgroup` surface, with the row
+of the admitted call-site table; the gh of the doctor tests is a shell
+stub, as the secret argv stubs of the package are, since the package
+has that fixture and no re-executed helper, and the well kept host of
+the package's tests (`helper_test.go`, T049's) gains a gh at the floor,
+the one edit outside `owns` the new row forced; the settings validation
+holds `tools.gh` to an absolute clean path, so the `fail` of a relative
+path is the settings' (`settings-invalid`) and the row judges the file
+and the version; the schema `host-settings.v1` and the reference page
+are regenerated.
+
 - Implements: REQ-1319 (03 3.1), REQ-1320 (04 4.1), REQ-1322 (04 4.2),
   REQ-1331 (04 4.2), REQ-1058 (12 12.1).
 - Operator: no.

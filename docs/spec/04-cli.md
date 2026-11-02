@@ -146,6 +146,7 @@ and each caller names its class.
 | julieta's own `git` | 5 min |
 | `mise install` (also the one in the setup of `tools/ci all`), `mise lock`, and a repo's `mise run setup` under `julieta setup`; `go env` in `tools/mutants`, whose mise shim may install go on a cold cache | 30 min |
 | `herdr` | 30 s |
+| `gh --version` in `upgrade` and the `gh-floor` row of `doctor`, and the two verification commands of `gh` in `upgrade` (a network read) | 2 min |
 | a command step of `tools/ci fast` or `tools/ci all`, the setup steps `mise trust` and `go mod download` included, `mise install` and the race step excepted | 15 min |
 | the race step of `tools/ci all` | 40 min |
 | a git command of `tools/ci` or `tools/mutants`; the `git pack-objects` and `git unpack-objects` pair of `tools/mutants` start together, and each runs under this limit, with no shared deadline | 2 min |
