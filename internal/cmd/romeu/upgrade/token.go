@@ -121,9 +121,9 @@ func writeToken(dir string, t finishToken) (err error) {
 
 // consumeToken reads the token of the state directory dir and deletes
 // it, so a token serves one finish. It refuses a token that is absent, a
-// link or no regular file, not owned by the user or open to others, over
-// tokenLimit, or not of the line format; whatever stood at its path is
-// removed but an absent one.
+// link or no regular file, not owned by the user or of another mode than
+// 0600, over tokenLimit, or not of the line format; whatever stood at
+// its path is removed but an absent one.
 func consumeToken(dir string) (finishToken, error) {
 	path := filepath.Join(dir, tokenName)
 	// O_NONBLOCK keeps a FIFO planted at the path from blocking the open.
@@ -144,7 +144,7 @@ func consumeToken(dir string) (finishToken, error) {
 		return finishToken{}, err
 	}
 	st, ok := info.Sys().(*syscall.Stat_t)
-	if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || !ok || int(st.Uid) != os.Getuid() {
+	if info.Mode() != 0o600 || !ok || int(st.Uid) != os.Getuid() {
 		return finishToken{}, fmt.Errorf("the token is not a regular file of this user, mode 0600 (mode %s)", info.Mode())
 	}
 	data, err := io.ReadAll(io.LimitReader(f, tokenLimit+1))

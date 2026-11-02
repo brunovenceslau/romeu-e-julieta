@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	gosync "sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -145,6 +146,30 @@ func TestRunGhBothStreams(t *testing.T) {
 	assert.Len(t, stdout, ghOutputLimit, "the standard output is cut to 4 KiB")
 	assert.True(t, strings.HasPrefix(string(stdout), "out-0\n"), "the standard output starts with its first line")
 	assert.NotContains(t, string(stdout), "err-", "the standard error is not in the standard output")
+}
+
+// TestCappedConcurrentWrites holds the lock of capped on every run, not
+// only when a process happens to write both streams at once: two
+// goroutines write the same capture a few hundred times each, which the
+// race detector (go test -race) reports without the lock, and the bytes
+// kept stay at the cap.
+func TestCappedConcurrentWrites(t *testing.T) {
+	t.Parallel()
+	c := &capped{left: ghOutputLimit}
+	chunk := []byte(strings.Repeat("x", 100))
+	var wg gosync.WaitGroup
+	for range 2 {
+		wg.Go(func() {
+			for range 300 {
+				n, _ := c.Write(chunk)
+				assert.Equal(t, len(chunk), n, "every write is reported whole")
+			}
+		})
+	}
+	wg.Wait()
+
+	assert.Equal(t, ghOutputLimit, c.b.Len(), "the capture is cut at the cap")
+	assert.Zero(t, c.left)
 }
 
 // TestAttestNamesTheArchiveByItsAbsolutePath: gh runs in HOME, so the

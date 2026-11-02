@@ -120,7 +120,10 @@ each line ended by a line feed (`token.go`); `--finish` opens it with
 `O_NOFOLLOW`, deletes it, reads at most 4 KiB, and refuses one that is
 missing, not a regular file of the user with mode 0600, of another
 format, expired or more than 60 s ahead, of another sha256 than its own
-executable, or of another version than its argument. Provisional, each
+executable, or of another version than its argument. The token stops an
+accidental or non-terminal `--finish`, not a process of the same user,
+which could write a token and open a pty, and could write
+`toolchain.json` itself. Provisional, each
 open to review: the swap writes the token after the rename and before
 the exec, so a token that does not write leaves the new binary
 installed with the message of a failed exec; the swap removes a stale

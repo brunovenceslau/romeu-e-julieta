@@ -6,6 +6,7 @@
 package upgrade
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"io"
 	"io/fs"
@@ -197,6 +198,22 @@ func TestFinishRefuses(t *testing.T) {
 			_, terminal := openPTY(t)
 			return terminal, int(terminal.Fd())
 		}, "not a regular file of this user, mode 0600 (mode -rw-r--r--)"},
+		{"a token of mode 0400", func(t *testing.T, m machine) (io.Reader, int) {
+			t.Helper()
+			m.writeToken(t, "v1.0.0-alpha.0", oldBinary, expiry)
+			require.NoError(t, os.Chmod(filepath.Join(m.stateHome, "romeu", tokenName), 0o400))
+			_, terminal := openPTY(t)
+			return terminal, int(terminal.Fd())
+		}, "not a regular file of this user, mode 0600 (mode -r--------)"},
+		{"a token over the read limit", func(t *testing.T, m machine) (io.Reader, int) {
+			t.Helper()
+			token := finishToken{version: "v1.0.0-alpha.0", sum: sha256.Sum256([]byte(oldBinary)), expires: expiry}.encode()
+			padded := append(token, bytes.Repeat([]byte("x"), tokenLimit+1-len(token))...)
+			require.Len(t, padded, tokenLimit+1)
+			require.NoError(t, os.WriteFile(filepath.Join(m.stateHome, "romeu", tokenName), padded, 0o600))
+			_, terminal := openPTY(t)
+			return terminal, int(terminal.Fd())
+		}, "the token passes 4096 bytes"},
 		{"a token of another format", func(t *testing.T, m machine) (io.Reader, int) {
 			t.Helper()
 			require.NoError(t, os.WriteFile(filepath.Join(m.stateHome, "romeu", tokenName), []byte("version v1.0.0-alpha.0\n"), 0o600))

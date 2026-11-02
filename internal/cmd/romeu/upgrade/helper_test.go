@@ -55,7 +55,10 @@ const helperEnv = "UPGRADE_TEST_HELPER"
 // As swap it runs the swap step on UPGRADE_TEST_SWAP_TEMP,
 // UPGRADE_TEST_SWAP_EXE, the hex sha256 UPGRADE_TEST_SWAP_SUM and the
 // state directory UPGRADE_TEST_SWAP_STATE, and fails when the step
-// returns.
+// returns. As swap-refused it runs the same step, which must return an
+// error, and writes the id of the error, a line feed and its message to
+// UPGRADE_TEST_SWAP_RESULT; a step that replaced the process writes
+// nothing.
 func TestHelperProcess(t *testing.T) {
 	switch os.Getenv(helperEnv) {
 	case "gh":
@@ -70,6 +73,18 @@ func TestHelperProcess(t *testing.T) {
 		require.NoError(t, err)
 		copy(s.sum[:], sum)
 		require.NoError(t, swap(s), "the swap step returned")
+	case "swap-refused":
+		s := swapStep{
+			temp: os.Getenv("UPGRADE_TEST_SWAP_TEMP"), exe: os.Getenv("UPGRADE_TEST_SWAP_EXE"),
+			stateDir: os.Getenv("UPGRADE_TEST_SWAP_STATE"), running: "v1.0.0-alpha.1",
+			expires: time.Date(2026, 11, 2, 9, 1, 0, 0, time.UTC),
+		}
+		sum, err := hex.DecodeString(os.Getenv("UPGRADE_TEST_SWAP_SUM"))
+		require.NoError(t, err)
+		copy(s.sum[:], sum)
+		err = swap(s)
+		require.Error(t, err, "the swap step returned no error")
+		require.NoError(t, os.WriteFile(os.Getenv("UPGRADE_TEST_SWAP_RESULT"), []byte(cli.Of(err).ID+"\n"+err.Error()), 0o600))
 	}
 }
 
