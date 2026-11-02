@@ -3,7 +3,7 @@ id: T185
 title: "init marks the config clone and sync finds it by the marker"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/cmd/romeu/init/marker*.go
   - internal/cmd/romeu/init/init.go
@@ -17,6 +17,8 @@ after:
   - T178
 ask_first: []
 sitting: none
+merged: 2026-11-01
+pr: 366
 ---
 
 # T185 - init marks the config clone and sync finds it by the marker

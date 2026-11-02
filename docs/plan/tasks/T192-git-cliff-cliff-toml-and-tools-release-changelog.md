@@ -3,7 +3,7 @@ id: T192
 title: "git-cliff, cliff.toml and tools/release changelog"
 milestone: M3
 module: ci-release
-fate: new
+fate: merged
 owns:
   - cliff.toml
   - CHANGELOG.md
@@ -21,6 +21,8 @@ ask_first:
   - checks
   - release
 sitting: none
+merged: 2026-11-01
+pr: 364
 ---
 
 # T192 - git-cliff, cliff.toml and tools/release changelog
