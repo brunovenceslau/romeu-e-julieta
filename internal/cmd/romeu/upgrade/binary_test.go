@@ -246,7 +246,7 @@ func TestSwapRefuses(t *testing.T) {
 			require.NoError(t, err, out.String())
 			got, err := os.ReadFile(result)
 			require.NoError(t, err, "the swap returned; output of the child: %q", out.String())
-			assert.Equal(t, "PASS\n", out.String(), "the child ran nothing else")
+			assert.Equal(t, "PASS\n", withoutCoverage(out.String()), "the child ran nothing else")
 			id, message, _ := strings.Cut(string(got), "\n")
 			assert.Equal(t, tt.id.ID, id, message)
 			assert.Contains(t, message, tt.message)

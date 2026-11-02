@@ -147,6 +147,20 @@ func ghHelper(args []string) error {
 	return os.WriteFile(filepath.Join(home, "gh-answer-exit"), []byte(strings.TrimSpace(exit)), 0o600)
 }
 
+// withoutCoverage drops the "coverage: ..." lines a test binary built
+// with -cover prints when it exits, as the race run of tools/ci builds
+// it, so a check on what a helper child printed reads the same with
+// and without coverage.
+func withoutCoverage(out string) string {
+	var kept strings.Builder
+	for line := range strings.Lines(out) {
+		if !strings.HasPrefix(line, "coverage: ") {
+			kept.WriteString(line)
+		}
+	}
+	return kept.String()
+}
+
 // ghBinary writes the gh of the test: a script, mode 0700 in a
 // directory of its own, that runs this test binary as the gh helper
 // with the arguments it was given, then prints the helper's answer and
