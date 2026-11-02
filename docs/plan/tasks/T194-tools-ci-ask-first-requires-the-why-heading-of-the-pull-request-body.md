@@ -3,7 +3,7 @@ id: T194
 title: "tools/ci ask-first requires the Why heading of the pull request body"
 milestone: M3
 module: ci-bootstrap
-fate: new
+fate: merged
 owns:
   - tools/ci/internal/askfirst/approval/sections*.go
 needs: []
@@ -12,6 +12,8 @@ ask_first:
   - approvals
   - checks
 sitting: none
+merged: 2026-11-01
+pr: 365
 ---
 
 # T194 - tools/ci ask-first requires the Why heading of the pull request body

@@ -3,7 +3,7 @@ id: T195
 title: "tools.gh: the host setting, its init resolution and the gh-floor row of doctor"
 milestone: M3
 module: romeu-cli
-fate: new
+fate: merged
 owns:
   - internal/spec/host*.go
   - internal/cmd/romeu/init/init.go
@@ -22,6 +22,8 @@ ask_first:
   - procgroup
   - checks
 sitting: none
+merged: 2026-11-02
+pr: 368
 ---
 
 # T195 - tools.gh: the host setting, its init resolution and the gh-floor row of doctor
