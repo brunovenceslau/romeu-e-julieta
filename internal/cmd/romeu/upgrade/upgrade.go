@@ -16,10 +16,11 @@
 // version> (preview.go), whose text ends with the one question. Any
 // answer but y deletes the temporary file; y renames it over the
 // running binary and replaces the process with it, as romeu upgrade
-// --finish <running version> (finish.go), which writes toolchain.json
-// and runs the steps of romeu sync --all. The two argv forms are kept
-// by every later release, since the old binary chooses them; neither
-// flag is listed by the help.
+// --finish <running version> (finish.go), which needs the finish token
+// the swap writes (token.go), then writes toolchain.json and runs the
+// steps of romeu sync --all. The two argv forms and the token are kept
+// by every later release, since the old binary makes them; neither flag
+// is listed by the help.
 //
 // all/import_upgrade.go links the command into romeu.
 package upgrade
@@ -42,13 +43,15 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/romeu/doctor"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/gate"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/hostpaths"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/termsafe"
 )
 
 // The process's environment, standard input and the file descriptor of
 // its standard error, which the CLI writer env.Stderr writes to; the
-// source of the releases; and the swap step. A test replaces them.
+// source of the releases; and the swap step, which install calls last
+// and which returns only when it fails. A test replaces them.
 var (
 	getenv   = os.Getenv
 	stdin    = func() io.Reader { return os.Stdin }
@@ -157,7 +160,7 @@ func check(ctx context.Context, env *cli.Env, tag string) error {
 // the checks, the preview, the confirmation and the swap.
 func install(ctx context.Context, env *cli.Env, tag string) error {
 	in := stdin()
-	if f, ok := in.(*os.File); !ok || !term.IsTerminal(int(f.Fd())) || !term.IsTerminal(stderrFD()) {
+	if !onTerminal(in) {
 		return noTerminal()
 	}
 	h, err := hostpaths.LoadSettings(env, getenv, usage)
@@ -170,6 +173,9 @@ func install(ctx context.Context, env *cli.Env, tag string) error {
 	}
 	gh := h.Tools.Gh
 	if _, err := doctor.GhAtFloor(ctx, gh, home); err != nil {
+		if _, ok := errors.AsType[*procgroup.TimeoutError](err); ok {
+			return cli.SubprocessTimeout.Wrap(err, "gh --version did not finish")
+		}
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -234,7 +240,7 @@ func install(ctx context.Context, env *cli.Env, tag string) error {
 		return err
 	}
 
-	temp, err := extract(archive, filepath.Dir(exe))
+	temp, sum, err := extract(archive, filepath.Dir(exe))
 	if err != nil {
 		return err
 	}
@@ -251,7 +257,7 @@ func install(ctx context.Context, env *cli.Env, tag string) error {
 		return err
 	}
 	lk.Unlock()
-	err = replace(temp, exe, []string{exe, "upgrade", "--finish", running})
+	err = replace(swapStep{temp: temp, exe: exe, sum: sum, stateDir: stateDir, running: running, expires: env.Now().Add(tokenLife)})
 	removeTemp(temp)
 	return err
 }
@@ -271,6 +277,13 @@ func confirm(ctx context.Context, in io.Reader, env *cli.Env, temp, running, hom
 		return false, noTerminal()
 	}
 	return ok, err
+}
+
+// onTerminal reports whether in is a terminal and the standard error
+// is one too.
+func onTerminal(in io.Reader) bool {
+	f, ok := in.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd())) && term.IsTerminal(stderrFD())
 }
 
 // noTerminal is the refusal without a terminal on stdin or on stderr

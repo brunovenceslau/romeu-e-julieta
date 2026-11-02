@@ -9,6 +9,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json/v2"
@@ -51,16 +52,24 @@ const helperEnv = "UPGRADE_TEST_HELPER"
 // $HOME/gh-attest-output with the status of $HOME/gh-attest-exit (0
 // when absent).
 //
-// As swap it runs the swap step on UPGRADE_TEST_SWAP_TEMP and
-// UPGRADE_TEST_SWAP_EXE, and fails when the step returns.
+// As swap it runs the swap step on UPGRADE_TEST_SWAP_TEMP,
+// UPGRADE_TEST_SWAP_EXE, the hex sha256 UPGRADE_TEST_SWAP_SUM and the
+// state directory UPGRADE_TEST_SWAP_STATE, and fails when the step
+// returns.
 func TestHelperProcess(t *testing.T) {
 	switch os.Getenv(helperEnv) {
 	case "gh":
 		require.NoError(t, ghHelper(os.Args[slices.Index(os.Args, "--")+1:]))
 	case "swap":
-		exe := os.Getenv("UPGRADE_TEST_SWAP_EXE")
-		err := swap(os.Getenv("UPGRADE_TEST_SWAP_TEMP"), exe, []string{exe, "upgrade", "--finish", "v1.0.0-alpha.1"})
-		require.NoError(t, err, "the swap step returned")
+		s := swapStep{
+			temp: os.Getenv("UPGRADE_TEST_SWAP_TEMP"), exe: os.Getenv("UPGRADE_TEST_SWAP_EXE"),
+			stateDir: os.Getenv("UPGRADE_TEST_SWAP_STATE"), running: "v1.0.0-alpha.1",
+			expires: time.Date(2026, 11, 2, 9, 1, 0, 0, time.UTC),
+		}
+		sum, err := hex.DecodeString(os.Getenv("UPGRADE_TEST_SWAP_SUM"))
+		require.NoError(t, err)
+		copy(s.sum[:], sum)
+		require.NoError(t, swap(s), "the swap step returned")
 	}
 }
 
@@ -197,7 +206,7 @@ type request struct {
 	TLS                                      bool
 }
 
-// releaseServer serves the releases of testdata/releases.json from an
+// releaseServer serves the releases of testdata/releases-handmade.json from an
 // API server, whose asset reads redirect to an asset server; both are
 // TLS servers of httptest, and both record each request.
 type releaseServer struct {
@@ -218,7 +227,7 @@ type releaseServer struct {
 // binary script and its checksums.txt.
 func newReleaseServer(t *testing.T) *releaseServer {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "releases.json"))
+	data, err := os.ReadFile(filepath.Join("testdata", "releases-handmade.json"))
 	require.NoError(t, err)
 	s := &releaseServer{files: map[string][]byte{}}
 	require.NoError(t, json.Unmarshal(data, &s.releases))
@@ -308,9 +317,17 @@ func (s *releaseServer) serveAPI(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// serveAsset answers a download with the content of the asset.
+// serveAsset answers a download with the content of the asset; /hang
+// answers nothing until the client goes away, or 5 s.
 func (s *releaseServer) serveAsset(w http.ResponseWriter, r *http.Request) {
 	s.record(r)
+	if r.URL.Path == "/hang" {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
+		return
+	}
 	data, ok := s.files[strings.TrimPrefix(r.URL.Path, "/download/")]
 	if !ok {
 		http.NotFound(w, r)
@@ -386,28 +403,22 @@ func (m machine) getenv(k string) string {
 	return map[string]string{"HOME": m.home, "XDG_STATE_HOME": m.stateHome}[k]
 }
 
-// replaced is what the replace seam was given.
-type replaced struct {
-	temp, exe string
-	argv      []string
-}
-
 // use points the seams of the package at m, the reader in and the
 // file descriptor errFD, the releases of srv, and a replace step that
 // renames the new binary over the running one as swap does and records
 // what it was given in place of replacing the process. The tests that
 // call it do not run in parallel.
-func use(t *testing.T, m machine, in io.Reader, errFD int, srv *releaseServer) *[]replaced {
+func use(t *testing.T, m machine, in io.Reader, errFD int, srv *releaseServer) *[]swapStep {
 	t.Helper()
 	oldEnv, oldIn, oldErr, oldSrc, oldReplace, oldExe := getenv, stdin, stderrFD, sources, replace, executable
-	var calls []replaced
+	var calls []swapStep
 	getenv = m.getenv
 	stdin = func() io.Reader { return in }
 	stderrFD = func() int { return errFD }
 	sources = func(string) (*source, error) { return srv.source(), nil }
-	replace = func(temp, exe string, argv []string) error {
-		calls = append(calls, replaced{temp, exe, argv})
-		return os.Rename(temp, exe)
+	replace = func(s swapStep) error {
+		calls = append(calls, s)
+		return os.Rename(s.temp, s.exe)
 	}
 	executable = func() (string, error) { return m.exe, nil }
 	t.Cleanup(func() {
@@ -461,6 +472,15 @@ type outcome struct {
 	stdout, stderr string
 }
 
+// writeToken writes the finish token of a swap into the state
+// directory of m: made by the romeu of version, for the binary whose
+// content is content, expiring at expires.
+func (m machine) writeToken(t *testing.T, version, content string, expires time.Time) {
+	t.Helper()
+	require.NoError(t, writeToken(filepath.Join(m.stateHome, "romeu"),
+		finishToken{version: version, sum: sha256.Sum256([]byte(content)), expires: expires}))
+}
+
 // commandDeadline is how long runCommand waits for the command to end.
 const commandDeadline = 30 * time.Second
 
@@ -468,6 +488,12 @@ const commandDeadline = 30 * time.Second
 // when answer is not empty it is typed on master in the same write that
 // shows the question.
 func runCommand(t *testing.T, m machine, master *os.File, answer string, args ...string) outcome {
+	t.Helper()
+	return runCommandIn(t, t.Context(), m, master, answer, args...)
+}
+
+// runCommandIn is runCommand under the context ctx.
+func runCommandIn(t *testing.T, ctx context.Context, m machine, master *os.File, answer string, args ...string) outcome {
 	t.Helper()
 	var stdout lockedBuffer
 	stderr := &typingBuffer{master: master, answer: answer}
@@ -480,7 +506,7 @@ func runCommand(t *testing.T, m machine, master *os.File, answer string, args ..
 		SettingsPath: m.settings,
 	}
 	done := make(chan int, 1)
-	go func() { done <- cli.Main(t.Context(), args, env) }()
+	go func() { done <- cli.Main(ctx, args, env) }()
 	select {
 	case code := <-done:
 		require.NoError(t, stderr.err, "type the answer")

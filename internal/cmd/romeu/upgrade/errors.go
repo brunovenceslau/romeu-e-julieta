@@ -24,9 +24,12 @@ var (
 	// REQ-1333): the sha256 of the archive differs from checksums.txt,
 	// or a command of the attestation entry of the verification
 	// contract exited non-zero; the running binary is unchanged, and the
-	// details hold gh's output, escaped and cut to its first 4 KiB. The
-	// new binary's preview that does not run is this error too (T196,
-	// provisional): the archive did not prove it runs here.
+	// details hold gh's output, escaped and cut to its first 4 KiB. An
+	// archive that does not extract, a preview of the new binary that
+	// fails, passes its cap or prints no confirmation (the archive did
+	// not prove it runs here), and a new binary that changed between its
+	// extraction and the swap are this error too (amended on
+	// 2026-11-02).
 	VerifyFailed = cli.Row{
 		ID:          "RJ-363",
 		Slug:        "upgrade-verify-failed",
@@ -48,7 +51,8 @@ var (
 
 	// BinaryUnwritable is the error upgrade-binary-unwritable (RJ-365,
 	// REQ-1335): the directory of the running binary, its links
-	// resolved, is not writable by the user, found before any download.
+	// resolved, is not writable by the user, is owned by another user or
+	// is writable by its group or others, found before any download.
 	BinaryUnwritable = cli.Row{
 		ID:          "RJ-365",
 		Slug:        "upgrade-binary-unwritable",

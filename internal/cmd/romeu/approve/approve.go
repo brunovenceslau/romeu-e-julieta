@@ -133,7 +133,7 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 		_, err := fmt.Fprintf(env.Stdout, "gate 1: the toolchain of this machine is acknowledged already (sbx %s, romeu %s)\n", live.Sbx, live.Romeu.Version)
 		return err
 	}
-	text, err := TextOf(st, live)
+	text, err := TextOf(st, rec, live)
 	if err != nil {
 		return err
 	}
@@ -157,18 +157,14 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 }
 
 // TextOf returns what gate 1 prints before its answer for the live
-// toolchain against the record in st (Text), the projects each catalog
-// change affects read from the project records of st; a nil st is a
-// machine with no state directory yet, which holds no record. romeu
-// upgrade's preview prints it (04 4.2, REQ-1348, T196); it reads st and
-// writes nothing.
-func TextOf(st *state.Store, live Live) (string, error) {
+// toolchain against rec, the record Load read from st (Text), the
+// projects each catalog change affects read from the project records of
+// st; a nil st is a machine with no state directory yet, which holds no
+// record. romeu upgrade's preview prints it (04 4.2, REQ-1348, T196); it
+// reads st and writes nothing.
+func TextOf(st *state.Store, rec *state.Toolchain, live Live) (string, error) {
 	if st == nil {
 		return Text(nil, live, map[string][]string{})
-	}
-	rec, err := Load(st)
-	if err != nil {
-		return "", err
 	}
 	projects, err := appliedEgress(st)
 	if err != nil {

@@ -46,10 +46,11 @@ var (
 )
 
 // The limits of REQ-1327: one timeout per request and a cap per
-// response.
+// response, the API's, checksums.txt's and an archive's.
 const (
 	requestTimeout = 30 * time.Second
 	apiCap         = 8 << 20
+	checksumsCap   = 1 << 20
 	assetCap       = 256 << 20
 )
 
@@ -67,9 +68,9 @@ type source struct {
 	client     *http.Client
 	api, asset string // the two hosts, host[:port]
 	userAgent  string // GitHub's API refuses a request with none
-	// apiCap and assetCap are the caps of a response of the API and of
-	// an asset; a test lowers them.
-	apiCap, assetCap int64
+	// apiCap, checksumsCap and assetCap are the caps of a response of
+	// the API, of checksums.txt and of the archive; a test lowers them.
+	apiCap, checksumsCap, assetCap int64
 }
 
 // newSource returns the source of the injected values.
@@ -106,11 +107,12 @@ func newSourceWith(client *http.Client, api, asset, version string) *source {
 			return errors.New("more than 5 redirects")
 		}
 		if req.URL.Scheme != "https" || (req.URL.Host != asset && req.URL.Host != api) {
-			return fmt.Errorf("a redirect to %s, which is neither the API host nor the asset host", termsafe.Escape(req.URL.Redacted()))
+			return fmt.Errorf("a redirect to %s, which is neither the API host nor the asset host", termsafe.Escape(shown(req.URL)))
 		}
 		return nil
 	}
-	return &source{client: &c, api: api, asset: asset, userAgent: "romeu/" + version, apiCap: apiCap, assetCap: assetCap}
+	return &source{client: &c, api: api, asset: asset, userAgent: "romeu/" + version,
+		apiCap: apiCap, checksumsCap: checksumsCap, assetCap: assetCap}
 }
 
 // Release is the part of a GitHub release the pick reads.
@@ -147,18 +149,19 @@ func (s *source) pick(ctx context.Context, tag string) (Release, error) {
 	if err != nil {
 		return Release{}, err
 	}
+	where := cli.Detail{Key: "url", Value: shownString("https://" + s.api + path)}
 	var rel Release
 	if tag != "" {
 		if err := json.Unmarshal(body, &rel); err != nil {
-			return Release{}, DownloadFailed.Wrap(err, "the release does not decode", cli.Detail{Key: "url", Value: "https://" + s.api + path})
+			return Release{}, DownloadFailed.Wrap(err, "the release does not decode", where)
 		}
 		if rel.Draft {
-			return Release{}, DownloadFailed.New("release "+termsafe.Escape(tag)+" is a draft", cli.Detail{Key: "url", Value: "https://" + s.api + path})
+			return Release{}, DownloadFailed.New("release "+termsafe.Escape(tag)+" is a draft", where)
 		}
 	} else {
 		var list []Release
 		if err := json.Unmarshal(body, &list); err != nil {
-			return Release{}, DownloadFailed.Wrap(err, "the list of releases does not decode", cli.Detail{Key: "url", Value: "https://" + s.api + path})
+			return Release{}, DownloadFailed.Wrap(err, "the list of releases does not decode", where)
 		}
 		found := false
 		for _, r := range list {
@@ -168,11 +171,11 @@ func (s *source) pick(ctx context.Context, tag string) (Release, error) {
 			}
 		}
 		if !found {
-			return Release{}, DownloadFailed.New("the repository has no published release", cli.Detail{Key: "url", Value: "https://" + s.api + path})
+			return Release{}, DownloadFailed.New("the repository has no published release", where)
 		}
 	}
 	if !tagForm.MatchString(rel.Tag) || (tag != "" && rel.Tag != tag) {
-		return Release{}, DownloadFailed.New("the release names the tag "+termsafe.Escape(strconv.Quote(rel.Tag))+", which is not a release tag", cli.Detail{Key: "url", Value: "https://" + s.api + path})
+		return Release{}, DownloadFailed.New("the release names the tag "+termsafe.Escape(strconv.Quote(rel.Tag))+", which is not a release tag", where)
 	}
 	return rel, nil
 }
@@ -203,17 +206,24 @@ func (rel Release) assets() (archive, checksums Asset, err error) {
 }
 
 // download returns the content of the asset a, read on the API host and
-// redirected to the asset host, up to the asset cap.
+// redirected to the asset host, up to the cap of checksums.txt for it
+// and the asset cap for any other.
 func (s *source) download(ctx context.Context, a Asset) ([]byte, error) {
-	return s.get(ctx, "https://"+s.api+"/repos/"+Repo+"/releases/assets/"+strconv.FormatInt(a.ID, 10), "application/octet-stream", s.assetCap)
+	limit := s.assetCap
+	if a.Name == ChecksumsName {
+		limit = s.checksumsCap
+	}
+	return s.get(ctx, "https://"+s.api+"/repos/"+Repo+"/releases/assets/"+strconv.FormatInt(a.ID, 10), "application/octet-stream", limit)
 }
 
 // get reads the body of a GET of u with the Accept header accept, and
 // returns download-failed for a request that fails or times out, a
 // status that is not 2xx and a body over limit, with the URL and the
 // status in the details. The request carries no Authorization header.
+// No URL reaches an error with its query: the one of an asset host's
+// redirect is a signed grant.
 func (s *source) get(ctx context.Context, u, accept string, limit int64) ([]byte, error) {
-	where := cli.Detail{Key: "url", Value: u}
+	where := cli.Detail{Key: "url", Value: shownString(u)}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, DownloadFailed.Wrap(err, "the request does not build", where)
@@ -224,6 +234,9 @@ func (s *source) get(ctx context.Context, u, accept string, limit int64) ([]byte
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
+		}
+		if ue, ok := errors.AsType[*url.Error](err); ok {
+			ue.URL = shownString(ue.URL)
 		}
 		return nil, DownloadFailed.Wrap(err, "the read failed", where)
 	}
@@ -243,4 +256,21 @@ func (s *source) get(ctx context.Context, u, accept string, limit int64) ([]byte
 		return nil, DownloadFailed.New(fmt.Sprintf("the body passed its cap of %d bytes", limit), where, status)
 	}
 	return body, nil
+}
+
+// shown returns u as an error may show it: its scheme, host and path,
+// without its user, its query and its fragment.
+func shown(u *url.URL) string {
+	c := url.URL{Scheme: u.Scheme, Host: u.Host, Path: u.Path, RawPath: u.RawPath}
+	return c.String()
+}
+
+// shownString is shown for a URL in a string; one that does not parse
+// is shown as a placeholder.
+func shownString(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "<a URL that does not parse>"
+	}
+	return shown(u)
 }

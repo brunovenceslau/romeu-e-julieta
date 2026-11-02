@@ -43,54 +43,59 @@ func checkGhFloor(ctx context.Context, h *host) Check {
 	if h.baseErr != nil {
 		return errorOf(slug, h.baseErr)
 	}
-	gh := h.settings.Tools.Gh
-	if gh == "" {
-		return warn(slug, "tools.gh is unset, so romeu upgrade cannot run: install gh at or above "+GhFloor+" (the install of J1 step 2) and record its absolute path as tools.gh of the host settings")
-	}
 	// The settings validation holds tools.gh to an absolute clean path
 	// (REQ-1319), so a relative one never reaches here: baseErr says so.
-	if info, err := os.Stat(gh); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		return fail(slug, "tools.gh does not name an executable file: "+termsafe.Escape(gh))
-	}
-	if err := gitsafe.CheckCredentialHelperFile(gh); err != nil {
-		return fail(slug, "tools.gh is refused: "+termsafe.Escape(err.Error()))
-	}
-	out, err := runGhVersion(ctx, gh, h.home)
+	v, err := GhAtFloor(ctx, h.settings.Tools.Gh, h.home)
 	if _, ok := errors.AsType[*procgroup.TimeoutError](err); ok {
 		return errorOf(slug, cli.SubprocessTimeout.Wrap(err, "gh --version did not finish"))
 	}
 	if ctx.Err() != nil {
 		return errorOf(slug, ctx.Err())
 	}
-	if err != nil {
-		return errorOf(slug, fmt.Errorf("gh --version: %w", err))
-	}
-	v, err := parseGhVersion(out)
-	if err != nil {
+	var refused ghRefused
+	switch {
+	case errors.Is(err, errGhUnset):
+		return warn(slug, "tools.gh is unset, so romeu upgrade cannot run: install gh at or above "+GhFloor+" (the install of J1 step 2) and record its absolute path as tools.gh of the host settings")
+	case errors.As(err, &refused) && v != "":
+		return fail(slug, refused.Error()+": romeu upgrade needs the attestation flags of that release")
+	case errors.As(err, &refused):
+		return fail(slug, refused.Error())
+	case err != nil:
 		return errorOf(slug, err)
-	}
-	if !atGhFloor(v) {
-		return fail(slug, fmt.Sprintf("gh %s is below the floor %s of 12 12.1: romeu upgrade needs the attestation flags of that release", v, GhFloor))
 	}
 	return pass(slug, fmt.Sprintf("gh %s, floor %s", v, GhFloor))
 }
 
-// GhAtFloor is the reader of this row for romeu upgrade (04 4.2,
-// REQ-1326, T196): it judges the gh at path gh as the row does, running
-// gh --version through the same call site with HOME home, and returns
-// the version gh printed, or an error that says why upgrade cannot use
-// it: tools.gh unset, a file that is not an executable regular file or
-// that the file rule of the credential helper refuses, a gh that does
-// not run or prints another line, or a version below GhFloor.
+// errGhUnset is the refusal of GhAtFloor for tools.gh unset, which the
+// row warns of.
+var errGhUnset = errors.New("tools.gh is unset")
+
+// ghRefused is a refusal of GhAtFloor that the row fails: a file that is
+// not an executable regular file or that the file rule of the
+// credential helper refuses, and a version below GhFloor. Any other
+// error of GhAtFloor is a gh that does not run or prints another line,
+// which the row reports as an error.
+type ghRefused string
+
+func (r ghRefused) Error() string { return string(r) }
+
+// GhAtFloor is the reader of this row, which romeu upgrade calls too (04
+// 4.2, REQ-1326, T196): it judges the gh at path gh, running gh
+// --version with HOME home, and returns the version gh printed, or an
+// error that says why upgrade cannot use it: tools.gh unset, a file that
+// is not an executable regular file or that the file rule of the
+// credential helper refuses, a gh that does not run (its error wrapped,
+// a timeout of procgroup included) or prints another line, or a version
+// below GhFloor, the one refusal that returns the version too.
 func GhAtFloor(ctx context.Context, gh, home string) (string, error) {
 	if gh == "" {
-		return "", errors.New("tools.gh is unset")
+		return "", errGhUnset
 	}
 	if info, err := os.Stat(gh); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		return "", errors.New("tools.gh does not name an executable file: " + termsafe.Escape(gh))
+		return "", ghRefused("tools.gh does not name an executable file: " + termsafe.Escape(gh))
 	}
 	if err := gitsafe.CheckCredentialHelperFile(gh); err != nil {
-		return "", fmt.Errorf("tools.gh is refused: %w", err)
+		return "", ghRefused("tools.gh is refused: " + termsafe.Escape(err.Error()))
 	}
 	out, err := runGhVersion(ctx, gh, home)
 	if err != nil {
@@ -101,7 +106,7 @@ func GhAtFloor(ctx context.Context, gh, home string) (string, error) {
 		return "", err
 	}
 	if !atGhFloor(v) {
-		return v.String(), fmt.Errorf("gh %s is below the floor %s of 12 12.1", v, GhFloor)
+		return v.String(), ghRefused(fmt.Sprintf("gh %s is below the floor %s of 12 12.1", v, GhFloor))
 	}
 	return v.String(), nil
 }

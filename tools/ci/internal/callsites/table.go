@@ -106,6 +106,11 @@ var Admitted = []Site{
 	// declines or a step fails before the swap (REQ-1329, T196).
 	{KindRemove, "internal/cmd/romeu/upgrade", "removeArchiveDir"},
 	{KindRemove, "internal/cmd/romeu/upgrade", "removeTemp"},
+	// The finish token of romeu upgrade in the state directory, a file
+	// the swap step writes for one romeu upgrade --finish: the finish
+	// deletes it as it reads it, and the swap deletes a stale one and
+	// the one of an exec that failed (REQ-1330, T196).
+	{KindRemove, "internal/cmd/romeu/upgrade", "removeToken"},
 	// Candidate dirs.
 	{KindRemove, "internal/state", "RenderCandidate"},
 	{KindRemove, "internal/state", "Candidate.remove"},

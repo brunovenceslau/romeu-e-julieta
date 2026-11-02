@@ -1,15 +1,32 @@
 # SPDX-FileCopyrightText: 2026 Bruno Venceslau
 # SPDX-License-Identifier: GPL-3.0-only
 
-# The license of the fixture of romeu upgrade, which cannot carry an
-# SPDX header of its own (REUSE 3.3): releases.json is a page of
-# /repos/<owner>/romeu-e-julieta/releases in the shape of the GitHub
-# REST API, written for the tests before the repository has a release:
-# a draft first, then two published prereleases.
+# The license of each fixture of romeu upgrade, none of which can carry
+# an SPDX header of its own (REUSE 3.3), and where each comes from.
+#
+# Recorded on 2026-11-02, unauthenticated (no token, as romeu upgrade
+# sends no Authorization header, REQ-1327), and committed unmodified:
+# - releases-recorded.json: the answer of
+#     curl -sS 'https://api.github.com/repos/goreleaser/goreleaser/releases?per_page=10'
+#   the release list of the public repository goreleaser/goreleaser
+#   (license MIT), picked because it holds prereleases and darwin
+#   archives: five nightly prereleases, then five releases.
+#
+# Written by hand:
+# - releases-handmade.json: a page of
+#   /repos/<owner>/romeu-e-julieta/releases in the shape of the GitHub
+#   REST API, written for the tests before the repository has a release:
+#   a draft first, then two published prereleases.
 
 version = 1
 
 [[annotations]]
-path = ["*.json"]
+path = ["releases-handmade.json"]
 SPDX-FileCopyrightText = "2026 Bruno Venceslau"
 SPDX-License-Identifier = "GPL-3.0-only"
+
+# The release metadata of goreleaser/goreleaser, as the API served it.
+[[annotations]]
+path = ["releases-recorded.json"]
+SPDX-FileCopyrightText = "2016-2026 Carlos Alexandro Becker"
+SPDX-License-Identifier = "MIT"

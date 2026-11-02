@@ -98,6 +98,69 @@ since the package's tests may not write to the process's streams. The e2e answer
 clone of the config repo, so the new binary records gate 1 and the
 steps of `sync --all` stop at step 2 (`config-clone-missing`, exit 2).
 
+Reviewed on 2026-11-02 (code review and security audit; scope this
+repository), and changed so. Three of the provisional choices above are
+now the text of the specification, for the maintainer's approval
+through the `contracts` line: the preview prints and the running romeu
+asks (REQ-1348), the preview's environment adds `ROMEU_SETTINGS` and
+`XDG_STATE_HOME` (REQ-1348, not the general list of REQ-0296), and a
+preview that fails is `upgrade-verify-failed` (REQ-1333, with an archive
+that does not extract); REQ-1327 names the 30 s timeout as built and a
+cap of 1 MiB for `checksums.txt`. `--finish` is bound to the swap that
+just happened (REQ-1330), so a process of the same user cannot run it
+to acknowledge gate 1 with no prompt: it needs a terminal on its stdin
+and stderr, as `install` does, and the finish token. The token is part
+of the interface every later release keeps, as `--preview` and
+`--finish` are, since the old binary writes it and the new one reads
+it: the file `upgrade-finish` of the romeu state directory (02 2.4),
+mode 0600, created with `O_EXCL` and `O_NOFOLLOW` right before the
+exec, in the line format `romeu-upgrade-finish/1`, `version <running
+version>`, `sha256 <hex of the new binary>`, `expires <RFC 3339 UTC>`,
+each line ended by a line feed (`token.go`); `--finish` opens it with
+`O_NOFOLLOW`, deletes it, reads at most 4 KiB, and refuses one that is
+missing, not a regular file of the user with mode 0600, of another
+format, expired or more than 60 s ahead, of another sha256 than its own
+executable, or of another version than its argument. Provisional, each
+open to review: the swap writes the token after the rename and before
+the exec, so a token that does not write leaves the new binary
+installed with the message of a failed exec; the swap removes a stale
+token before it writes, and removes its own after a failed exec; the
+token's expiry comes from the command's clock (`env.Now`, 60 s).
+Before the rename the swap checks the temporary file with `Lstat`
+(regular, the user's, mode 0755) and its sha256 against the one
+`extract` computed from the verified archive, or it is
+`upgrade-verify-failed` and deletes it. `runningBinary` refuses a
+directory another user owns or its group or others may write (RJ-365,
+the message naming its mode); the attestation names the archive to gh
+by its absolute path; no URL reaches an error with its query, user or
+fragment, the signed redirect of the asset host included. The captures
+of gh's output take a lock (procgroup copies stdout and stderr in two
+goroutines). The edits outside `owns` this review forced: `checkGhFloor`
+of `internal/cmd/romeu/doctor/gh_floor.go` now calls `GhAtFloor` and
+maps its refusals (unset warns, a refused file or a version below the
+floor fails, any other error is an error, a timeout is
+`subprocess-timeout`), with doctor's tests unchanged; `approve.TextOf`
+takes the record its caller loaded, so `approve` loads it once;
+`releaseLDFlags` of `tools/release/internal/build/build.go`, with
+`TestReleaseLDFlags`, which holds that a release sets `-X` for
+`main.version`, `main.commit` and `main.date` alone; the line of
+`upgrade-finish` in the state tree of 02 2.4 and a sentence on the
+three test seams under REQ-0940 (10 10.4). The recorded fixture of 10
+10.1 is `testdata/releases-recorded.json`, the release list of
+goreleaser/goreleaser read unauthenticated on 2026-11-02 (its
+provenance in `testdata/REUSE.toml`), beside the hand-written
+`testdata/releases-handmade.json` of the draft-first and prerelease
+cases.
+
+Deferred, each with the event that reopens it: a warning or a flag for
+a downgrade, before the first stable tag (v1.0.0); a sweep of
+`.romeu-upgrade-*` files a crash left beside the binary, at the first
+report of one; holding the lock through the exec and keeping
+`.romeu-previous` for a rollback, if a failed exec is ever reported; a
+check at the workflow level that a release build injects nothing but
+the version stamp, beyond `TestReleaseLDFlags`, with T088's build of
+`release.yml`.
+
 - Implements: REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-1320 (04 4.1),
   REQ-1321 (04 4.1), REQ-1323 (04 4.2), REQ-1324 (04 4.2), REQ-1325 (04
   4.2), REQ-1326 (04 4.2), REQ-1327 (04 4.2), REQ-1328 (04 4.2),

@@ -254,7 +254,8 @@ func TestUpgradeDeclined(t *testing.T) {
 // which records gate 1 with no second prompt and runs the steps of sync
 // --all; with no clone of the config repo on this machine, sync stops at
 // its step 2 (config-clone-missing, exit 2), after gate 1 passed at its
-// step 1 (REQ-1330). gh ran with the argv of the verification contract.
+// step 1 (REQ-1330), the finish token of the swap consumed. gh ran with
+// the argv of the verification contract.
 func TestUpgradeSwapsAndFinishes(t *testing.T) {
 	t.Parallel()
 	f := newUpgradeFixture(t)
@@ -276,6 +277,8 @@ func TestUpgradeSwapsAndFinishes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, entries, 1, "no temporary file is left")
 	require.NoError(t, s.Steps[0].Assert(f.e.World(t)))
+	assert.FileExists(t, filepath.Join(f.e.StateDir(), "toolchain.json"), "the finish passed the token of the swap")
+	assert.NoFileExists(t, filepath.Join(f.e.StateDir(), "upgrade-finish"), "the finish consumed the token of the swap")
 
 	log, err := os.ReadFile(f.ghLog)
 	require.NoError(t, err)

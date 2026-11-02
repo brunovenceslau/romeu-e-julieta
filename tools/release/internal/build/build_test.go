@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -377,4 +378,28 @@ func TestNoticesCapALicenseFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dep, "LICENSE"), bytes.Repeat([]byte("x"), maxLicense+1), 0o644))
 	_, err := Notices(t.Context(), root, goBinOf(t), []Target{{"julieta", "linux", "amd64"}})
 	require.ErrorContains(t, err, "is larger than")
+}
+
+// TestReleaseLDFlags: the -ldflags of a release set -X for the version
+// stamp of main alone (main.version, main.commit, main.date), so no test
+// seam of the product, such as the API host, the asset host and the
+// root certificate of romeu upgrade (10 10.4), is set in a release.
+func TestReleaseLDFlags(t *testing.T) {
+	t.Parallel()
+	flags := strings.Fields(releaseLDFlags("v1.0.0", "0123456789abcdef0123456789abcdef01234567", time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)))
+	var set []string
+	for i, f := range flags {
+		switch {
+		case f == "-X":
+			require.Less(t, i+1, len(flags), "-X ends the flags")
+			name, _, ok := strings.Cut(flags[i+1], "=")
+			require.True(t, ok, flags[i+1])
+			set = append(set, name)
+		case strings.HasPrefix(f, "-X"):
+			t.Fatalf("a -X flag in another form: %q", f)
+		}
+	}
+	assert.Equal(t, []string{"main.version", "main.commit", "main.date"}, set)
+	assert.Equal(t, "-buildid= -X main.version=v1.0.0 -X main.commit=0123456789abcdef0123456789abcdef01234567 -X main.date=2026-11-02T09:00:00Z",
+		releaseLDFlags("v1.0.0", "0123456789abcdef0123456789abcdef01234567", time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)))
 }

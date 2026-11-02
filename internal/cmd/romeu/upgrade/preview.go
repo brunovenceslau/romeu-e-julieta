@@ -133,7 +133,13 @@ func preview(ctx context.Context, env *cli.Env, running string) error {
 	default:
 		defer func() { _ = st.Close() }()
 	}
-	text, err := approve.TextOf(st, live)
+	var rec *state.Toolchain
+	if st != nil {
+		if rec, err = approve.Load(st); err != nil {
+			return err
+		}
+	}
+	text, err := approve.TextOf(st, rec, live)
 	if err != nil {
 		return err
 	}

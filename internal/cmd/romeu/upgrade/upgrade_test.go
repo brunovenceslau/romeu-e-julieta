@@ -6,6 +6,7 @@
 package upgrade
 
 import (
+	"crypto/sha256"
 	"errors"
 	"io"
 	"net/http"
@@ -14,10 +15,13 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/spec"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/state"
 )
@@ -147,6 +151,29 @@ func TestUpgradeBeforeAnyDownload(t *testing.T) {
 	}
 }
 
+// TestUpgradeGhTimeout: a gh --version that does not finish within the
+// timeout of its class is the error subprocess-timeout, as doctor
+// reports it, not upgrade-gh-unusable; nothing is read or written.
+func TestUpgradeGhTimeout(t *testing.T) {
+	m := newMachine(t)
+	gh := filepath.Join(m.home, "gh-slow")
+	require.NoError(t, os.WriteFile(gh, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700))
+	sbx := filepath.Join(filepath.Dir(m.home), "sbx")
+	m.writeSettings(t, spec.Tools{Sbx: sbx, Git: "/usr/bin/git", Gh: gh})
+	srv := newReleaseServer(t)
+	_, terminal := openPTY(t)
+	_ = use(t, m, terminal, int(terminal.Fd()), srv)
+	before := treeOf(t, m)
+
+	got := runCommandIn(t, procgroup.WithTestTimeout(t.Context(), procgroup.Gh, 100*time.Millisecond), m, nil, "", "upgrade")
+
+	assert.Equal(t, cli.SubprocessTimeout.Exit, got.code, got.stderr)
+	assert.Contains(t, got.stderr, "error "+cli.SubprocessTimeout.ID+" ")
+	assert.NotContains(t, got.stderr, GhUnusable.ID)
+	assert.Empty(t, srv.seen(), "no read of the network")
+	assert.Equal(t, before, treeOf(t, m))
+}
+
 // TestUpgradeCurrent holds REQ-1324: a release equal to the running
 // version prints current and exits 0, with no download and no
 // attestation.
@@ -213,8 +240,12 @@ func TestUpgradeConfirmed(t *testing.T) {
 	assert.Contains(t, got.stdout, "installing  romeu v1.0.0-alpha.2 at "+m.exe+"\n")
 	require.Len(t, *calls, 1)
 	assert.Equal(t, m.exe, (*calls)[0].exe)
-	assert.Equal(t, []string{m.exe, "upgrade", "--finish", "v1.0.0-alpha.1"}, (*calls)[0].argv)
+	assert.Equal(t, []string{m.exe, "upgrade", "--finish", "v1.0.0-alpha.1"}, (*calls)[0].argv())
 	assert.Equal(t, m.bin, filepath.Dir((*calls)[0].temp), "the new binary was beside the running one")
+	assert.Equal(t, sha256.Sum256([]byte(newBinaryScript)), (*calls)[0].sum, "the sha256 of the new binary")
+	assert.Equal(t, filepath.Join(m.stateHome, "romeu"), (*calls)[0].stateDir)
+	assert.Equal(t, "v1.0.0-alpha.1", (*calls)[0].running)
+	assert.Equal(t, time.Date(2026, 11, 2, 9, 1, 0, 0, time.UTC), (*calls)[0].expires, "60 s after the clock")
 	data, err := os.ReadFile(m.exe)
 	require.NoError(t, err)
 	assert.Equal(t, newBinaryScript, string(data))

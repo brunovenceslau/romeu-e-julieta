@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
@@ -83,7 +84,8 @@ const ghOutputLimit = 4096
 
 // attest runs the attestation entry through gh, the tools.gh judged at
 // the floor, with HOME home, on the archive written to a directory of
-// its own under the temporary directory, which it removes after. A
+// its own under the temporary directory, named to gh by its absolute
+// path, which it removes after. A
 // command that exits non-zero, or a commit that is not a full commit
 // id, is verify-failed with gh's output, escaped and cut, in the
 // details.
@@ -93,7 +95,11 @@ func attest(ctx context.Context, gh, home, tag, name string, archive []byte) err
 		return cli.Internal.Wrap(err, "upgrade: a temporary directory for the archive")
 	}
 	defer removeArchiveDir(dir)
-	path := filepath.Join(dir, name)
+	// gh runs in home, so a relative TMPDIR would point it elsewhere.
+	path, err := filepath.Abs(filepath.Join(dir, name))
+	if err != nil {
+		return cli.Internal.Wrap(err, "upgrade: the path of the archive")
+	}
 	if err := os.WriteFile(path, archive, 0o600); err != nil {
 		return cli.Internal.Wrap(err, "upgrade: write the archive")
 	}
@@ -155,14 +161,20 @@ func runGh(ctx context.Context, argv []string, home string) (stdout, both []byte
 }
 
 // capped keeps the first left bytes it is given and drops the rest,
-// reporting every write as whole, so a command never blocks on it.
+// reporting every write as whole, so a command never blocks on it. Its
+// writes take a lock: procgroup copies a command's standard output and
+// standard error in two goroutines, and runGh gives both the same
+// capped.
 type capped struct {
+	mu   sync.Mutex
 	b    bytes.Buffer
 	left int
 }
 
 // Write keeps what fits.
 func (c *capped) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if n := min(len(p), c.left); n > 0 {
 		c.b.Write(p[:n])
 		c.left -= n
