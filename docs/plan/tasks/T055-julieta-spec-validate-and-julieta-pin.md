@@ -156,6 +156,24 @@ with `ErrRefused` (`internal/gitsafe/gitsafe.go`, `url.go` and
 test `TestSpecValidateCatalogSlugsAndExits` pins each outcome's slug to
 its exit.
 
+Security review of 2026-11-03 (a `security-auditor` on the gitsafe part,
+no critical or high finding), decided the same day, scope this
+repository: `--catalog` keeps the git config and credentials of the
+machine it runs on, so a private repo that machine can read is read,
+and the trust in who triggers the config repo's CI and its egress are
+the controls against a spec that names a private repo or a host that
+resolves to an internal address; the spec row and the help say so.
+Applied: `tipFlags` gains `transfer.bundleURI=false` and a minimum
+speed (`http.lowSpeedLimit` 1024 for `http.lowSpeedTime` 60 s), and
+the work dir is made absolute before `TipFile`, so a relative
+`$TMPDIR`, the machine's, is not a finding of every repo. Deferred:
+a bound on the bytes of the fetch (`--filter=blob:limit`, which needs
+the fetched repository set up as a partial clone, or a size limit on
+the work dir), reopened when the config repo's CI runs `--catalog` on
+pull requests from authors it does not trust, or a fetch fills a
+runner; accepted: an `fsck.<msg>=ignore` of the machine's config can
+weaken `transfer.fsckObjects`, the same trust as its credentials.
+
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03
   3.1), REQ-0178 (03 3.1), REQ-0211 (03 3.5), REQ-0420 (04 4.3),

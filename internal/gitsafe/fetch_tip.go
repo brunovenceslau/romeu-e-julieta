@@ -30,7 +30,11 @@ var ErrNoDefaultBranch = errors.New("gitsafe: the origin names no default branch
 // for its ls-remote and fetch, the hardening host mode has on every
 // call (05 5.1): no redirect is followed, so one fails with ErrMoved;
 // no automatic gc or maintenance runs in the throwaway repository; and
-// every object received is checked. They are TipFile's own, not added
+// every object received is checked. Two more, from the security review
+// of 2026-11-03: no bundle URI the server advertises is fetched, so the
+// origin cannot send git to another host; and a transfer slower than
+// 1 KiB/s for 60 s ends, so an origin that dribbles bytes fails long
+// before the repo's deadline. They are TipFile's own, not added
 // to sandboxSettings: julieta's other git calls run in the clones the
 // agent works in, whose config is the sandbox's own (05 5.1 states the
 // exception). No setting of a git host is added: hostSettings reads the
@@ -40,6 +44,9 @@ var tipFlags = []setting{
 	{"gc.auto", "0"},
 	{"maintenance.auto", "false"},
 	{"transfer.fsckObjects", "true"},
+	{"transfer.bundleURI", "false"},
+	{"http.lowSpeedLimit", "1024"},
+	{"http.lowSpeedTime", "60"},
 }
 
 // TipFile returns the bytes of the regular file name in the commit at

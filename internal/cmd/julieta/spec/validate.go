@@ -52,7 +52,8 @@ var _ = cli.Register(func() cli.Command {
 				"the embedded egress catalog and the spec's egress.tools lack, a finding, and a lock that does not parse or that gitsafe refuses, a finding too; " +
 				"it warns lock-host-gated for each lock host the catalog does not produce, and for an artifact URL with no host it can read. " +
 				"A pass is no gate on those hosts: romeu sync gates them. --catalog fetches from origins the specs name, so the config repo's CI " +
-				"runs it for trusted authors only, or under restricted egress. " +
+				"runs it for trusted authors only, or under restricted egress: the fetch uses this machine's git config and credentials, " +
+				"so a private repo the machine can read is read and parts of its lock can reach the output, and a host name can resolve to an internal address. " +
 				"An origin it cannot read, or one that lacks the ref or a default branch, is fetch-failed, exit 1. " +
 				"Any finding is exit 6; a file that cannot be read is exit 2. " +
 				"With --json it prints one document of the format julieta-spec.v1, the warnings among its members, and stderr is then empty but for an error.",
