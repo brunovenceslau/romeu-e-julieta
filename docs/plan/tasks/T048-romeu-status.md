@@ -17,6 +17,7 @@ owns:
   - internal/render/live_test.go
   - internal/cmd/romeu/version/**
   - internal/cmd/romeu/all/import_status.go
+  - internal/cmd/romeu/all/import_version.go
   - e2e/status_test.go
   - e2e/version_test.go
   - internal/gitsafe/version.go
@@ -77,8 +78,8 @@ project. Slice D1: the command file over T169's `hostpaths`, which
 runs the sbx floor check once before any other sbx call, as the driver
 requires, `import_status.go` and the e2e cases `TestStatus*`. Slice D2:
 the `versions` object of `romeu version --json` (which reads the
-settings too), with its schema `romeu-version.v1` (`formats`), once the
-report is whole; and the text of REQ-0327, REQ-0329 and the
+settings too), with its schema `romeu-version.v1` (`formats`), over the
+report as slices A to D1 leave it; and the text of REQ-0327, REQ-0329 and the
 RJ-359 row amended for what slice C put at the head of the report (the
 toolchain, its warnings and the failed reads outside a project's
 block). The
@@ -128,14 +129,13 @@ REQ-0327, REQ-0329 and the RJ-359 row in `docs/spec/04-cli.md`, outside
     `status/sections.go` (rule 14 of `docs/plan.md`), the seam T066
     and T080 add a file to.
   - On fixtures of host state, `status --json` reports, without taking
-    the lock: drift, an interrupted promotion, a stale toolchain, an
-    orphaned project and an orphaned repo dir, the sandbox state, spec
-    vs synced commit, recreate needed, each generation with its state
+    the lock: drift, an interrupted promotion, a stale toolchain, the
+    sandbox state, recreate needed, each generation with its state
     (`adopted, not gated` for an adopted one), the salvage records,
-    unimported snapshots, `removal-pending` and `record-unreadable`, and
-    per repo the `createdAt` of the last `snapshot/heads.json`,
-    `disabled`, and the newest facts' dirty and stash counts; the fields
-    julieta supplies land with T066.
+    `removal-pending` and `record-unreadable`; the fields julieta
+    supplies land with T066. The orphans, the spec against the synced
+    commit, the unimported snapshots and the per-repo snapshot facts
+    moved to T197 with slice B2 (re-plan of 2026-10-31).
   - `status` reports a live sbx version outside the tested window of 10
     10.3 as the warning `sbx-untested`, naming the version and the
     recorded range; until block A the window is the version the
@@ -157,6 +157,8 @@ REQ-0327, REQ-0329 and the RJ-359 row in `docs/spec/04-cli.md`, outside
   - A romeu built with plain `go build`, which embeds no julieta, runs
     `status` as the embedded build does, and never stops with
     `julieta-not-embedded` (from T043, 2026-10-30; 04 4.2).
-- Verify: `go test -tags e2e ./e2e/... -run '^TestStatus' -v`. The
-  pattern names the `TestStatus*` functions this task adds, and the
+- Verify: `go test -tags e2e ./e2e/... -run '^(TestStatus|TestVersion)' -v`
+  and `go test ./internal/cmd/romeu/version/ -v`. The patterns name the
+  `TestStatus*` and `TestVersion*` functions and the version package's
+  tests (`TestReportIsItsSchema` among them) this task adds, and the
   reviewer reads them in the `-v` output (10 10.8).
