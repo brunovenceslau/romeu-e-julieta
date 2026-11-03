@@ -46,10 +46,11 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 		// A relative or unclean $TMPDIR is the machine's, not the repo's:
 		// TipFile refuses such a work dir, which would read as a finding of
 		// every repo (the security review of 2026-11-03).
-		if work, err = filepath.Abs(work); err != nil {
+		abs, err := filepath.Abs(work)
+		if err != nil {
 			return nil, false, err
 		}
-		return g.TipFile(ctx, work, url, ref, "mise.lock", mise.MaxFileSize)
+		return g.TipFile(ctx, abs, url, ref, "mise.lock", mise.MaxFileSize)
 	}
 }
 

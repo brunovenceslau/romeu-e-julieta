@@ -31,8 +31,9 @@ var ErrNoDefaultBranch = errors.New("gitsafe: the origin names no default branch
 // call (05 5.1): no redirect is followed, so one fails with ErrMoved;
 // no automatic gc or maintenance runs in the throwaway repository; and
 // every object received is checked. Two more, from the security review
-// of 2026-11-03: no bundle URI the server advertises is fetched, so the
-// origin cannot send git to another host; and a transfer slower than
+// of 2026-11-03: no bundle URI the server advertises is fetched, which
+// git documents for clone only, so it guards a later change of this
+// path rather than today's init and fetch; and a transfer slower than
 // 1 KiB/s for 60 s ends, so an origin that dribbles bytes fails long
 // before the repo's deadline. They are TipFile's own, not added
 // to sandboxSettings: julieta's other git calls run in the clones the
