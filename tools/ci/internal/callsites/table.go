@@ -39,6 +39,11 @@ const (
 	// KindRunner is procgroup.Run and procgroup.CombinedOutput, the
 	// runner every subprocess of the product starts through.
 	KindRunner Kind = "procgroup runner"
+	// KindSyscallExec is syscall.Exec, which replaces the process with
+	// another program (REQ-1336): admitted in the swap step of romeu
+	// upgrade alone. unix.Exec, os.StartProcess and the fork calls stay
+	// findings of the os/exec scan (procgroup.go), which no row admits.
+	KindSyscallExec Kind = "syscall.Exec"
 )
 
 // AnyFunc in the Func of a row admits every function of the package:
@@ -73,6 +78,19 @@ var Admitted = []Site{
 	{KindRunner, "internal/mise", AnyFunc},
 	{KindRunner, "internal/hooks", AnyFunc},
 	{KindRunner, "internal/cmd/romeu/doctor", "runSecretArgv"},
+	// gh --version of the gh-floor row of doctor (REQ-1320, T195).
+	{KindRunner, "internal/cmd/romeu/doctor", "runGhVersion"},
+	// The gh step and the preview step of romeu upgrade (REQ-1320,
+	// REQ-1321, T196): gh --version runs through runGhVersion of doctor,
+	// the two commands of the verification contract through runGh, and
+	// the new romeu, once, through runPreview.
+	{KindRunner, "internal/cmd/romeu/upgrade", "runGh"},
+	{KindRunner, "internal/cmd/romeu/upgrade", "runPreview"},
+
+	// syscall.Exec: the swap step of romeu upgrade alone, which
+	// replaces the process with the new romeu (REQ-1321, REQ-1336,
+	// T196).
+	{KindSyscallExec, "internal/cmd/romeu/upgrade", "swap"},
 
 	// I16 (05 5.2): the functions that remove temp files, candidate dirs,
 	// kit dirs no longer referenced by the live sbxenv.yaml and what the
@@ -82,6 +100,17 @@ var Admitted = []Site{
 	// Temporary files and directories.
 	{KindRemove, "internal/gitsafe", "Runner.BundleOf"},
 	{KindRemove, "internal/cmd/romeu/init", "cloneConfig"},
+	// romeu upgrade: the archive it verifies, in a directory of its own
+	// under the temporary directory, and the new binary extracted under
+	// a temporary name beside the running one, when the operator
+	// declines or a step fails before the swap (REQ-1329, T196).
+	{KindRemove, "internal/cmd/romeu/upgrade", "removeArchiveDir"},
+	{KindRemove, "internal/cmd/romeu/upgrade", "removeTemp"},
+	// The finish token of romeu upgrade in the state directory, a file
+	// the swap step writes for one romeu upgrade --finish: the finish
+	// deletes it as it reads it, and the swap deletes a stale one and
+	// the one of an exec that failed (REQ-1330, T196).
+	{KindRemove, "internal/cmd/romeu/upgrade", "removeToken"},
 	// Candidate dirs.
 	{KindRemove, "internal/state", "RenderCandidate"},
 	{KindRemove, "internal/state", "Candidate.remove"},
@@ -109,6 +138,9 @@ var Admitted = []Site{
 	// .romeu/bin/* and the workspace files.
 	{KindRename, "internal/state", "writeFile"},
 	{KindRename, "internal/render", "replaceFile"},
+	// The running romeu binary, replaced by the new one in the swap step
+	// of upgrade (05 5.2, I16, amended on 2026-10-31; T196).
+	{KindRename, "internal/cmd/romeu/upgrade", "swap"},
 	// sbx env rm, for rm.
 	{KindEnvRm, "internal/sbxdrv", "EnvRm"},
 }

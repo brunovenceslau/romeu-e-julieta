@@ -139,7 +139,7 @@ func TestPRHeadFromGit(t *testing.T) {
 				r.Write(name, src)
 			}
 			head := r.Commit("head files")
-			findings, err := Judge(t.Context(), r.Repo, PR{BaseSHA: base, HeadSHA: head}, false)
+			findings, err := Judge(t.Context(), r.Repo, PR{BaseSHA: base, HeadSHA: head, Body: fullBody}, false)
 			require.NoError(t, err)
 			var got []string
 			for _, f := range findings {

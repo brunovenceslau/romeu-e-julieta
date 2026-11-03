@@ -30,6 +30,7 @@ after:
   - T048
 ask_first:
   - sbxdrv
+  - formats
 sitting: none
 ---
 

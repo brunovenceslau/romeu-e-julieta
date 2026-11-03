@@ -56,6 +56,7 @@ docs/reference/romeu/doctor.md -text
 docs/reference/romeu/init.md -text
 docs/reference/romeu/status.md -text
 docs/reference/romeu/sync.md -text
+docs/reference/romeu/upgrade.md -text
 docs/reference/romeu/version.md -text
 internal/cli/exitcodes_gen.go -text
 internal/gate/fields_gen.go -text

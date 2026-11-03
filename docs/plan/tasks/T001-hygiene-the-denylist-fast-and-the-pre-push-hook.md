@@ -18,6 +18,10 @@ pr: 7
 Merged on 2026-10-02 in pull request #7. The text below is the one
 written before the re-plan.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1062 (12 12.1) now lists git-cliff among the tools pinned in
+`mise.toml` and `mise.lock`; T192 adds the pin.
+
 - Implements: REQ-0016 (index), REQ-0021 (index), REQ-0022 (index),
   REQ-0028 (index), REQ-0032 (index), REQ-0034 (00 0.4), REQ-0035 (00
   0.4), REQ-0111 (02 2.1), REQ-0124 (02 2.1), REQ-0542 (05 5.3),

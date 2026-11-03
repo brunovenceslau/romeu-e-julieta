@@ -22,6 +22,12 @@ signing agent, `kit.allowedSources`, secrets), in the heading order of
 ADR 0001 rule 12 as ADR 0009 decision 6 amends it, so T095 extends it;
 `tools/ci/headings.yaml` with the README list, on the `checks` surface.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1058 (12 12.1) names `romeu upgrade` beside J1 as what needs the
+`gh` floor, and the attestation entry of J1 step 2 gained `--source-ref
+refs/heads/main` (REQ-0909); the README shows the entry of
+`commands.yaml` (T088).
+
 - Implements: REQ-0520 (05 5.2), REQ-0547 (05 5.4), REQ-0549 (05 5.4), REQ-0602 (06 6.4), REQ-1058 (12 12.1),
   REQ-1087 (12 12.2), REQ-1183 (12 12.8).
 - Operator: no

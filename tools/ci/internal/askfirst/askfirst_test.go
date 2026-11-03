@@ -91,7 +91,7 @@ func prRepo(t *testing.T) (*gittest.Repo, string) {
 
 // alert wraps lines in the approval alert.
 func alert(lines ...string) string {
-	return "> [!IMPORTANT]\n" + strings.Join(lines, "\n") + "\n"
+	return "## Why\n\nA reason.\n\n## What changed\n\n- a file\n\n## Evidence\n\n`go test`: ok\n\n## Lessons\n\nnone\n\n> [!IMPORTANT]\n" + strings.Join(lines, "\n") + "\n"
 }
 
 const validLine = "> - [x] Approval: decisions - amend rule 8"

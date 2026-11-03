@@ -48,6 +48,10 @@ item below is deferred, with the task whose merge reopens it:
 - The catalog embedded: `internal/catalog` does not exist. Reopened by
   T031.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0902 (10 10.2) now skips the fuzz gate for a prerelease tag while
+`fuzz.yml` does not exist; T088 adds that rule to `fuzzgate.go`.
+
 - Implements: REQ-0006 (index), REQ-0011 (index), REQ-0037 (00 0.4),
   REQ-0040 (01 1.1), REQ-0128 (02 2.1), REQ-0129 (02 2.1), REQ-0130 (02
   2.1), REQ-0131 (02 2.1), REQ-0432 (04 4.4), REQ-0837 (10 10.2),

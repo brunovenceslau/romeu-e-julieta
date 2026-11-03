@@ -86,6 +86,10 @@ site); `record-unreadable` reads the project records and
 descriptors); `vscode-trust` does not read the trusted folders of VS
 Code (trigger: a first SQLite reader, or T134).
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0330 and the row table of REQ-0369 (04 4.2) gained the `gh-floor`
+row, which runs `gh --version`; T195 adds it through `doctor/rows.go`.
+
 - Implements: REQ-0056 (01 1.3), REQ-0057 (01 1.3), REQ-0059 (01 1.4),
   REQ-0062 (01 1.4), REQ-0136 (02 2.3), REQ-0141 (02 2.3), REQ-0148 (02
   2.4), REQ-0207 (03 3.4), REQ-0209 (03 3.4), REQ-0330 (04 4.2),

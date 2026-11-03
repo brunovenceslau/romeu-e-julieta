@@ -54,9 +54,11 @@ var testSeams = []string{"WithTestTimeout", "SetBeforeStepAside"}
 
 // startCalls are the functions, by package path, that start or replace
 // a process without os/exec; no file outside this package calls them.
+// syscall.Exec is not among them: the admitted-call-site table judges
+// it (KindSyscallExec, REQ-1336), in this package too.
 var startCalls = map[string][]string{
 	"os":                    {"StartProcess"},
-	"syscall":               {"Exec", "ForkExec", "StartProcess"},
+	"syscall":               {"ForkExec", "StartProcess"},
 	"golang.org/x/sys/unix": {"Exec", "ForkExec"},
 }
 

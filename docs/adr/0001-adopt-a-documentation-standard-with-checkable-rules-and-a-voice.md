@@ -17,6 +17,8 @@ Superseded in part by [37. State what is at stake in every decision record](0037
 
 Superseded in part by [39. State the scope of every decision record](0039-state-the-scope-of-every-decision-record.md) (rule 9)
 
+Superseded in part by [44. Generate a changelog file with git-cliff and make each section the release body](0044-generate-a-changelog-file-with-git-cliff-and-make-each-section-the-release-body.md) (rule 11)
+
 ## Context
 
 In Shakespeare's play, Romeo and Juliet do not die for lack of a plan.
@@ -248,8 +250,14 @@ not a permanent state.
     (12 12.3), carry a generated-file header and the front matter of
     rule 1, both written by the generator, and are never hand-edited;
     drift fails the build. Owner: `tools/ci generated`.
-11. **[check]** Release notes are generated from Conventional Commit
-    subjects (12 12.6); nobody writes a CHANGELOG by hand. Commit
+11. **[check]** `CHANGELOG.md` is generated from the merged pull
+    requests by `git-cliff` (12 12.6), and each of its sections is the
+    release's notes; nobody writes it by hand (amended by ADR 0044 on
+    2026-11-01; before it, no changelog file existed and the notes were
+    generated at publish time). Owner of the changelog half:
+    `tools/release notes` in `release.yml`, which refuses a section
+    that differs from what the generator renders at the tag; between
+    releases, review. Commit
     subjects and the PR title are checked for the Conventional Commit
     form (a squash merge can make the title a subject), and PR bodies
     for the sections of 12 12.4. Owner: `tools/ci pr`.
@@ -370,7 +378,7 @@ not reserve the number for anything else.
 | Supersede link: the spec wrote `Supersedes: NNNN`; adr-tools' `adr new -s` writes the link forms `Supercedes` and `Superceded by`, misspelled ([src/adr-new](https://github.com/npryce/adr-tools/blob/master/src/adr-new)) | `Supersedes [N. Title](file)` and `Superseded by [M. Title](file)` in the Status section, correctly spelled (rule 7) | the link is clickable and checked in both directions. We keep adr-tools' link shape and not its spelling; that is a recorded divergence, so a record written by `adr new -s` itself fails `tools/ci sequences` until the word is corrected |
 | Screenshots allowed by one source, no media in another | text diagrams only (rule 17) | binary media rot silently and cannot be diffed or retrieved as text |
 | Em dash used by two sources | banned everywhere, commits and PR text included | the spec's Boundaries banned it before this record ([index](../spec.md#boundaries-for-everyone-who-changes-this-repo)). We keep the ban because one dash form makes the check a byte search that skips nothing (rule 4) |
-| Hand-written CHANGELOG in one source | generated release notes (rule 11) | the spec generates them (12 12.6); a hand-written file duplicates that source |
+| Hand-written CHANGELOG in one source | a generated `CHANGELOG.md` (rule 11) | the generator writes the file from git (12 12.6); a hand-written one would drift from the merged pull requests |
 | Three README shapes | one order (rule 12), prerequisites before the first run | the first run needs a macOS host with sbx; a reader who lacks them must find out before step one |
 | "No TODO comments" in one source | `TODO(#<issue>)` only | a TODO with an issue is tracked work; one without is a wish |
 | Where lessons live | `docs/lessons.md` (12 12.7); a lesson that changes a decision also adds an ADR; a trap at a code site gets a comment citing the ADR or lesson | the spec already has a checked lessons file |
