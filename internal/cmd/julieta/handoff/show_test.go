@@ -85,6 +85,37 @@ func TestShowHookPrintsInOrder(t *testing.T) {
 	assert.Contains(t, plain, "the newest facts differ")
 }
 
+// TestShowHookAlertsAMissingPathLink prints the alert block
+// julieta-link-missing (REQ-1351, REQ-1352) when the PATH link does not
+// lead to a file: after the one-line warnings, before the fixed line,
+// set apart by empty lines, with the setup of the running julieta as
+// its fix. With the link there it prints no alert.
+func TestShowHookAlertsAMissingPathLink(t *testing.T) {
+	s := newSandbox(t)
+	s.setupState(t, setup.Warning{Slug: "lock-stale", Message: "api mise.lock is behind mise.toml"})
+	assert.NotContains(t, s.ok(t, "", "handoff", "show", "--hook"), "!! ", "the link is there")
+
+	link := filepath.Join(s.home, setup.LinkPath)
+	require.NoError(t, os.Remove(link))
+	restore := handoff.SetExecutable(func() (string, error) { return "/opt/julieta/bin/julieta-linux-arm64", nil })
+	defer restore()
+	want := "warning lock-stale: api mise.lock is behind mise.toml\n" +
+		"\n" +
+		"!! julieta is not on PATH (julieta-link-missing)\n" +
+		"   link: " + link + "\n" +
+		"   fix:  /opt/julieta/bin/julieta-linux-arm64 setup\n" +
+		"\n" +
+		"built-in memory is disabled, use julieta memory add\n"
+	out := s.ok(t, "", "handoff", "show", "--hook")
+	assert.True(t, strings.HasPrefix(out, want), out)
+
+	// A link that leads nowhere is no link.
+	require.NoError(t, os.Symlink(filepath.Join(s.home, "gone"), link))
+	assert.Contains(t, s.ok(t, "", "handoff", "show", "--hook"), "!! julieta is not on PATH")
+	// Without --hook: no alert.
+	assert.NotContains(t, s.ok(t, "", "handoff", "show"), "!! ")
+}
+
 // TestShowHookPrintsSnapshotsDisabled prints the warning
 // snapshots-disabled setup recorded, as every warning of julieta state,
 // and keeps it: a SessionStart clears no warning (REQ-0665).

@@ -485,9 +485,10 @@ func TestKitJulietaClaudeGuard(t *testing.T) {
 
 // TestKitJulietaClaudeMountAbsent holds the wrappers to REQ-0673 when
 // julieta cannot run, as with the .romeu/bin mount absent after an sbx
-// change: each session hook prints one stdout line naming the failure
-// and julieta status and exits 0, and the PreToolUse guard exits 2
-// (REQ-0599).
+// change: each session hook prints on stdout the alert block of
+// REQ-1352, whose fix is the host command that recreates the sandbox
+// named by SANDBOX_NAME, and exits 0, and the PreToolUse guard prints
+// the block on stderr and exits 2 (REQ-0599).
 func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 	w := workload(t)
 	k := startClaudeKit(t, false, guardDocs(t))
@@ -500,7 +501,7 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 		stdout, stderr, code := k.hookRun(s.hookCommand(t, "PreToolUse", "Bash"), "merge.json")
 		assert.Equal(t, 2, code, stderr)
 		assert.Empty(t, stdout)
-		assert.Contains(t, stderr, "julieta hooks guard failed: "+w.Julieta+" could not run, so the tool call is refused")
+		assert.Contains(t, stderr, mountAbsentBlock("the tool call is refused: julieta hooks guard did not run (the guard fails closed)", w.Julieta, "<name>"))
 	})
 	for _, c := range []struct{ event, matcher, what string }{
 		{"SessionStart", "startup", "julieta handoff show --hook"},
@@ -509,10 +510,25 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 		{"SessionStart", "compact", "julieta handoff show --hook"},
 		{"SessionEnd", "", "julieta handoff write --facts"},
 	} {
-		stdout, stderr, code := k.hookRun(s.hookCommand(t, c.event, c.matcher), "recorded.json")
+		cmd := s.hookCommand(t, c.event, c.matcher)
+		stdout, stderr, code := k.hookRun(cmd, "recorded.json")
 		assert.Zero(t, code, "%s %s: %s", c.event, c.matcher, stderr)
-		assert.Equal(t, c.what+" failed: "+w.Julieta+" could not run, the .romeu/bin mount may be absent; run julieta status\n", stdout, c.event)
+		assert.Equal(t, mountAbsentBlock(c.what+" did not run", w.Julieta, "<name>"), stdout, c.event)
+		stdout, _, code = k.hookRun("export SANDBOX_NAME=shop; "+cmd, "recorded.json")
+		assert.Zero(t, code)
+		assert.Equal(t, mountAbsentBlock(c.what+" did not run", w.Julieta, "shop"), stdout, c.event)
 	}
+}
+
+// mountAbsentBlock is the alert block of REQ-1352 a wrapper prints when
+// the julieta at path cannot run (REQ-0673), for the sandbox name.
+func mountAbsentBlock(fault, path, name string) string {
+	return "\n" +
+		"!! julieta cannot run: " + fault + "\n" +
+		"   binary: " + path + "\n" +
+		"   cause:  the .romeu/bin mount is likely absent\n" +
+		"   fix:    on the host, romeu recreate " + name + " (not built yet, T068: until then recreate the sandbox by hand)\n" +
+		"\n"
 }
 
 // TestKitJulietaClaudeHostileArg is the fault test of the arg: a

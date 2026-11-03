@@ -12,8 +12,9 @@ import (
 	"github.com/google/renameio/v2"
 )
 
-// linkPath is the PATH link below $HOME (04 4.3, REQ-0397).
-const linkPath = ".local/bin/julieta"
+// LinkPath is the PATH link below $HOME (04 4.3, REQ-0397), which
+// SessionStart checks too (08 8.2, REQ-1351).
+const LinkPath = ".local/bin/julieta"
 
 // executable finds the running binary; a test replaces it.
 var executable = os.Executable
@@ -26,7 +27,7 @@ var executable = os.Executable
 // path never goes missing. A link that cannot be made leaves the
 // sandbox unusable.
 func linkBinary(_ context.Context, r *run) {
-	path := filepath.Join(r.home, linkPath)
+	path := filepath.Join(r.home, LinkPath)
 	r.report.Link.Path = path
 	target, err := executable()
 	if err != nil {

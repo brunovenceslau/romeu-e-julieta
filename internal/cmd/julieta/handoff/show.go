@@ -6,6 +6,7 @@ package handoff
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -98,6 +99,7 @@ func render(ctx context.Context, repo string, hook bool) (string, error) {
 		if s.Warnings, err = warnings(sb.home); err != nil {
 			return "", err
 		}
+		s.Alerts = linkAlert(sb.home)
 	}
 	return s.Render(), nil
 }
@@ -167,4 +169,25 @@ func warnings(home string) ([]string, error) {
 		out = append(out, "hook failure: the store of hook failures is partly unreadable: "+oneLine(ferr.Error()))
 	}
 	return out, nil
+}
+
+// executable finds the running julieta; a test replaces it.
+var executable = os.Executable
+
+// linkAlert returns the alert block julieta-link-missing (REQ-1351)
+// when the PATH link of setup does not lead to a file, so julieta is
+// not found in the agent's shell, with the setup of the running julieta
+// as its fix; nil when the link leads to one.
+func linkAlert(home string) []string {
+	link := filepath.Join(home, setup.LinkPath)
+	if info, err := os.Stat(link); err == nil && info.Mode().IsRegular() {
+		return nil
+	}
+	fix := "<the absolute path of julieta> setup"
+	if exe, err := executable(); err == nil {
+		fix = esc(exe) + " setup"
+	}
+	return []string{hf.AlertBlock("julieta is not on PATH (julieta-link-missing)",
+		hf.AlertField{Label: "link", Value: esc(link)},
+		hf.AlertField{Label: "fix", Value: fix})}
 }

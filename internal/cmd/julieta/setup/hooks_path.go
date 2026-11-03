@@ -36,7 +36,7 @@ var systemHooksPath = func(ctx context.Context, git *gitsafe.Runner) (string, bo
 // names another directory once cleaned, which setup reports with its
 // fix and does not overwrite.
 func installDispatcher(ctx context.Context, r *run) {
-	if _, err := hooks.Install(r.home, filepath.Join(r.home, linkPath)); err != nil {
+	if _, err := hooks.Install(r.home, filepath.Join(r.home, LinkPath)); err != nil {
 		r.fail("the hook dispatcher: %v", err)
 		return
 	}
