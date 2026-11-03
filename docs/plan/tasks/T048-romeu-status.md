@@ -24,6 +24,8 @@ owns:
   - internal/gitsafe/floor.go
   - tools/ci/internal/schema/status.go
   - schemas/romeu-status.v1.json
+  - schemas/romeu-version.v1.json
+  - tools/ci/internal/schema/version.go
   - .gitattributes
 needs:
   - T043
@@ -95,8 +97,11 @@ error id inside the object, since its row of 04 4.2 has exit 0 alone;
 the macOS version comes from the sysctl `kern.osproductversion`, which
 starts no program, so romeu still runs sbx and git alone (REQ-0296);
 the git version comes from `gitsafe.Runner.Version`, which `CheckFloor`
-shares. The J10 line is T197's, with slice B2: it needs the `createdAt`
-of the newest `snapshot/heads.json` (on main, in
+shares; a sysctl that fails or a macOS version that does not parse is
+`upstream-shape` (RJ-310); the document names its format,
+`romeu-version/v1`, and `schemas/romeu-version.v1.json` is generated
+from `version.Report`. The J10 line is T197's, with slice B2: it needs
+the `createdAt` of the newest `snapshot/heads.json` (on main, in
 `internal/salvage/snapshot.go`) and when `refs/sandboxes/<name>/*` was
 last fetched.
 
@@ -131,10 +136,6 @@ REQ-0327, REQ-0329 and the RJ-359 row in `docs/spec/04-cli.md`, outside
     per repo the `createdAt` of the last `snapshot/heads.json`,
     `disabled`, and the newest facts' dirty and stash counts; the fields
     julieta supplies land with T066.
-  - The J10 step 1 line is a fixture: `absent; generation <G> open;
-    snapshot <T>; refs/sandboxes last fetched <T2>`; for an orphaned
-    repo dir the report lists its unpushed and salvage-only work (J13
-    step 3).
   - `status` reports a live sbx version outside the tested window of 10
     10.3 as the warning `sbx-untested`, naming the version and the
     recorded range; until block A the window is the version the
@@ -148,7 +149,9 @@ REQ-0327, REQ-0329 and the RJ-359 row in `docs/spec/04-cli.md`, outside
     when any read failed, and never 3.
   - `romeu version --json` gains the `versions` object of 04 4.1, read
     from host state and each project's live `render.json`, in its own
-    file `internal/cmd/romeu/version/versions.go`.
+    file `internal/cmd/romeu/version/versions.go`, and its document is
+    validated against the generated `schemas/romeu-version.v1.json`
+    (REQ-0268).
   - The fields that come from julieta land with T066, in a file of its
     own under this package.
   - A romeu built with plain `go build`, which embeds no julieta, runs
