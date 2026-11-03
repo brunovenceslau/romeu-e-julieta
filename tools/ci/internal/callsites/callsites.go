@@ -12,7 +12,8 @@
 //   - in the packages either binary links, each call of the runner
 //     (procgroup.Run) outside a package the table names;
 //   - in the module, exec.Command and exec.CommandContext outside the
-//     function the table names, and the imports and calls that start a
+//     function the table names, syscall.Exec outside the function the
+//     table names (REQ-1336), and the imports and calls that start a
 //     process or map a signal around internal/procgroup (the scan of
 //     procgroup.go).
 //
@@ -80,7 +81,7 @@ func Scan(root, module string, table []Site) ([]check.Finding, error) {
 	}
 	findings := slices.Concat(
 		execFindings(t),
-		siteFindings(t, all, []Kind{KindExec}, table),
+		siteFindings(t, all, []Kind{KindExec, KindSyscallExec}, table),
 		siteFindings(t, both, []Kind{KindRunner}, table),
 		siteFindings(t, romeu, i16Kinds, table),
 	)

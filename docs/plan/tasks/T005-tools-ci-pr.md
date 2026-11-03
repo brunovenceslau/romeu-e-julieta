@@ -61,6 +61,11 @@ approval line is typed by the PR's author, and the index row on the
 signed approval record, move to T182, so 05 does not wait for this
 task to state the checklist of T180.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1131 (12 12.4) now asks the four body sections as level-2 headings;
+the heading check lands early in T194, and this task keeps the rest of
+its list.
+
 - Implements: REQ-0022 (index), REQ-0032 (index), REQ-0122 (02 2.1),
   REQ-0262 (03 3.13), REQ-0476 (05 5.2), REQ-0479 (05 5.2), REQ-0483 (05
   5.2), REQ-0484 (05 5.2), REQ-0497 (05 5.2), REQ-0537 (05 5.3),

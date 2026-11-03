@@ -513,3 +513,51 @@ func TestInitRefusesARootSwappedBeforeItIsOpened(t *testing.T) {
 		})
 	}
 }
+
+// TestInitGh: init records the gh on PATH as tools.gh when its path
+// meets the rule of REQ-1319 (the path form, and the file rule of the
+// credential helper), and goes on with tools.gh unset when there is
+// none, or the one found fails the rule (REQ-1322); the settings are
+// the same otherwise.
+func TestInitGh(t *testing.T) {
+	cases := []struct {
+		name    string
+		arrange func(t *testing.T, m *machine)
+		want    bool // whether the settings hold tools.gh as m.path["gh"]
+	}{
+		{"no gh on PATH", func(*testing.T, *machine) {}, false},
+		{"a gh that meets the rule", func(t *testing.T, m *machine) {
+			t.Helper()
+			m.path["gh"] = m.helperScript(t, 0o755)
+		}, true},
+		{"a gh others can write", func(t *testing.T, m *machine) {
+			t.Helper()
+			m.path["gh"] = m.helperScript(t, 0o777)
+		}, false},
+		{"a gh at a path with a space", func(t *testing.T, m *machine) {
+			t.Helper()
+			dir := filepath.Join(m.bin, "my tools")
+			require.NoError(t, os.MkdirAll(dir, 0o700))
+			p := filepath.Join(dir, "gh")
+			require.NoError(t, os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755))
+			m.path["gh"] = p
+		}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := newMachine(t, projectSpec)
+			c.arrange(t, m)
+
+			code, _, stderr := m.init(t, "--config-url", "https://github.com/owner/cfg")
+
+			require.Equal(t, 0, code, stderr)
+			data, err := os.ReadFile(m.settings())
+			require.NoError(t, err)
+			if !c.want {
+				assert.NotContains(t, string(data), "gh:")
+				return
+			}
+			assert.Contains(t, string(data), "gh: "+m.path["gh"]+"\n")
+		})
+	}
+}

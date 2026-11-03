@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 // Package version is the command romeu version (04 4.2): the version
-// stamp of the binary, and with --json the sha256 of the binary and its
-// GOARCH (04 4.1, Version).
+// stamp of the binary, and with --json the sha256 of the binary, its
+// GOARCH and the versions object (04 4.1, Version).
 package version
 
 import (
@@ -29,8 +29,13 @@ var executable = osExecutable
 // osExecutable is the executable of the process.
 var osExecutable = os.Executable
 
-// report is the --json document of romeu version.
-type report struct {
+// Schema is the value of the schema field of the --json document of
+// romeu version, the format romeu-version.v1 (REQ-0161).
+const Schema = "romeu-version/v1"
+
+// Report is the --json document of romeu version, whose schema,
+// romeu-version.v1, is generated from this type (tools/ci/internal/schema).
+type Report struct {
 	Version  string `json:"version"`
 	Commit   string `json:"commit"`
 	Date     string `json:"date"`
@@ -38,7 +43,16 @@ type report struct {
 	Protocol int    `json:"protocol"`
 	SHA256   string `json:"sha256"`
 	GOARCH   string `json:"goarch"`
+	// Versions are the versions of sbx, git, macOS and each project's
+	// live render (REQ-0286).
+	Versions Versions `json:"versions"`
+	// Schema is "romeu-version/v1".
+	Schema string `json:"schema"`
 }
+
+// versionSeams are the seams the versions object is read through; a
+// test replaces them.
+var versionSeams = hostSeams
 
 var _ = cli.Register(func() cli.Command {
 	c := cli.Define(cli.PreflightNone, cli.LockNone, cli.AppendsNothing(), cli.SnapshotNone, cli.ReadsOnly)
@@ -67,7 +81,11 @@ var _ = cli.Register(func() cli.Command {
 				if err := c.Context().Err(); err != nil {
 					return err
 				}
-				doc := report{Version: v.Version, Commit: v.Commit, Date: v.Date, Go: runtime.Version(), Protocol: v.Protocol, SHA256: sum, GOARCH: runtime.GOARCH}
+				doc := Report{Version: v.Version, Commit: v.Commit, Date: v.Date, Go: runtime.Version(), Protocol: v.Protocol, SHA256: sum, GOARCH: runtime.GOARCH, Schema: Schema}
+				doc.Versions = readVersions(c.Context(), env, versionSeams())
+				if err := c.Context().Err(); err != nil {
+					return err
+				}
 				b, err := json.Marshal(doc, json.Deterministic(true))
 				if err != nil {
 					return err

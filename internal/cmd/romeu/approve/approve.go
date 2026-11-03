@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -132,11 +133,7 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 		_, err := fmt.Fprintf(env.Stdout, "gate 1: the toolchain of this machine is acknowledged already (sbx %s, romeu %s)\n", live.Sbx, live.Romeu.Version)
 		return err
 	}
-	projects, err := appliedEgress(st)
-	if err != nil {
-		return err
-	}
-	text, err := Text(rec, live, projects)
+	text, err := TextOf(st, rec, live)
 	if err != nil {
 		return err
 	}
@@ -152,13 +149,38 @@ func run(cmd *cobra.Command, env *cli.Env) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := st.UpdateToolchain(lk, func(t *state.Toolchain) error {
-		return acknowledge(t, live, env.Now())
-	}); err != nil {
+	if err := Acknowledge(st, lk, live, env.Now()); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(env.Stdout, "acknowledged  %s\n", termsafe.Escape(filepath.Join(stateDir, "toolchain.json")))
 	return err
+}
+
+// TextOf returns what gate 1 prints before its answer for the live
+// toolchain against rec, the record Load read from st (Text), the
+// projects each catalog change affects read from the project records of
+// st; a nil st is a machine with no state directory yet, which holds no
+// record. romeu upgrade's preview prints it (04 4.2, REQ-1348, T196); it
+// reads st and writes nothing.
+func TextOf(st *state.Store, rec *state.Toolchain, live Live) (string, error) {
+	if st == nil {
+		return Text(nil, live, map[string][]string{})
+	}
+	projects, err := appliedEgress(st)
+	if err != nil {
+		return "", err
+	}
+	return Text(rec, live, projects)
+}
+
+// Acknowledge writes live into toolchain.json of st, under the lock lk,
+// acknowledged at now: gate 1's write, which romeu upgrade --finish
+// makes with no second prompt once the operator confirmed the preview
+// (04 4.2, REQ-1330, T196).
+func Acknowledge(st *state.Store, lk *state.Lock, live Live, now time.Time) error {
+	return st.UpdateToolchain(lk, func(t *state.Toolchain) error {
+		return acknowledge(t, live, now)
+	})
 }
 
 // appliedEgress returns, for each project with a record, the domains

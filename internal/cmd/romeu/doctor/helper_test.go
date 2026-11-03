@@ -104,6 +104,9 @@ func newFixture(t *testing.T) *fixture {
 		Config: spec.ConfigRepo{Project: "cfg", URL: "https://github.com/owner/cfg", Ref: "main"},
 		Tools:  spec.Tools{Sbx: f.tool(t, "sbx"), Git: f.tool(t, "git")},
 	}
+	// A gh at the floor of 12 12.1, so gh-floor passes on the well
+	// kept host (T195).
+	f.settings.Tools.Gh = stub(t, f, "gh", "printf 'gh version 2.68.0 (2025-03-11)\\nhttps://github.com/cli/cli/releases/tag/v2.68.0\\n'")
 	return f
 }
 

@@ -21,6 +21,11 @@ the maintainer's environments all on the new tools. The text below is
 the one written before the re-plan; `owns` is written when the task
 reopens.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0909 (10 10.2) gained the ref that started the workflow,
+`refs/heads/main`, checked by `--source-ref`; the entry the guide pages
+show comes from J1's `commands.yaml` (T088).
+
 - Implements: REQ-0719 (08 8.5), REQ-0723 (09 (opening)), REQ-0730 (09
   (opening)), REQ-0909 (10 10.2), REQ-1080 (12 12.2), REQ-1088 (12
   12.2), REQ-1108 (12 12.3), REQ-1184 (12 12.8), REQ-1187 (12 12.8),

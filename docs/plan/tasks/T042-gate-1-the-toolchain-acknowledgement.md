@@ -31,6 +31,12 @@ Goal: Gate 1, `approve --toolchain`.
 Re-plan (2026-10-12): Kept whole: a security invariant is never deferred
 (ADR 0005, rule 1).
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0061 and REQ-0062 (01 1.4) now name the confirmed prompt of `romeu
+upgrade` as gate 1 too, and REQ-0369's table (04 4.2) gained the `gh-
+floor` row; T196 reuses `approve.Changes` and `approve.Text`, T195 adds
+the row.
+
 - Implements: REQ-0055 (01 1.3), REQ-0059 (01 1.4), REQ-0060 (01 1.4),
   REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01 1.4), REQ-0065 (01
   1.4), REQ-0228 (03 3.8), REQ-0272 (04 4.1), REQ-0310 (04 4.2),

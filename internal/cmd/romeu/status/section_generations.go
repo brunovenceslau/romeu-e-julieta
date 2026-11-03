@@ -31,11 +31,8 @@ var _ = register(section{
 				State:     string(g.State),
 				Adopted:   g.Adopted,
 				CreatedAt: g.CreatedAt,
+				ClosedAt:  g.ClosedAt,
 				Salvage:   []Salvage{},
-			}
-			if !g.ClosedAt.IsZero() {
-				closed := g.ClosedAt
-				out.ClosedAt = &closed
 			}
 			for _, s := range g.Salvage {
 				out.Salvage = append(out.Salvage, Salvage{
@@ -57,7 +54,7 @@ var _ = register(section{
 				b.WriteString(" (adopted, not gated)")
 			}
 			fmt.Fprintf(&b, ", created %s", g.CreatedAt.UTC().Format(time.RFC3339))
-			if g.ClosedAt != nil {
+			if !g.ClosedAt.IsZero() {
 				fmt.Fprintf(&b, ", closed %s", g.ClosedAt.UTC().Format(time.RFC3339))
 			}
 			b.WriteString("\n")

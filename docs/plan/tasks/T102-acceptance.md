@@ -25,6 +25,11 @@ before the re-plan; `needs` lists its earlier dependencies with a folded
 id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-1093 and REQ-1096 (12 12.2) now release a tag through `tools/release
+prepare`, the merge of the release pull request and `tools/release tag`
+(T193); the acceptance steps of this task are unchanged.
+
 - Implements: REQ-0002 (index), REQ-0003 (index), REQ-0004 (index),
   REQ-0006 (index), REQ-0007 (index), REQ-0009 (index), REQ-0475 (05
   5.2), REQ-0871 (10 10.2), REQ-0872 (10 10.2), REQ-0873 (10 10.2),

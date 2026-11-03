@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Bruno Venceslau
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The command lines of J9, a kit or workload bump (09, REQ-0730):
+# scenario id to its ordered lines. Its first step, romeu release, is
+# the one line so far.
+J9:
+  - romeu upgrade

@@ -49,6 +49,10 @@ type Tools struct {
 	// /usr/bin:/bin, by name, or an absolute path; hardened git uses
 	// this helper and no other.
 	GitCredentialHelper string `json:"gitCredentialHelper,omitzero" yaml:"gitCredentialHelper,omitempty"`
+	// Gh is the absolute path of gh, which romeu upgrade verifies a
+	// release through and doctor holds to the floor of 12 12.1
+	// (REQ-1319); optional, unset when init found no gh on PATH.
+	Gh string `json:"gh,omitzero" yaml:"gh,omitempty"`
 }
 
 // GitHost is a host a repo URL may name.

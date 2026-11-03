@@ -31,6 +31,11 @@ Re-plan (2026-10-30, decided by the operator): T049 built the
 `secret-argv` row and the schema of `doctor --json`
 (`romeu-doctor.v1`), so neither is this task's any more.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0061 and REQ-0062 (01 1.4) now name the confirmed prompt of `romeu
+upgrade` as gate 1 too; T196 builds it, and the preflight of this task
+is unchanged.
+
 - Implements: REQ-0011 (index), REQ-0020 (index), REQ-0048 (01 1.2),
   REQ-0056 (01 1.3), REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01
   1.4), REQ-0065 (01 1.4), REQ-0141 (02 2.3), REQ-0145 (02 2.3),

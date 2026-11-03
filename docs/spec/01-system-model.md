@@ -98,15 +98,17 @@ changes; romeu gates only what sbx cannot see.
 
 `REQ-0060` Record `toolchain.json` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)):
 the sbx version, romeu's version and sha256, the embedded julieta's
-version, protocol and sha256, and the acknowledged catalog itself. `REQ-0061` Approved once per change with `romeu approve --toolchain`, which
-prints, before the prompt, the julieta version change, the catalog diff
+version, protocol and sha256, and the acknowledged catalog itself. `REQ-0061` Approved once per change with `romeu approve --toolchain`, or
+with the confirmed prompt of `romeu upgrade`, which shows the same after
+the changelog sections since the running version (04 4.2, amended on
+2026-10-31); either prints, before the prompt, the julieta version change, the catalog diff
 (domains added or removed per `backend:tool`, upload flags changed) with
 the projects each change affects, the live sbx version beside the
 newest recorded one, and `downgrade` beside any version lower than the
 recorded one. `REQ-0062` Every command that invokes sbx compares the live
 `sbx version`, its own version and sha256 and its embedded catalog
 digest to the record and exits 3 on a mismatch, except
-`romeu approve --toolchain`, which is gate 1 itself, `romeu status` and
+`romeu approve --toolchain` and `romeu upgrade`, which are gate 1 itself, `romeu status` and
 `romeu doctor`, which report the mismatch, and the protective commands
 of 1.5, which print it and go on
 ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)). This

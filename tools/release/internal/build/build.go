@@ -149,12 +149,7 @@ func build(ctx context.Context, o Options, key func(root string) string) (Result
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 
-	b := builder{o: o, stage: stage, key: key(o.Root), ldflags: strings.Join([]string{
-		"-buildid=",
-		"-X main.version=" + o.Version,
-		"-X main.commit=" + commit,
-		"-X main.date=" + when.Format(time.RFC3339),
-	}, " ")}
+	b := builder{o: o, stage: stage, key: key(o.Root), ldflags: releaseLDFlags(o.Version, commit, when)}
 	archives := map[string][]byte{}
 	var names []string
 	res.Embedded = true
@@ -180,6 +175,19 @@ func build(ctx context.Context, o Options, key func(root string) string) (Result
 	}
 	res.Checksums = filepath.Join(out, ChecksumsName)
 	return res, nil
+}
+
+// releaseLDFlags returns the -ldflags of the romeu binary of a release:
+// the version stamp of main and nothing else. romeu upgrade has test
+// seams of the same form (its API host, asset host and root certificate,
+// 10 10.4), which a release never sets; TestReleaseLDFlags holds it.
+func releaseLDFlags(version, commit string, when time.Time) string {
+	return strings.Join([]string{
+		"-buildid=",
+		"-X main.version=" + version,
+		"-X main.commit=" + commit,
+		"-X main.date=" + when.Format(time.RFC3339),
+	}, " ")
 }
 
 // checkOut refuses an Out that holds anything. It must be absent or an

@@ -19,6 +19,11 @@ pr: 16
 Merged on 2026-10-08 in pull request #16. The text below is the one
 written before the re-plan.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0914 (10 10.2) now says releases come from `main` by the
+`workflow_dispatch` start of REQ-0899, which T088 builds; REQ-1051 and
+REQ-1062 (12 12.1) gained git-cliff, which T192 pins.
+
 - Implements: REQ-0007 (index), REQ-0014 (index), REQ-0016 (index),
   REQ-0021 (index), REQ-0022 (index), REQ-0263 (03 3.13), REQ-0264 (03
   3.13), REQ-0265 (03 3.13), REQ-0266 (03 3.13), REQ-0542 (05 5.3),

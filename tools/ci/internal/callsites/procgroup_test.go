@@ -245,7 +245,6 @@ func TestCallsitesProcgroupFixture(t *testing.T) {
 		"internal/fixture/start.go: calls golang.org/x/sys/unix.Exec outside internal/procgroup",
 		"internal/fixture/start.go: calls os.StartProcess outside internal/procgroup",
 		"internal/fixture/start.go: calls os.StartProcess outside internal/procgroup",
-		"internal/fixture/start.go: calls syscall.Exec outside internal/procgroup",
 		"internal/fixture/start.go: calls syscall.ForkExec outside internal/procgroup",
 		"internal/fixture/tools.go: imports example.com/fixture/tools outside tools/, whose packages start programs past this package",
 		"internal/fixture/tools.go: imports example.com/fixture/tools/ci/git outside tools/, whose packages start programs past this package",

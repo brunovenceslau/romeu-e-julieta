@@ -59,3 +59,5 @@ with the maintainer's approval; a reversal is a new record that supersedes it. T
 | 41 | [Readers of formats between binaries ignore unknown members](0041-readers-of-formats-between-binaries-ignore-unknown-members.md) | Proposed |
 | 42 | [A handoff is a memory entry of the project's shared directory](0042-a-handoff-is-a-memory-entry-of-the-project-s-shared-directory.md) | Proposed |
 | 43 | [Keep the durable copy of memory in a private git repository per project](0043-keep-the-durable-copy-of-memory-in-a-private-git-repository-per-project.md) | Proposed |
+| 44 | [Generate a changelog file with git-cliff and make each section the release body](0044-generate-a-changelog-file-with-git-cliff-and-make-each-section-the-release-body.md) | Proposed |
+| 45 | [Release from main by workflow_dispatch and upgrade romeu by one command that verifies through gh](0045-release-from-main-by-workflow-dispatch-and-upgrade-romeu-by-one-command-that-verifies-through-gh.md) | Proposed |

@@ -6,6 +6,7 @@
 package sync
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -183,6 +184,98 @@ func TestFetchConfig(t *testing.T) {
 			assert.NotNil(t, r.git)
 			assert.Equal(t, [][]string{{"https://github.com/owner/cfg", "+refs/heads/*:refs/romeu/origin/cfg/*"}}, c.fetched)
 			assert.Equal(t, f.head, gitIn(t, c.clone, "rev-parse", "refs/romeu/origin/cfg/main"))
+		})
+	}
+}
+
+// TestConfigMarker: step 2 finds the config repo's clone by the marker
+// <cfg>-env/.romeu-config (02 2.3), with two clones there; a marker
+// that is malformed, a link, or names no clone is exit 2 (config-marker);
+// with no marker and one clone the guess of before stands and warns
+// config-marker-missing.
+func TestConfigMarker(t *testing.T) {
+	const slug = "config-marker"
+	tests := []struct {
+		name string
+		// marker is the content of the marker; "" writes none. link
+		// makes the marker a symbolic link to a file of that content.
+		marker string
+		link   bool
+		// other adds a second clone dir under <cfg>-env/.
+		other bool
+		// linkedDir adds a clone dir of that name under <cfg>-env/, with
+		// a .git; viaLink makes it a symbolic link to such a dir outside.
+		linkedDir string
+		viaLink   bool
+		want      string // the dir found; "" when step 2 refuses with slug
+		warn      string
+	}{
+		{name: "the marker names the clone among two", marker: "cfg\n", other: true, want: "cfg"},
+		{name: "no marker and one clone warns", want: "cfg", warn: "config-marker-missing"},
+		{name: "no newline", marker: "cfg"},
+		{name: "a parent path", marker: "../cfg\n"},
+		{name: "a path", marker: "x/cfg\n"},
+		{name: "a reserved name", marker: ".romeu\n"},
+		{name: "two lines", marker: "cfg\nother\n"},
+		{name: "a dir that is not there", marker: "other\n"},
+		{name: "a dir without a .git", marker: "plain\n"},
+		{name: "a link", marker: "cfg\n", link: true},
+		{name: "over the limit", marker: strings.Repeat("c", markerLimit) + "\n"},
+		{name: "a name of 63 bytes is held to the pattern, not the size", marker: strings.Repeat("c", 63) + "\n", linkedDir: strings.Repeat("c", 63), want: strings.Repeat("c", 63)},
+		{name: "a name of 64 bytes", marker: strings.Repeat("c", 64) + "\n"},
+		{name: "a clone dir that is a link", marker: "linked\n", linkedDir: "linked", viaLink: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newConfig(t, map[string]string{"projects/cfg.yaml": "first"})
+			env := filepath.Join(c.root, "cfg-env")
+			require.NoError(t, os.MkdirAll(filepath.Join(env, "plain"), 0o700))
+			if tt.other {
+				require.NoError(t, os.MkdirAll(filepath.Join(env, "other", ".git"), 0o700))
+			}
+			if tt.linkedDir != "" {
+				target := filepath.Join(env, tt.linkedDir)
+				if tt.viaLink {
+					target = filepath.Join(c.home, "elsewhere")
+				}
+				require.NoError(t, os.MkdirAll(target, 0o700))
+				gitIn(t, target, "init", "-q", "-b", "main")
+				if tt.viaLink {
+					require.NoError(t, os.Symlink(target, filepath.Join(env, tt.linkedDir)))
+				}
+			}
+			marker := filepath.Join(env, markerName)
+			switch {
+			case tt.link:
+				target := filepath.Join(c.home, "marker")
+				require.NoError(t, os.WriteFile(target, []byte(tt.marker), 0o600))
+				require.NoError(t, os.Symlink(target, marker))
+			case tt.marker != "":
+				require.NoError(t, os.WriteFile(marker, []byte(tt.marker), 0o600))
+			}
+			r := c.run(flags{from: fromOrigin})
+
+			err := fetchConfig(t.Context(), r)
+
+			if tt.want == "" {
+				require.Error(t, err)
+				assert.Equal(t, 2, cli.ExitCode(err))
+				assert.Contains(t, err.Error(), slug+": ")
+				assert.Empty(t, c.fetched, "nothing is fetched before the clone is found")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, filepath.Join(env, tt.want), r.configClone)
+			var out bytes.Buffer
+			for _, w := range r.warnings {
+				w(cli.NewWriter(&out))
+			}
+			if tt.warn == "" {
+				assert.Empty(t, out.String())
+				return
+			}
+			assert.Contains(t, out.String(), "warning "+tt.warn+": "+env+" has no "+markerName)
+			assert.Contains(t, out.String(), "write cfg as the only line of "+marker)
 		})
 	}
 }

@@ -35,6 +35,7 @@ Its JSON Schema is [schemas/host-settings.v1.json](../../schemas/host-settings.v
 | `tools.sbx` | string | yes | Sbx is the absolute path of sbx. |
 | `tools.git` | string | yes | Git is the absolute path of git. |
 | `tools.gitCredentialHelper` | string | no | GitCredentialHelper is the git-credential-\<name> helper on /usr/bin:/bin, by name, or an absolute path; hardened git uses this helper and no other. |
+| `tools.gh` | string | no | Gh is the absolute path of gh, which romeu upgrade verifies a release through and doctor holds to the floor of 12 12.1 (REQ-1319); optional, unset when init found no gh on PATH. |
 | `gitHosts` | list of object | no | GitHosts are the hosts a repo URL may name. |
 | `gitHosts[].host` | string | yes | Host is the host name. |
 | `gitHosts[].caFile` | string | no | CAFile is the absolute path of a CA bundle for a private host. |
@@ -56,6 +57,7 @@ Its JSON Schema is [schemas/host-settings.v1.json](../../schemas/host-settings.v
 | `tools.sbx` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `tools.git` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `tools.gitCredentialHelper` | matches `^(?:[a-z0-9][a-z0-9-]{0,62}\|/[A-Za-z0-9._/+-]+)$`; a git-credential-\<name> helper's name, or an absolute, clean path with no space or shell character, since git runs it through sh | is neither a helper name nor a plain absolute path | invalid document, exit 2 | romeu only | REQ-1267 |
+| `tools.gh` | matches `^/[A-Za-z0-9._/+-]+$`; an absolute, clean path of letters, digits and ._/+-, naming the gh romeu upgrade verifies a release through; optional | is not an absolute, clean path of letters, digits and ._/+- | invalid document, exit 2 | romeu only | REQ-1319 |
 | `gitHosts[].host` | a lowercase host name, IDNA A-labels, no port or IP literal, no label of 0x and hex digits; a private suffix such as git.corp.internal is valid, unlike an egress domain | is not a host name | invalid document, exit 2 | romeu only | REQ-1268 |
 | `gitHosts[].caFile` | matches `^/.*$`; an absolute, clean path | is not an absolute, clean path | invalid document, exit 2 | romeu only | 03 3.4 |
 | `workloadRepositories[]` | matches `^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]\|__\|-+)[a-z0-9]+)*)+$` | is not \<registry>/\<repository> | invalid document, exit 2 | romeu only | REQ-0190 |

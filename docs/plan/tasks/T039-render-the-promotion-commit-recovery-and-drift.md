@@ -35,6 +35,12 @@ injection and the call-site check.
 
 Re-plan (2026-10-12): Kept as written before the re-plan.
 
+Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
+REQ-0499, REQ-0500 (05 5.2) and REQ-1060 (12 12.1) now admit the swap of
+the running binary in `upgrade`, the `gh` and preview steps of
+`upgrade`, the `gh-floor` row of `doctor` and `syscall.Exec` in the swap
+step; T195 and T196 add those rows to the call-site table.
+
 - Implements: REQ-0029 (index), REQ-0047 (01 1.2), REQ-0081 (01 1.6),
   REQ-0082 (01 1.6), REQ-0084 (01 1.6), REQ-0085 (01 1.6), REQ-0086 (01
   1.6), REQ-0087 (01 1.6), REQ-0226 (03 3.7), REQ-0256 (03 3.12),

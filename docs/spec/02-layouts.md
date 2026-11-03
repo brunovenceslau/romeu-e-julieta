@@ -9,6 +9,7 @@ and julieta's setup. Type: reference.
 romeu-e-julieta/
 ├─ go.mod                      module github.com/<owner>/romeu-e-julieta
 ├─ VERSION                     the next release, `<major>.<minor>.<patch>` and a newline; the `$schema` hints under examples/ and tools/release read it
+├─ CHANGELOG.md, changelog.go  the generated changelog (12 12.6) and the one root package, which embeds it for `romeu upgrade`
 ├─ mise.toml, mise.lock        dev tools for this repo (go, golangci-lint, ...); lock for linux-x64, linux-arm64, macos-x64, macos-arm64
 ├─ ARCHITECTURE.md             one page: components, trust boundaries, the state machines
 ├─ CONTRIBUTING.md             dev loop; how to add a command, invariant, probe or kit via tools/new
@@ -184,7 +185,10 @@ which files are generated is the inventory of
 each embedded input sits beside the package that embeds it. `REQ-0129` `romeu`
 embeds the catalog (`internal/catalog/egress/*.yaml`, from
 `internal/catalog`), the product kit directories through `kits/embed.go`
-(package `kits`, one `embed.FS`, `pins.yaml` excluded) and, at release
+(package `kits`, one `embed.FS`, `pins.yaml` excluded), `CHANGELOG.md`
+through `changelog.go` at the root of the repository, the one package
+there, since the file is read at the root by people and by git-cliff
+(12 12.6; added on 2026-11-01) and, at release
 time, the `julieta` linux binary of romeu's own `GOARCH`, which
 `tools/release build` maps onto the empty placeholder
 `internal/embedded/julieta` with a `go build` overlay, writing nothing
@@ -252,6 +256,7 @@ $ROMEU_ROOT/                            default $HOME/Developer; never a VS Code
 ├─ .attic/<name>/<UTC-ts>/              retired projects (moved, never deleted by romeu); .attic/ is mode 0700
 └─ <name>-env/                          one per project; <name> = sandbox name; mode 0700
    ├─ .metadata_never_index             written by sync, outside every mount; keeps Spotlight from parsing agent-written files (probe A17)
+   ├─ .romeu-config                      the config project's env only: one line, the dir of the config repo's clone; written by init, mode 0600, outside the clone; sync step 2 finds the clone by it (decided on 2026-10-29)
    ├─ sbxenv.yaml                       derived, never hand-edited; the promotion commit point
    ├─ .romeu/
    │  ├─ render.json                    derived: spec source, SHAs, file digests, egress, digests, promotion marker
@@ -343,6 +348,7 @@ $XDG_CONFIG_HOME/romeu/settings.yaml    (default $HOME/.config/romeu/settings.ya
 $XDG_STATE_HOME/romeu/                  (default $HOME/.local/state/romeu/), mode 0700
 ├─ romeu.lock                           flock: one mutating romeu at a time
 ├─ toolchain.json                       gate 1 record, including the acknowledged catalog
+├─ upgrade-finish                       one-shot token of the swap of romeu upgrade for its --finish (04 4.2, REQ-1330)
 ├─ projects/<name>.json                 one record per project: approval, generations, applied egress
 ├─ descriptors/<digest>.json            content-addressed cache of parsed workload and kit descriptors
 └─ attic/<name>/<UTC-ts>/               records of retired projects
