@@ -253,6 +253,11 @@ func TestSpecValidateCatalogSlugsAndExits(t *testing.T) {
 			wantExit: 1, wantErrID: "RJ-360",
 		},
 		{
+			name:     "fetch-failed by a URL the host's git config rewrote to one gitsafe refuses",
+			fetch:    answer("", fmt.Errorf("%w: %w: %q rewrites to it", gitsafe.ErrRewritten, gitsafe.ErrRefused, "https://github.com/example/shop-api")),
+			wantExit: 1, wantErrID: "RJ-360",
+		},
+		{
 			name:     "fetch-failed by an origin with no default branch",
 			fetch:    answer("", fmt.Errorf("%w: %q", gitsafe.ErrNoDefaultBranch, "https://github.com/example/shop-api")),
 			wantExit: 1, wantErrID: "RJ-360",

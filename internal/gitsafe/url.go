@@ -68,10 +68,10 @@ func (r *Runner) resolveURL(ctx context.Context, dir, raw string) (string, error
 	}
 	resolved := strings.TrimSuffix(out, "\n")
 	if err := CheckURL(resolved); err != nil {
-		return "", fmt.Errorf("%w: %q rewrites to it", err, raw)
+		return "", fmt.Errorf("%w: %w: %q rewrites to it", ErrRewritten, err, raw)
 	}
 	if isLoopbackDaemon(resolved) && !isLoopbackDaemon(raw) {
-		return "", fmt.Errorf("%w: %q rewrites to the loopback daemon %q", ErrRefused, raw, resolved)
+		return "", fmt.Errorf("%w: %w: %q rewrites to the loopback daemon %q", ErrRewritten, ErrRefused, raw, resolved)
 	}
 	return resolved, nil
 }

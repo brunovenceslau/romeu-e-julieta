@@ -187,6 +187,12 @@ var ErrConfig = errors.New("gitsafe: invalid config")
 // that gitsafe refuses before git runs.
 var ErrRefused = errors.New("gitsafe: refused")
 
+// ErrRewritten is the error of a URL that a url.<base>.insteadOf of
+// git's config rewrote to one gitsafe refuses: the URL as given passed
+// CheckURL, so the cause is the config of the machine, not the URL. It
+// always comes with ErrRefused.
+var ErrRewritten = errors.New("gitsafe: rewritten by git's config")
+
 // hostPattern is a host name or IPv4 address with an optional port.
 var hostPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$`)
 

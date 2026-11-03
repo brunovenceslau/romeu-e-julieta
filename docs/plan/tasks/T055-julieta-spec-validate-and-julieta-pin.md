@@ -146,9 +146,15 @@ cap, a URL or ref it will not use), is the finding `lock-unparsed`,
 exit 6, as the exit-code cell of 04 4.3 says; a git failure, a
 deadline, a redirect (`gitsafe.ErrMoved`), an origin with no default
 branch (`gitsafe.ErrNoDefaultBranch`, which is not a refusal) and a
-missing ref stay `fetch-failed`, `RJ-360`, exit 1. The test
-`TestSpecValidateCatalogSlugsAndExits` pins each outcome's slug to its
-exit.
+missing ref stay `fetch-failed`, `RJ-360`, exit 1. Decided on
+2026-11-03, scope this repository: a URL that a `url.<base>.insteadOf`
+of the machine's git config rewrites to one gitsafe refuses is
+`fetch-failed` too, since the cause is the machine and not the repo;
+gitsafe marks it with the sentinel `ErrRewritten`, which always comes
+with `ErrRefused` (`internal/gitsafe/gitsafe.go`, `url.go` and
+`url_test.go`, outside `owns`, the one edit the decision forced). The
+test `TestSpecValidateCatalogSlugsAndExits` pins each outcome's slug to
+its exit.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03

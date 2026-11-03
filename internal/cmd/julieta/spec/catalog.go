@@ -76,7 +76,10 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 		data, found, err := fetch(repoCtx, r.URL, r.Ref)
 		repoErr := repoCtx.Err()
 		cancel()
-		if errors.Is(err, gitsafe.ErrRefused) {
+		// A URL that git's config of this machine rewrote to one gitsafe
+		// refuses is the machine's, not the repo's: fetch-failed (decided
+		// on 2026-11-03).
+		if errors.Is(err, gitsafe.ErrRefused) && !errors.Is(err, gitsafe.ErrRewritten) {
 			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
 				message: fmt.Sprintf("gitsafe refused to read the mise.lock of %s at %s: %v", r.URL, refName(r.Ref), err)})
 			continue
