@@ -183,9 +183,10 @@ func TestTipFileNoDefaultBranch(t *testing.T) {
 }
 
 // TestTipFileFlags: the ls-remote and the fetch of TipFile run with its
-// own hardening, as host mode's every call does (05 5.1): no redirect
-// followed, no automatic gc or maintenance, every object checked; the
-// other calls of sandbox mode do not get them.
+// own hardening (05 5.1): no redirect followed, no automatic gc or
+// maintenance, every object checked, as host mode's every call does,
+// and no bundle URI fetched and a minimum transfer speed; the other
+// calls of sandbox mode do not get them.
 func TestTipFileFlags(t *testing.T) {
 	r := newRunner(t, Sandbox)
 	var rec recorder
