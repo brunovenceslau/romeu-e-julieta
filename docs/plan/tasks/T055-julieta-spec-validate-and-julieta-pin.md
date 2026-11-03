@@ -15,6 +15,13 @@ owns:
   - examples/.github/workflows/validate.yml
   - internal/cmd/romeu/sync/step10_report.go
   - internal/cmd/romeu/sync/step10_report_test.go
+  - docs/spec/04-cli.md
+  - schemas/julieta-spec.v1.json
+  - tools/ci/internal/schema/julieta.go
+  - .gitattributes
+  - internal/gitsafe/fetch_tip.go
+  - internal/gitsafe/fetch_tip_test.go
+  - docs/spec/05-security.md
 needs:
   - T021
   - T032
@@ -22,8 +29,14 @@ needs:
   - T036
   - T051
   - T043
-after: []
-ask_first: []
+after:
+  - T048
+ask_first:
+  - checks
+  - contracts
+  - formats
+  - gitsafe
+  - spec
 sitting: none
 ---
 
@@ -53,6 +66,89 @@ the pin of `validate.yml` whose format and reader this task defines;
 it owns `step10_report.go` of `sync` and its test for it, and T043
 moves from `after` to `needs`. Decided by the operator on 2026-10-30,
 scope this repository.
+
+Re-plan (2026-10-30): built in three slices, decided by the operator
+on 2026-10-30, scope this repository. Slice A is `julieta spec
+validate`: the first acceptance line, with `--json`
+(`internal/cmd/julieta/spec/`, `import_spec.go`,
+`e2e/julieta_spec_test.go`). Slice B is `julieta pin workload` and
+`pin check` for spec workloads; it needs a tag-to-digest read through
+the guarded client of `internal/oci`, outside this file set. Slice C
+is `pin check --workflows`, `examples/.github/workflows/validate.yml`,
+the warning `julieta-pin-mismatch` of `romeu sync` and the J2 step; it
+needs a rule of `tools/ci schema` for a workflow under `examples/`
+(`checks`), a world of `e2e/internal/romeu` whose `Run` accepts a
+julieta line, with one line each in `e2e/scenarios/j2/commands.yaml`,
+`j2.go` and `j2_test.go`, and the reader of `validate.yml`. That reader
+goes in a new package, `internal/pin`, linked by both binaries, which
+needs a row in the import table of 10 10.7 and in
+`tools/ci/internal/imports/rows.go` (`checks`); slice C builds it.
+Decided for slice A, the same day:
+- A file under `projects/` that is not `*.yaml` is found by reading
+  the directory of each file given in `projects/`, since the glob of
+  the config repo's CI never names one, and the summary says
+  `spec validate <n> files (<k> from projects/)` when it added some.
+- The manifest of the size check is built from the spec alone with
+  stand-ins, the root `/` among them, a lower bound that sync measures
+  again.
+- `--catalog` reads each lock with a shallow fetch, the one commit at
+  the tip of the ref, through the new `TipFile` of gitsafe
+  (`internal/gitsafe/fetch_tip.go`, `gitsafe`), decided by the
+  operator on 2026-10-30 in place of a full clone; what gitsafe refuses
+  of the origin's content is the finding `lock-unparsed`, and a failed
+  fetch, a missing ref or an origin with no default branch is
+  `fetch-failed`. Deferred (2026-10-30, scope this repository): depth 1
+  bounds the commits fetched, not the bytes of the tip's tree;
+  `--filter=blob:limit=<cap>`, which works with `GIT_NO_LAZY_FETCH`,
+  is the change, reopened when a tip tree is too large for the config
+  repo's CI. From the security review of the same day, `TipFile`'s
+  ls-remote and fetch follow no redirect and run no automatic gc or
+  maintenance and check every object, the tip is peeled to its commit,
+  and each repo's read and the whole `--catalog` run have a deadline,
+  the limits of the classes `julieta-git` and `julieta-setup` of
+  `internal/procgroup`, since no section names one; 04 4.3 names them
+  in the command's row, and 05 5.1 states `TipFile`'s exception to the
+  sandbox's own `http.*`.
+- An origin `--catalog` cannot read is the new error `fetch-failed`
+  (`RJ-360`, exit 1, a row of 04 4.4 declared in the command's
+  `errors.go`); a lock host the catalog does not produce is the new
+  warning `lock-host-gated` of 04 4.1; a lock that does not parse, or
+  that gitsafe refuses, is the finding `lock-unparsed`, exit 6, now in
+  the command's exit-code cell of 04 4.3.
+- `--json` prints the format `julieta-spec.v1`, whose schema is
+  registered in `tools/ci/internal/schema/julieta.go`: the files judged,
+  the findings, each `{field, file, message, rule}`, `field` the place
+  inside the file and empty for a finding of the whole file, the rules not checked and the warnings, each text escaped
+  (I29); under `--json` stderr holds nothing but an error.
+- A lock artifact URL with no host julieta can read is the warning
+  `lock-host-gated` too, and a pass of `--catalog` is no gate on lock
+  hosts, which sync gates; the config repo's CI runs it for trusted
+  authors only, or under restricted egress (from the security review
+  of 2026-10-30).
+This task now owns `docs/spec/04-cli.md`, which T185, T188 and T189
+own too; T055 was on the critical path, so it came first: the branch
+added T055 to the `after` of T185, and T188 and T189, which come after
+T185, followed it through that edge. T185 merged on 2026-11-01 (#366)
+before this task did, and the front matter of a merged task is not
+edited, so the edge on T185 is dropped.
+It ordered T055 against T185, T188 and T189, which the plan check
+(rule 1 of `docs/plan.md`) still requires for `docs/spec/04-cli.md`:
+T188, which is not merged, takes T055 in its `after`, and T189 follows
+it through T188. T055 takes T048 in its `after` for `.gitattributes`,
+which both own; T048's last slice, D2, merged in #372, and #373 marks
+the task merged. The merge of `main` into this
+branch (2026-11-03) resolved the two conflicts in
+`docs/spec/04-cli.md` and `docs/reference/exit-codes.md` by hand.
+Decided on 2026-11-02, scope this repository: the spec wins on what
+`lock-unparsed` is. Any refusal by gitsafe of the lock, an error that
+wraps `gitsafe.ErrRefused` (a file that is no regular file within the
+cap, a URL or ref it will not use), is the finding `lock-unparsed`,
+exit 6, as the exit-code cell of 04 4.3 says; a git failure, a
+deadline, a redirect (`gitsafe.ErrMoved`), an origin with no default
+branch (`gitsafe.ErrNoDefaultBranch`, which is not a refusal) and a
+missing ref stay `fetch-failed`, `RJ-360`, exit 1. The test
+`TestSpecValidateCatalogSlugsAndExits` pins each outcome's slug to its
+exit.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03

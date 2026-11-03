@@ -138,7 +138,14 @@ the gitHosts allowlist did not see.
   which the sandbox may need to reach origin: the agent can write
   them, and julieta runs at the agent's trust, so a program they name
   gains the agent nothing. CheckURL still admits only `https://` and
-  `git://127.0.0.1` URLs.
+  `git://127.0.0.1` URLs. One sandbox call is the exception: the
+  shallow read of `julieta spec validate --catalog` (gitsafe's
+  `TipFile`) runs its `ls-remote` and fetch with
+  `http.followRedirects=false`, `gc.auto=0`, `maintenance.auto=false`
+  and `transfer.fsckObjects=true`, as host mode does, since it fetches
+  from origins a config repo's CI may not trust into a throwaway
+  repository, where no agent needs a redirect or a gc (decided on
+  2026-10-30).
 - `REQ-0464` Credentials: when `tools.gitCredentialHelper` is set, only
   `-c credential.https://<host>.helper=<host settings value>` after the
   empty `credential.helper`, `<host>` being the host of `config.url`, so

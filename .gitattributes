@@ -42,6 +42,8 @@ docs/reference/julieta/memory/show.md -text
 docs/reference/julieta/salvage.md -text
 docs/reference/julieta/setup.md -text
 docs/reference/julieta/snapshot.md -text
+docs/reference/julieta/spec.md -text
+docs/reference/julieta/spec/validate.md -text
 docs/reference/julieta/status.md -text
 docs/reference/julieta/version.md -text
 docs/reference/manifest.md -text
@@ -68,6 +70,7 @@ schemas/julieta-handoff.v1.json -text
 schemas/julieta-memory.v1.json -text
 schemas/julieta-salvage.v1.json -text
 schemas/julieta-setup.v1.json -text
+schemas/julieta-spec.v1.json -text
 schemas/julieta-status.v1.json -text
 schemas/manifest.v1.json -text
 schemas/memory-entry.v1.json -text
