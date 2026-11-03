@@ -53,7 +53,8 @@ var tipFlags = []setting{
 // work is an empty directory the caller made and removes: the bare
 // repository is made in it, so nothing is left once the caller removes
 // it. The URL passes the rules of a fetch (CheckURL, and the same check
-// of what the config rewrites it to), the refspec writes refs/remotes/
+// of what the config rewrites it to, whose refusal also wraps
+// ErrRewritten), the refspec writes refs/remotes/
 // only (I5), and the file is read as CommitFile reads it, under limit:
 // a file that is a symbolic link, a gitlink, a directory or over limit
 // is refused, ErrRefused and ErrFileRefused. The tip is peeled to its
