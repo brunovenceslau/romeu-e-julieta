@@ -145,7 +145,10 @@ the gitHosts allowlist did not see.
   and `transfer.fsckObjects=true`, as host mode does, since it fetches
   from origins a config repo's CI may not trust into a throwaway
   repository, where no agent needs a redirect or a gc (decided on
-  2026-10-30).
+  2026-10-30); and with `transfer.bundleURI=false`, so no bundle URI an
+  origin advertises is fetched, and `http.lowSpeedLimit=1024` for
+  `http.lowSpeedTime=60`, so a transfer slower than 1 KiB/s for 60 s
+  ends before the read's deadline (decided on 2026-11-03).
 - `REQ-0464` Credentials: when `tools.gitCredentialHelper` is set, only
   `-c credential.https://<host>.helper=<host settings value>` after the
   empty `credential.helper`, `<host>` being the host of `config.url`, so
