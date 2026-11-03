@@ -75,11 +75,14 @@ func newSandbox(t *testing.T) *sandbox {
 		},
 	}
 	t.Setenv("HOME", s.home)
-	// The PATH link setup makes, so the hook prints no alert; a test of
-	// the alert removes it.
-	link := filepath.Join(s.home, setup.LinkPath)
-	require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o700))
-	require.NoError(t, os.WriteFile(link, nil, 0o700))
+	// julieta on PATH as setup links it, to the running binary, so the
+	// hook prints no alert; a test of the alert changes it.
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	bin := filepath.Join(s.home, ".local", "bin")
+	require.NoError(t, os.MkdirAll(bin, 0o700))
+	require.NoError(t, os.Symlink(exe, filepath.Join(bin, "julieta")))
+	t.Setenv("PATH", bin)
 	v, err := manifest.EncodeEnv(s.m)
 	require.NoError(t, err)
 	t.Setenv(setup.ManifestEnv, v)

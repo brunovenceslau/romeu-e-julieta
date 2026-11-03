@@ -41,6 +41,9 @@ const (
 	// dropInName is the name of the drop-in the kit installs its
 	// settings file as, in managed-settings.d.
 	dropInName = "50-julieta-claude.json"
+	// LauncherPath is the launcher the kit installs, which runs julieta
+	// by the path julietaBin (06 6.4, REQ-1353).
+	LauncherPath = "/usr/local/bin/julieta"
 	// SkillsDir is the agent's skills directory, relative to $HOME.
 	SkillsDir = ".claude/skills"
 )
@@ -67,8 +70,9 @@ type Command struct {
 // absent), prints the alert block of REQ-1352 with the host command
 // that brings the mount back (REQ-0673) and exits 0 for a session hook,
 // and prints it on stderr and exits 2 for the PreToolUse guard, which
-// fails closed. A status of 126 or more is the shell's for a program it
-// could not run.
+// fails closed. A status of 126 or 127 is the shell's for a program it
+// could not run; a julieta that ran and failed or was killed prints no
+// block.
 func Commands(julieta string) ([]Command, error) {
 	q, err := shquote.Quote(julieta)
 	if err != nil {
@@ -76,7 +80,7 @@ func Commands(julieta string) ([]Command, error) {
 	}
 	session := func(args, what string) (string, error) {
 		block, err := cannotRun(what+" did not run", julieta)
-		return q + " " + args + " || [ $? -lt 126 ] || " + block + "; exit 0", err
+		return q + " " + args + " || case $? in 126|127) " + block + ";; esac; exit 0", err
 	}
 	start, err := session("handoff show --hook", "julieta handoff show --hook")
 	if err != nil {
@@ -96,16 +100,17 @@ func Commands(julieta string) ([]Command, error) {
 	}
 	return append(cmds,
 		Command{Event: SessionEnd, Command: end},
-		Command{Event: PreToolUse, Matcher: "Bash", Command: q + " hooks guard || { [ $? -eq 2 ] || " + guard + " >&2; exit 2; }"},
+		Command{Event: PreToolUse, Matcher: "Bash", Command: q + " hooks guard || { case $? in 126|127) " + guard + " >&2;; esac; exit 2; }"},
 	), nil
 }
 
 // recreateFix is the fix line of the alert block of a julieta that
-// cannot run (REQ-0673). It is the one line the shell expands, so it
-// names the sandbox sbx runs in; it holds no other $, quote, backslash
-// or backquote. The text after the command goes when romeu recreate is
+// cannot run (REQ-0673). It is the one argument the shell expands: the
+// name of the sandbox sbx runs in, every character outside A-Za-z0-9._-
+// removed, so the value cannot add a line or a terminal sequence
+// (REQ-1352). The text after the command goes when romeu recreate is
 // built (T068).
-const recreateFix = "   fix:    on the host, romeu recreate ${SANDBOX_NAME:-<name>}" +
+const recreateFix = `   fix:    on the host, romeu recreate $(printf %s "${SANDBOX_NAME:-}" | tr -cd 'A-Za-z0-9._-' | grep . || echo '<name>')` +
 	" (not built yet, T068: until then recreate the sandbox by hand)"
 
 // cannotRun returns the shell command that prints the alert block of

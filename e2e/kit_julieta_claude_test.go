@@ -42,13 +42,16 @@ const (
 	claudeMemory = "/var/lib/julieta-claude/agent-memory"
 	claudeSkills = "/home/agent/.claude/skills"
 	agentHome    = "/home/agent"
-	docsDir      = "/e2e-docs"
+	// claudeLauncher is the launcher the kit installs (REQ-1353).
+	claudeLauncher = "/usr/local/bin/julieta"
+	docsDir        = "/e2e-docs"
 )
 
 // The install hooks of julieta-claude by position.
 const (
 	claudeHookPayload = iota
 	claudeHookSettings
+	claudeHookLauncher
 	claudeHookMemory
 	claudeHookSkillsDir
 	claudeHookSkills
@@ -83,6 +86,7 @@ func TestKitJulietaClaudeDescriptor(t *testing.T) {
 		assert.Equal(t, want, h.User, "hook %d", i)
 	}
 	assert.Equal(t, []string{"JULIETA_BIN"}, hooks[claudeHookSettings].Env)
+	assert.Equal(t, []string{"JULIETA_BIN"}, hooks[claudeHookLauncher].Env)
 }
 
 // keysOf returns the keys of m.
@@ -537,12 +541,14 @@ func mountAbsentBlock(fault, path, name string) string {
 // written and no command run from the value.
 func TestKitJulietaClaudeHostileArg(t *testing.T) {
 	k := startClaudeKit(t, false, nil)
-	h := k.d.hooks(t)[claudeHookSettings]
-	for _, bad := range []string{"", "relative/julieta", "/a b", "/a;touch /tmp/pwned", "/a#b", "/a&b", "/a$(touch /tmp/pwned)", "/a\n/b"} {
-		out, code := k.run(h, "JULIETA_BIN="+bad)
-		assert.Equal(t, 1, code, "%q: %s", bad, out)
-		_, absent := k.sh("0", "test ! -e "+claudeDropIn+" && test ! -e /tmp/pwned")
-		assert.Zero(t, absent, "%q wrote the drop-in or ran its command", bad)
+	for _, i := range []int{claudeHookSettings, claudeHookLauncher} {
+		h := k.d.hooks(t)[i]
+		for _, bad := range []string{"", "relative/julieta", "/a b", "/a;touch /tmp/pwned", "/a#b", "/a&b", "/a$(touch /tmp/pwned)", "/a\n/b"} {
+			out, code := k.run(h, "JULIETA_BIN="+bad)
+			assert.Equal(t, 1, code, "%q: %s", bad, out)
+			_, absent := k.sh("0", "test ! -e "+claudeDropIn+" && test ! -e "+claudeLauncher+" && test ! -e /tmp/pwned")
+			assert.Zero(t, absent, "%q wrote the drop-in or the launcher, or ran its command", bad)
+		}
 	}
 }
 
@@ -561,4 +567,15 @@ func TestKitJulietaClaudeOwners(t *testing.T) {
 	assert.Equal(t, "/etc/claude-code root 755\n/etc/claude-code/managed-settings.d root 755\n"+agentHome+"/.claude agent 755\n"+claudeSkills+" agent 755\n", modes)
 	out, code = k.sh("agent", "mkdir -p "+agentHome+"/.claude/projects "+agentHome+"/.claude/todos")
 	assert.Zero(t, code, "the agent still writes its state below ~/.claude: %s", out)
+
+	// The launcher (REQ-1353): root's, not the agent's to rewrite, and
+	// julieta resolves by name through it before any setup.
+	modes, code = k.sh("0", "stat -c '%n %U %G %a' "+claudeLauncher)
+	require.Zero(t, code, modes)
+	assert.Equal(t, claudeLauncher+" root root 755\n", modes)
+	out, code = k.sh("agent", "echo x >>"+claudeLauncher)
+	assert.NotZero(t, code, "the agent rewrote the launcher: %s", out)
+	out, code = k.exec("agent", []string{"HOME=" + agentHome, "PATH=/usr/local/bin:/usr/bin:/bin"}, "sh", "-c", "command -v julieta && julieta version")
+	require.Zero(t, code, out)
+	assert.True(t, strings.HasPrefix(out, claudeLauncher+"\n"), out)
 }

@@ -72,7 +72,7 @@ run every time, never remembered.
 
 | Hook | Command | Prints or writes |
 |---|---|---|
-| `REQ-0663` SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta memory index --hook` | `REQ-0664` in this order: (1) julieta's warnings, each by its slug of 04 4.1, one line each: `REQ-0665` `lock-stale`, `snapshots-disabled`, `agent-memory-writable`, `agent-path-missing` (8.5 step 5), `repo-setup-failed`, `memory-open-count`, `memory-stale`, `skills-stale`, `layout-stale`, `agent-hooks-missing`, and every recorded hook failure (one line per hook and repo, the newest failure of each, shown until a later run of the same hook succeeds, below; a `setup` that left the sandbox unusable is one, the hook `Setup`, whose line names `$HOME/.local/state/julieta/setup.log`, 06 6.4); `REQ-1351` then, when the `PATH` link of REQ-0397, `$HOME/.local/bin/julieta`, does not lead to a file, so `julieta` is not found in the agent's shell, the alert block of REQ-1352, `!! julieta is not on PATH (julieta-link-missing)`, `link: <the link>`, and `fix: <the absolute path of the running julieta> setup` (added on 2026-11-03); (2) the fixed built-in memory line (8.1); (3) the open `handoff` entry of the project's shared dir (8.3): its index line, then the gap line of 8.3 when the newest stamp differs from its stamp, then its body, or the gap line of 8.3 alone when no `handoff` is open; (4) the index of the other open entries over every memory dir of the project, the line of `memory list` (04 4.3) per entry, newest `updatedAt` first, under a line that says how to read one: `read an entry: julieta memory show <id>`. `REQ-0666` It reads every manifest repo's memory dir and labels each item with its repo. `REQ-0667` The output is bounded by the two values of 8.6, each cut at a line: part (3) by the narrative bound, the body cut by whole lines with the last line `read the rest: julieta memory show <id>`, and part (4) by the index bound, the index holding every whole line that fits, as the agent's own memory loads its index, never a partial line, with the last line `<n> more entries: julieta memory list` when any is left out. The warnings are never cut. `REQ-1291` Two warnings keep the index small without a hand, both printed in part (1), both hints to close or update, since julieta deletes nothing (8.1): `memory-open-count`, one line, when the open entries of the project, the `handoff` apart, exceed the count of 8.6. `REQ-1294` `memory-stale`, one line naming the id and the escaped title of each open entry whose `updatedAt` is older than the days of 8.6, oldest first, at most ten lines and then `<n> more stale entries: julieta memory list --status open`, so the part that is never cut stays small |
+| `REQ-0663` SessionStart, for every source the pinned Claude Code fires (startup, resume, clear, compact) | `julieta memory index --hook` | `REQ-0664` in this order: (1) julieta's warnings, each by its slug of 04 4.1, one line each: `REQ-0665` `lock-stale`, `snapshots-disabled`, `agent-memory-writable`, `agent-path-missing` (8.5 step 5), `repo-setup-failed`, `memory-open-count`, `memory-stale`, `skills-stale`, `layout-stale`, `agent-hooks-missing`, and every recorded hook failure (one line per hook and repo, the newest failure of each, shown until a later run of the same hook succeeds, below; a `setup` that left the sandbox unusable is one, the hook `Setup`, whose line names `$HOME/.local/state/julieta/setup.log`, 06 6.4); `REQ-1351` then, when `julieta` is not found on the hook's `PATH`, the alert block of REQ-1352 `!! julieta is not on PATH (julieta-link-missing)` with `fix: <the absolute path of the running julieta> setup`; and when the `julieta` found is neither the launcher of 06 6.4 (REQ-1353) nor the running julieta, the same slug with `!! julieta on PATH is another program (julieta-link-missing)`, `found: <its path>` and `fix: rm <its path>` (added on 2026-11-03); (2) the fixed built-in memory line (8.1); (3) the open `handoff` entry of the project's shared dir (8.3): its index line, then the gap line of 8.3 when the newest stamp differs from its stamp, then its body, or the gap line of 8.3 alone when no `handoff` is open; (4) the index of the other open entries over every memory dir of the project, the line of `memory list` (04 4.3) per entry, newest `updatedAt` first, under a line that says how to read one: `read an entry: julieta memory show <id>`. `REQ-0666` It reads every manifest repo's memory dir and labels each item with its repo. `REQ-0667` The output is bounded by the two values of 8.6, each cut at a line: part (3) by the narrative bound, the body cut by whole lines with the last line `read the rest: julieta memory show <id>`, and part (4) by the index bound, the index holding every whole line that fits, as the agent's own memory loads its index, never a partial line, with the last line `<n> more entries: julieta memory list` when any is left out. The warnings are never cut. `REQ-1291` Two warnings keep the index small without a hand, both printed in part (1), both hints to close or update, since julieta deletes nothing (8.1): `memory-open-count`, one line, when the open entries of the project, the `handoff` apart, exceed the count of 8.6. `REQ-1294` `memory-stale`, one line naming the id and the escaped title of each open entry whose `updatedAt` is older than the days of 8.6, oldest first, at most ten lines and then `<n> more stale entries: julieta memory list --status open`, so the part that is never cut stays small |
 | SessionEnd | `julieta stamp` | `REQ-0668` a stamp file (03 3.10), so a session that ends without `/handoff` still leaves where the trees were; whether it raises the gap line is decided by what it holds (8.3), not by its time |
 
 `REQ-0669` julieta records in its state the time of the last SessionStart hook run
@@ -91,18 +91,20 @@ prints one stdout line naming the failure and `julieta status`, and julieta reco
 `REQ-0673` When julieta itself cannot run (the mount is absent after an sbx
 change), nothing of julieta is there to print, so the kit renders each
 hook command as a shell wrapper that prints the alert block of
-REQ-1352 below and exits 0 in that case. Its lines are `!! julieta
+REQ-1352 below and exits 0 in that case, the shell's status 126 or 127,
+and only then, since a julieta that ran and was killed is no absent
+mount. Its lines are `!! julieta
 cannot run: <command> did not run`, `binary: <the absolute path>`,
 `cause: the .romeu/bin mount is likely absent` and `fix: on the host,
 romeu recreate <name>`, `<name>` the value of `SANDBOX_NAME` that sbx
 sets in the sandbox, or `<name>` itself when it is unset; until `romeu
 recreate` is built (T068) the fix line adds that it is not built yet
 and the sandbox is recreated by hand. It names no julieta command,
-since none can run (added on 2026-11-03). The PreToolUse guard of 06 6.4 is excluded from this
-rule, because it must fail closed: its wrapper exits 2 when its program
+since none can run (added on 2026-11-03). The PreToolUse guard of 06
+6.4 is excluded from this rule, because it must fail closed: its wrapper exits 2 when its program
 cannot run, which blocks the tool call, and prints the same alert block
-on stderr, its first line saying that the tool call is refused. By the Claude Code hooks
-documentation (code.claude.com/docs/en/hooks, read on 2026-10-09), exit
+on stderr, its first line saying that the tool call is refused. By the
+Claude Code hooks documentation (code.claude.com/docs/en/hooks, read on 2026-10-09), exit
 2 is the one exit code that blocks a PreToolUse call by itself; any
 other code, a hook that cannot start and a hook that times out let the
 call proceed, so a guard that hangs is not a gate. Probe C5 confirms
@@ -114,7 +116,8 @@ a line that begins with `!! ` and names the fault, lines indented three
 spaces of the form `<label>: <value>`, the last of them `fix:` with the
 command that repairs it, and an empty line. Each line is escaped as any
 output is (I29), but for the wrapper of REQ-0673, which prints a fixed
-text, the path the kit rendered and `SANDBOX_NAME`.
+text, the path the kit rendered and `SANDBOX_NAME` with every
+character outside `A-Za-z0-9._-` removed.
 
 `REQ-0674` Which sources fire, that the output reaches the agent's context, its
 size limit, the behaviour on a non-zero exit and the SessionEnd timeout
