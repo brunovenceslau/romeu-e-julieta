@@ -78,7 +78,7 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 		cancel()
 		if errors.Is(err, gitsafe.ErrRefused) {
 			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
-				message: fmt.Sprintf("gitsafe refused the mise.lock of %s at %s (a regular file within the cap of %d bytes is read): %v", r.URL, refName(r.Ref), mise.MaxFileSize, err)})
+				message: fmt.Sprintf("gitsafe refused to read the mise.lock of %s at %s: %v", r.URL, refName(r.Ref), err)})
 			continue
 		}
 		if err != nil {

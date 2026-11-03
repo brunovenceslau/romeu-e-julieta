@@ -128,13 +128,15 @@ Decided for slice A, the same day:
 This task now owns `docs/spec/04-cli.md`, which T185, T188 and T189
 own too; T055 was on the critical path, so it came first: the branch
 added T055 to the `after` of T185, and T188 and T189, which come after
-T185, followed it through that edge. T185 merged on 2026-11-01 (#366) before this task did, and the front
-matter of a merged task is not edited, so the edge on T185 is dropped.
+T185, followed it through that edge. T185 merged on 2026-11-01 (#366)
+before this task did, and the front matter of a merged task is not
+edited, so the edge on T185 is dropped.
 It ordered T055 against T185, T188 and T189, which the plan check
 (rule 1 of `docs/plan.md`) still requires for `docs/spec/04-cli.md`:
 T188, which is not merged, takes T055 in its `after`, and T189 follows
 it through T188. T055 takes T048 in its `after` for `.gitattributes`,
-which both own; T048 merged in #372. The merge of `main` into this
+which both own; T048's last slice, D2, merged in #372, and #373 marks
+the task merged. The merge of `main` into this
 branch (2026-11-03) resolved the two conflicts in
 `docs/spec/04-cli.md` and `docs/reference/exit-codes.md` by hand.
 Decided on 2026-11-02, scope this repository: the spec wins on what

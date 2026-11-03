@@ -164,7 +164,7 @@ func TestSpecValidateCatalogUnparsedLock(t *testing.T) {
 	var out, errOut bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
 	assert.Equal(t, 6, cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, refused)))
-	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: gitsafe refused the mise.lock of https://github.com/example/shop-api at main (a regular file within the cap of 1048576 bytes is read): ")
+	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: gitsafe refused to read the mise.lock of https://github.com/example/shop-api at main: ")
 }
 
 // TestSpecValidateCatalogFetchFails: an origin that cannot be read stops
