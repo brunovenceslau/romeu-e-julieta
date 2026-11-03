@@ -27,7 +27,7 @@ import (
 // tip of its branch ref on origin, the default branch when ref is
 // empty, and whether that commit holds one. A lock that is no regular
 // file within the cap (a link, a directory, over the cap) is an error
-// that wraps gitsafe.ErrFileRefused.
+// that wraps gitsafe.ErrFileRefused, and so gitsafe.ErrRefused.
 type lockFetcher func(ctx context.Context, url, ref string) (data []byte, found bool, err error)
 
 // gitFetcher returns the lockFetcher of julieta: a shallow fetch of the
@@ -54,13 +54,15 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 // the lock that the catalog does not produce for these tools, nor its
 // meta and base sets, is the warning lock-host-gated, since sync gates
 // it (step 3), and so is an artifact URL with no host it can read. A
-// lock that does not parse, or that is no regular file within the cap
-// (gitsafe.ErrFileRefused), is the finding lock-unparsed: a property of
-// the repo, not of the network. The domains found are added to eg. A
-// repo whose lock cannot be fetched otherwise (git fails or runs past
-// repoTimeout, a redirect, the ref or a default branch missing) stops
-// the command with fetch-failed (RJ-360), so nothing passes on a lock
-// it did not read.
+// lock that does not parse, or that gitsafe refuses (any error that
+// wraps gitsafe.ErrRefused: a file that is no regular file within the
+// cap, a URL, ref or path it will not use), is the finding lock-unparsed
+// (04 4.3, the exit 6 cell), whatever the refusal. A repo whose lock
+// cannot be fetched otherwise (git fails or runs past repoTimeout, a
+// redirect, the ref or a default branch missing: none of them wraps
+// ErrRefused, and gitsafe's own docs call the last a state of the
+// origin) stops the command with fetch-failed (RJ-360), so nothing
+// passes on a lock it did not read. The domains found are added to eg.
 func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, file string, p projectspec.Project, eg egressSet) ([]finding, []setup.Warning, error) {
 	produced := egressSet{}
 	produced.add(cat.Meta()...)
@@ -74,9 +76,9 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 		data, found, err := fetch(repoCtx, r.URL, r.Ref)
 		repoErr := repoCtx.Err()
 		cancel()
-		if errors.Is(err, gitsafe.ErrFileRefused) {
+		if errors.Is(err, gitsafe.ErrRefused) {
 			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
-				message: fmt.Sprintf("the mise.lock of %s at %s is no regular file within the cap of %d bytes: %v", r.URL, refName(r.Ref), mise.MaxFileSize, err)})
+				message: fmt.Sprintf("gitsafe refused the mise.lock of %s at %s (a regular file within the cap of %d bytes is read): %v", r.URL, refName(r.Ref), mise.MaxFileSize, err)})
 			continue
 		}
 		if err != nil {

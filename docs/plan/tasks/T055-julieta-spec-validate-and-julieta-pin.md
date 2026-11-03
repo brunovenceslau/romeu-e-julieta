@@ -125,9 +125,24 @@ Decided for slice A, the same day:
   authors only, or under restricted egress (from the security review
   of 2026-10-30).
 This task now owns `docs/spec/04-cli.md`, which T185, T188 and T189
-own too; T055 is on the critical path, so it comes first: T185 takes
-T055 in its `after`, and T188 and T189, which come after T185, follow
-it through that edge.
+own too; T055 was on the critical path, so it came first: the branch
+added T055 to the `after` of T185, and T188 and T189, which come after
+T185, followed it through that edge. T185 merged on 2026-11-01 (#366)
+before this task did, and the front matter of a merged task is not
+edited, so that edge is dropped: it only kept the three tasks from
+editing the same file in the wrong order, and the merge of `main` into
+this branch (2026-11-03) resolved the two conflicts in
+`docs/spec/04-cli.md` and `docs/reference/exit-codes.md` by hand.
+Decided on 2026-11-02, scope this repository: the spec wins on what
+`lock-unparsed` is. Any refusal by gitsafe of the lock, an error that
+wraps `gitsafe.ErrRefused` (a file that is no regular file within the
+cap, a URL or ref it will not use), is the finding `lock-unparsed`,
+exit 6, as the exit-code cell of 04 4.3 says; a git failure, a
+deadline, a redirect (`gitsafe.ErrMoved`), an origin with no default
+branch (`gitsafe.ErrNoDefaultBranch`, which is not a refusal) and a
+missing ref stay `fetch-failed`, `RJ-360`, exit 1. The test
+`TestSpecValidateCatalogSlugsAndExits` pins each outcome's slug to its
+exit.
 
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03

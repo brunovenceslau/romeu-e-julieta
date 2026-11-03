@@ -164,7 +164,7 @@ func TestSpecValidateCatalogUnparsedLock(t *testing.T) {
 	var out, errOut bytes.Buffer
 	env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&errOut)}
 	assert.Equal(t, 6, cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, refused)))
-	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: the mise.lock of https://github.com/example/shop-api at main is no regular file within the cap of 1048576 bytes: ")
+	assert.Contains(t, out.String(), "finding lock-unparsed projects/shop.yaml: repos[0]: gitsafe refused the mise.lock of https://github.com/example/shop-api at main (a regular file within the cap of 1048576 bytes is read): ")
 }
 
 // TestSpecValidateCatalogFetchFails: an origin that cannot be read stops
@@ -182,6 +182,123 @@ func TestSpecValidateCatalogFetchFails(t *testing.T) {
 	assert.Contains(t, stderr, "url: https://github.com/example/fail\n")
 	assert.Contains(t, stderr, "could not read the mise.lock of https://github.com/example/fail at its default branch from origin")
 	assert.Empty(t, stdout)
+}
+
+// TestSpecValidateCatalogSlugsAndExits pins each outcome of --catalog to
+// its slug and its exit code (04 4.3, the exit cell of julieta spec
+// validate; 04 4.4, RJ-360), so a slug and its exit cannot drift apart.
+// A refusal by gitsafe of the lock, an error that wraps
+// gitsafe.ErrRefused, is the finding lock-unparsed, exit 6, whatever
+// the refusal; what git or the clock does to the read, and what the
+// origin is (a redirect, no default branch), is fetch-failed, exit 1.
+// The fetcher answers for the first repo of the spec; the second has
+// no lock.
+func TestSpecValidateCatalogSlugsAndExits(t *testing.T) {
+	answer := func(data string, err error) lockFetcher {
+		return func(_ context.Context, url, _ string) ([]byte, bool, error) {
+			if !strings.HasSuffix(url, "shop-api") {
+				return nil, false, nil
+			}
+			return []byte(data), err == nil, err
+		}
+	}
+	tests := []struct {
+		name         string
+		spec         string
+		fetch        lockFetcher
+		repoTimeout  time.Duration
+		runTimeout   time.Duration
+		wantExit     int
+		wantErrID    string
+		wantFindings []string
+		wantWarnings []string
+	}{
+		{name: "ok", fetch: answer(string(validLock), nil), wantExit: 0},
+		{
+			name:     "ok with no lock in the repo",
+			fetch:    func(context.Context, string, string) ([]byte, bool, error) { return nil, false, nil },
+			wantExit: 0,
+		},
+		{
+			name: "lock-unparsed by a lock that does not parse", fetch: answer("lockfile_version = 2\n", nil),
+			wantExit: 6, wantErrID: "RJ-328", wantFindings: []string{"lock-unparsed"},
+		},
+		{
+			name:     "lock-unparsed by a file gitsafe refuses",
+			fetch:    answer("", fmt.Errorf("%w: %w: a link", gitsafe.ErrRefused, gitsafe.ErrFileRefused)),
+			wantExit: 6, wantErrID: "RJ-328", wantFindings: []string{"lock-unparsed"},
+		},
+		{
+			name:     "lock-unparsed by a refusal that is not of the file",
+			fetch:    answer("", fmt.Errorf("%w: ref name %q", gitsafe.ErrRefused, "main..x")),
+			wantExit: 6, wantErrID: "RJ-328", wantFindings: []string{"lock-unparsed"},
+		},
+		{
+			name:     "catalog-unknown-tool with lock-host-gated",
+			fetch:    answer(acmeLock, nil),
+			wantExit: 6, wantErrID: "RJ-328", wantFindings: []string{"catalog-unknown-tool"}, wantWarnings: []string{"lock-host-gated"},
+		},
+		{
+			name: "lock-host-gated alone is a warning", spec: shopSpec + "  tools:\n    \"aqua:acme/tool\": [dl.acme.example]\n",
+			fetch: answer(acmeLock, nil), wantExit: 0, wantWarnings: []string{"lock-host-gated"},
+		},
+		{
+			name:     "fetch-failed by a git failure",
+			fetch:    answer("", errors.New("git: the origin did not answer")),
+			wantExit: 1, wantErrID: "RJ-360",
+		},
+		{
+			name:     "fetch-failed by a redirect",
+			fetch:    answer("", fmt.Errorf("fetch: %w", gitsafe.ErrMoved)),
+			wantExit: 1, wantErrID: "RJ-360",
+		},
+		{
+			name:     "fetch-failed by an origin with no default branch",
+			fetch:    answer("", fmt.Errorf("%w: %q", gitsafe.ErrNoDefaultBranch, "https://github.com/example/shop-api")),
+			wantExit: 1, wantErrID: "RJ-360",
+		},
+		{name: "fetch-failed by the deadline of the repo", fetch: hang, repoTimeout: 10 * time.Millisecond, wantExit: 1, wantErrID: "RJ-360"},
+		{name: "fetch-failed by the deadline of the run", fetch: hang, runTimeout: 10 * time.Millisecond, wantExit: 1, wantErrID: "RJ-360"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.repoTimeout != 0 {
+				saved := repoTimeout
+				repoTimeout = tt.repoTimeout
+				t.Cleanup(func() { repoTimeout = saved })
+			}
+			if tt.runTimeout != 0 {
+				saved := catalogTimeout
+				catalogTimeout = tt.runTimeout
+				t.Cleanup(func() { catalogTimeout = saved })
+			}
+			body := tt.spec
+			if body == "" {
+				body = shopSpec
+			}
+			configRepo(t, map[string]string{"shop.yaml": body})
+			var stdout, stderr bytes.Buffer
+			env := &cli.Env{Binary: "julieta", Stdout: cli.NewWriter(&stdout), Stderr: cli.NewWriter(&stderr)}
+
+			code := cli.Report(env, run(t.Context(), env, []string{"projects/shop.yaml"}, tt.fetch))
+
+			assert.Equal(t, tt.wantExit, code, stderr.String())
+			assert.Equal(t, tt.wantErrID, errorID(t, stderr.String()), stderr.String())
+			var findings, warnings []string
+			for line := range strings.Lines(stdout.String()) {
+				if f := strings.Fields(line); len(f) >= 2 && f[0] == "finding" {
+					findings = append(findings, f[1])
+				}
+			}
+			for line := range strings.Lines(stderr.String()) {
+				if f := strings.Fields(line); len(f) >= 2 && f[0] == "warning" {
+					warnings = append(warnings, strings.TrimSuffix(f[1], ":"))
+				}
+			}
+			assert.Equal(t, tt.wantFindings, findings)
+			assert.Equal(t, tt.wantWarnings, warnings)
+		})
+	}
 }
 
 // TestSpecValidateCatalogSkipsWhatDoesNotDecode: --catalog reads the
