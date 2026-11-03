@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/shquote"
 )
 
@@ -185,7 +185,7 @@ var executable = os.Executable
 // pasted.
 func pathAlert() []string {
 	exe, exeErr := executable()
-	found, err := exec.LookPath("julieta")
+	found, err := procgroup.LookPath("julieta")
 	if err != nil {
 		fix := "<the absolute path of julieta> setup"
 		if exeErr == nil {
