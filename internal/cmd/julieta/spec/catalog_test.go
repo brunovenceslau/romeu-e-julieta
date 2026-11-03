@@ -253,6 +253,11 @@ func TestSpecValidateCatalogSlugsAndExits(t *testing.T) {
 			wantExit: 1, wantErrID: "RJ-360",
 		},
 		{
+			name:     "fetch-failed by a URL the host's git config rewrote to one gitsafe refuses",
+			fetch:    answer("", fmt.Errorf("%w: %w: %q rewrites to it", gitsafe.ErrRewritten, gitsafe.ErrRefused, "https://github.com/example/shop-api")),
+			wantExit: 1, wantErrID: "RJ-360",
+		},
+		{
 			name:     "fetch-failed by an origin with no default branch",
 			fetch:    answer("", fmt.Errorf("%w: %q", gitsafe.ErrNoDefaultBranch, "https://github.com/example/shop-api")),
 			wantExit: 1, wantErrID: "RJ-360",
@@ -399,6 +404,20 @@ func TestSpecValidateCatalogReadsOrigin(t *testing.T) {
 	left, err := os.ReadDir(tmp)
 	require.NoError(t, err)
 	assert.Empty(t, left, "no julieta-spec-* directory is left")
+
+	// A relative $TMPDIR is the machine's: the read still works, and
+	// leaves nothing (the security review of 2026-11-03).
+	cwd := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(cwd, "rel"), 0o700))
+	t.Chdir(cwd)
+	t.Setenv("TMPDIR", "rel")
+	data, found, err := fetch(t.Context(), url, "main")
+	require.NoError(t, err, "a relative TMPDIR is no refusal of the repo")
+	assert.True(t, found)
+	assert.Equal(t, validLock, data)
+	left, err = os.ReadDir(filepath.Join(cwd, "rel"))
+	require.NoError(t, err)
+	assert.Empty(t, left, "no julieta-spec-* directory is left under a relative TMPDIR")
 }
 
 // TestSpecValidateCatalogHostlessURL: an artifact URL of a lock with no

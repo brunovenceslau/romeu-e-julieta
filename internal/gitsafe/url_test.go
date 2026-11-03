@@ -105,6 +105,7 @@ func TestInsteadOf(t *testing.T) {
 				got, err := r.resolveURL(t.Context(), dir, tt.url)
 				if tt.refused {
 					require.ErrorIs(t, err, ErrRefused)
+					require.ErrorIs(t, err, ErrRewritten, "the cause is the config's rewrite")
 					return
 				}
 				require.NoError(t, err)

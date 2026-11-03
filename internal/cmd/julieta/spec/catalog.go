@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -42,7 +43,14 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 			return nil, false, err
 		}
 		defer func() { _ = os.RemoveAll(work) }()
-		return g.TipFile(ctx, work, url, ref, "mise.lock", mise.MaxFileSize)
+		// A relative or unclean $TMPDIR is the machine's, not the repo's:
+		// TipFile refuses such a work dir, which would read as a finding of
+		// every repo (the security review of 2026-11-03).
+		abs, err := filepath.Abs(work)
+		if err != nil {
+			return nil, false, err
+		}
+		return g.TipFile(ctx, abs, url, ref, "mise.lock", mise.MaxFileSize)
 	}
 }
 
@@ -57,7 +65,9 @@ func gitFetcher(g *gitsafe.Runner) lockFetcher {
 // lock that does not parse, or that gitsafe refuses (any error that
 // wraps gitsafe.ErrRefused: a file that is no regular file within the
 // cap, a URL, ref or path it will not use), is the finding lock-unparsed
-// (04 4.3, the exit 6 cell), whatever the refusal. A repo whose lock
+// (04 4.3, the exit 6 cell), whatever the refusal, except one that also
+// wraps gitsafe.ErrRewritten: a URL the machine's git config rewrote,
+// which is fetch-failed. A repo whose lock
 // cannot be fetched otherwise (git fails or runs past repoTimeout, a
 // redirect, the ref or a default branch missing: none of them wraps
 // ErrRefused, and gitsafe's own docs call the last a state of the
@@ -76,7 +86,10 @@ func checkCatalog(ctx context.Context, fetch lockFetcher, cat catalog.Catalog, f
 		data, found, err := fetch(repoCtx, r.URL, r.Ref)
 		repoErr := repoCtx.Err()
 		cancel()
-		if errors.Is(err, gitsafe.ErrRefused) {
+		// A URL that git's config of this machine rewrote to one gitsafe
+		// refuses is the machine's, not the repo's: fetch-failed (decided
+		// on 2026-11-03).
+		if errors.Is(err, gitsafe.ErrRefused) && !errors.Is(err, gitsafe.ErrRewritten) {
 			findings = append(findings, finding{file: file, path: at, rule: "lock-unparsed",
 				message: fmt.Sprintf("gitsafe refused to read the mise.lock of %s at %s: %v", r.URL, refName(r.Ref), err)})
 			continue

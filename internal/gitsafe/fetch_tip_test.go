@@ -192,7 +192,8 @@ func TestTipFileFlags(t *testing.T) {
 	rec.install(r)
 	_, _, _ = r.TipFile(t.Context(), t.TempDir(), "https://example.com/o/r", "", "mise.lock", 64)
 	_, _, _ = r.TipFile(t.Context(), t.TempDir(), "https://example.com/o/r", "main", "mise.lock", 64)
-	want := []string{"-c", "http.followRedirects=false", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "transfer.fsckObjects=true"}
+	want := []string{"-c", "http.followRedirects=false", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "transfer.fsckObjects=true",
+		"-c", "transfer.bundleURI=false", "-c", "http.lowSpeedLimit=1024", "-c", "http.lowSpeedTime=60"}
 	seen := map[string]bool{}
 	for _, c := range rec.commands {
 		verb := ""
