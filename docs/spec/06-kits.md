@@ -155,7 +155,7 @@ obligation of the row above:
    synced or pushed (08 8.1); a run that leaves the sandbox unusable
    records the hook failure `Setup` (08 8.2, REQ-0675) and a clean run
    clears it. When julieta cannot run at all (the `.romeu/bin` mount
-   absent), the wrapper rule of REQ-0673 prints its line and nothing is
+   absent), the wrapper rule of REQ-0673 prints its alert block and nothing is
    recorded. The hook is outside the digest of REQ-0587: it is no
    installed file `setup` can read. `romeu run` step 6 (REQ-0357) stays
    the authoritative run: it is where a sandbox left unusable stops the
