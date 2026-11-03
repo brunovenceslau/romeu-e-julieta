@@ -3,7 +3,7 @@ id: T048
 title: "`romeu status`"
 milestone: M3
 module: romeu-cli
-fate: kept
+fate: merged
 owns:
   - internal/cmd/romeu/status/**
   - internal/state/read.go
@@ -39,6 +39,8 @@ ask_first:
   - gitsafe
   - checks
 sitting: none
+merged: 2026-11-03
+pr: 372
 ---
 
 # T048 - `romeu status`
