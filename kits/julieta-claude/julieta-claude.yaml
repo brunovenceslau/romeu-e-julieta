@@ -129,9 +129,9 @@ capabilities:
             - |
               [[ ${JULIETA_BIN-} =~ ^(/[A-Za-z0-9._-]+)+$ ]]
               install -d -o root -g root -m 0755 /usr/local/bin
-              t=$(mktemp /usr/local/bin/.julieta.XXXXXX)
-              printf '#!/bin/sh\nexec %s "$@"\n' "$JULIETA_BIN" >"$t"
-              chmod 0755 "$t" && mv -fT "$t" /usr/local/bin/julieta
+              printf '#!/bin/sh\nexec %s "$@"\n' "$JULIETA_BIN" >/usr/local/bin/.julieta.new
+              chmod 0755 /usr/local/bin/.julieta.new
+              mv -fT /usr/local/bin/.julieta.new /usr/local/bin/julieta
         - description: the agent's own memory dir, empty and not writable
           user: "0"
           command:
