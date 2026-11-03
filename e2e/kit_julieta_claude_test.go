@@ -505,7 +505,7 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 		stdout, stderr, code := k.hookRun(s.hookCommand(t, "PreToolUse", "Bash"), "merge.json")
 		assert.Equal(t, 2, code, stderr)
 		assert.Empty(t, stdout)
-		assert.Contains(t, stderr, mountAbsentBlock("the tool call is refused: julieta hooks guard did not run (the guard fails closed)", w.Julieta, "<name>"))
+		assert.Contains(t, stderr, mountAbsentBlock("julieta hooks guard did not run, so the tool call is refused", w.Julieta, "<name>"))
 	})
 	for _, c := range []struct{ event, matcher, what string }{
 		{"SessionStart", "startup", "julieta handoff show --hook"},
@@ -522,6 +522,43 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 		assert.Zero(t, code)
 		assert.Equal(t, mountAbsentBlock(c.what+" did not run", w.Julieta, "shop"), stdout, c.event)
 	}
+
+	// The name is reduced (REQ-0673): no line, sequence or option gets
+	// through, and nothing left is <name>.
+	start := s.hookCommand(t, "SessionStart", "startup")
+	for name, want := range map[string]string{
+		`a\nb;$(touch /tmp/pwned)\033[31m`: "abtouchtmppwned31m", "-f --all": "f--all", "..": "<name>", "": "<name>",
+	} {
+		stdout, _, code := k.hookRun("export SANDBOX_NAME=\"$(printf %b '"+name+"')\"; "+start, "recorded.json")
+		assert.Zero(t, code, name)
+		assert.Equal(t, mountAbsentBlock("julieta handoff show --hook did not run", w.Julieta, want), stdout, name)
+	}
+	_, code = k.sh("0", "test ! -e /tmp/pwned")
+	assert.Zero(t, code, "the name ran a command")
+
+	// A julieta that ran and failed or was killed is no absent mount: the
+	// session hook prints nothing and exits 0, the guard prints no block
+	// and exits 2; a julieta the shell cannot execute (126) is one.
+	stub := "printf '#!/bin/sh\\nexit %s\\n' \"$1\" >" + w.Julieta + " && chmod 0755 " + w.Julieta
+	out, code := k.sh("0", "mkdir -p $(dirname "+w.Julieta+")")
+	require.Zero(t, code, out)
+	guard := s.hookCommand(t, "PreToolUse", "Bash")
+	for _, status := range []string{"1", "2", "137"} {
+		out, code = k.sh("0", "set -- "+status+"; "+stub)
+		require.Zero(t, code, out)
+		stdout, stderr, code := k.hookRun(start, "recorded.json")
+		assert.Zero(t, code, status)
+		assert.Empty(t, stdout+stderr, status)
+		stdout, stderr, code = k.hookRun(guard, "merge.json")
+		assert.Equal(t, 2, code, status)
+		assert.Empty(t, stdout, status)
+		assert.NotContains(t, stderr, "!! ", status)
+	}
+	out, code = k.sh("0", "chmod 0644 "+w.Julieta)
+	require.Zero(t, code, out)
+	stdout, _, code := k.hookRun(start, "recorded.json")
+	assert.Zero(t, code)
+	assert.Equal(t, mountAbsentBlock("julieta handoff show --hook did not run", w.Julieta, "<name>"), stdout, "status 126")
 }
 
 // mountAbsentBlock is the alert block of REQ-1352 a wrapper prints when

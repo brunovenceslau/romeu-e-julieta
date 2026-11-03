@@ -206,7 +206,7 @@ func pathAlert() []string {
 func quoted(p string) string {
 	q, err := shquote.Quote(p)
 	if err != nil {
-		q = p
+		return "<path>"
 	}
 	return esc(q)
 }

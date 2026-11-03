@@ -91,15 +91,16 @@ type block struct {
 	entries int // entries it holds
 }
 
-// Render returns the print: the warnings and the alerts, the fixed line, the gap line
-// and the latest narrative, the facts now, the open entries not tagged
-// lesson, and the lessons (REQ-0664). Each item carries its repo label
-// and each agent-written text sits under AgentTextLine. When the print
-// of a hook passes Limit it is cut after whole blocks, the narrative
-// after whole lines, and its last line is "<n> more entries: julieta
-// memory list" (REQ-0667), or, when no entry was left out, a line that
-// says the print is cut; the warnings and the fixed line are never
-// cut, so they may pass Limit by themselves.
+// Render returns the print: the warnings and the alerts, the fixed
+// line, the gap line and the latest narrative, the facts now, the open
+// entries not tagged lesson, and the lessons (REQ-0664). Each item
+// carries its repo label and each agent-written text sits under
+// AgentTextLine. When the print of a hook passes Limit it is cut after
+// whole blocks, the narrative after whole lines, and its last line is
+// "<n> more entries: julieta memory list" (REQ-0667), or, when no entry
+// was left out, a line that says the print is cut; the warnings, the
+// alerts and the fixed line are never cut, so they may pass Limit by
+// themselves.
 func (s Session) Render() string {
 	var fixed strings.Builder
 	if s.Hook {

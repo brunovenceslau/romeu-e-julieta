@@ -90,7 +90,7 @@ func Commands(julieta string) ([]Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	guard, err := cannotRun("the tool call is refused: julieta hooks guard did not run (the guard fails closed)", julieta)
+	guard, err := cannotRun("julieta hooks guard did not run, so the tool call is refused", julieta)
 	if err != nil {
 		return nil, err
 	}
@@ -107,10 +107,11 @@ func Commands(julieta string) ([]Command, error) {
 // recreateFix is the fix line of the alert block of a julieta that
 // cannot run (REQ-0673). It is the one argument the shell expands: the
 // name of the sandbox sbx runs in, every character outside A-Za-z0-9._-
-// removed, so the value cannot add a line or a terminal sequence
-// (REQ-1352). The text after the command goes when romeu recreate is
-// built (T068).
-const recreateFix = `   fix:    on the host, romeu recreate $(printf %s "${SANDBOX_NAME:-}" | tr -cd 'A-Za-z0-9._-' | grep . || echo '<name>')` +
+// removed, then any leading - or ., cut at 64 characters, or <name>
+// when that leaves nothing, so the value cannot add a line, a terminal
+// sequence or an option (REQ-1352). The text after the command goes
+// when romeu recreate is built (T068).
+const recreateFix = `   fix:    on the host, romeu recreate $(printf %s "${SANDBOX_NAME:-}" | tr -cd 'A-Za-z0-9._-' | sed 's/^[-.]*//' | cut -c1-64 | grep . || echo '<name>')` +
 	" (not built yet, T068: until then recreate the sandbox by hand)"
 
 // cannotRun returns the shell command that prints the alert block of

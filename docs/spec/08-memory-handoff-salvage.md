@@ -93,22 +93,25 @@ change), nothing of julieta is there to print, so the kit renders each
 hook command as a shell wrapper that prints the alert block of
 REQ-1352 below and exits 0 in that case, the shell's status 126 or 127,
 and only then, since a julieta that ran and was killed is no absent
-mount. Its lines are `!! julieta
-cannot run: <command> did not run`, `binary: <the absolute path>`,
-`cause: the .romeu/bin mount is likely absent` and `fix: on the host,
-romeu recreate <name>`, `<name>` the value of `SANDBOX_NAME` that sbx
-sets in the sandbox, or `<name>` itself when it is unset; until `romeu
+mount. Its lines are `!! julieta cannot run: <command> did not run`,
+`binary: <the absolute path>`, `cause: the .romeu/bin mount is likely
+absent` and `fix: on the host, romeu recreate <name>`, `<name>` the
+value of `SANDBOX_NAME` that sbx sets in the sandbox, every character
+outside `A-Za-z0-9._-` removed, then any leading `-` or `.`, cut at 64
+characters, or `<name>` itself when that leaves nothing; until `romeu
 recreate` is built (T068) the fix line adds that it is not built yet
 and the sandbox is recreated by hand. It names no julieta command,
 since none can run (added on 2026-11-03). The PreToolUse guard of 06
-6.4 is excluded from this rule, because it must fail closed: its wrapper exits 2 when its program
-cannot run, which blocks the tool call, and prints the same alert block
-on stderr, its first line saying that the tool call is refused. By the
-Claude Code hooks documentation (code.claude.com/docs/en/hooks, read on 2026-10-09), exit
-2 is the one exit code that blocks a PreToolUse call by itself; any
-other code, a hook that cannot start and a hook that times out let the
-call proceed, so a guard that hangs is not a gate. Probe C5 confirms
-this for the pinned version.
+6.4 is excluded from this rule, because it must fail closed: its
+wrapper exits 2 whenever its program exits non-zero, which blocks the
+tool call, and on status 126 or 127 prints the same alert block on
+stderr, its first line `!! julieta cannot run: julieta hooks guard did
+not run, so the tool call is refused`. By the Claude Code hooks documentation
+(code.claude.com/docs/en/hooks, read on 2026-10-09), exit 2 is the one
+exit code that blocks a PreToolUse call by itself; any other code, a
+hook that cannot start and a hook that times out let the call proceed,
+so a guard that hangs is not a gate. Probe C5 confirms this for the
+pinned version.
 
 `REQ-1352` An alert block is a fault that leaves julieta unusable, printed
 so it stands apart from the one-line warnings around it: an empty line,
@@ -116,8 +119,8 @@ a line that begins with `!! ` and names the fault, lines indented three
 spaces of the form `<label>: <value>`, the last of them `fix:` with the
 command that repairs it, and an empty line. Each line is escaped as any
 output is (I29), but for the wrapper of REQ-0673, which prints a fixed
-text, the path the kit rendered and `SANDBOX_NAME` with every
-character outside `A-Za-z0-9._-` removed.
+text, the path the kit rendered and the sandbox name reduced as
+REQ-0673 says.
 
 `REQ-0674` Which sources fire, that the output reaches the agent's context, its
 size limit, the behaviour on a non-zero exit and the SessionEnd timeout

@@ -166,8 +166,9 @@ obligation of the row above:
 8. `REQ-1353` A launcher at `/usr/local/bin/julieta`, root-owned, mode
    0755, a `sh` script that runs `exec <julietaBin> "$@"`, so `julieta`
    resolves by name in every sandbox with the kit, before any `julieta
-   setup`, and the agent cannot rewrite it. The hooks and the guard keep
-   the absolute path. `$HOME/.local/bin` comes first on the agent's
+   setup`, and the agent user cannot rewrite it; where the agent has
+   root, as through `sudo`, it can, so the launcher is a convenience and
+   not a boundary. The hooks and the guard keep the absolute path. `$HOME/.local/bin` comes first on the agent's
    `PATH` and is the agent's, so a `julieta` there, the link of REQ-0397
    or any other file, shadows the launcher for the agent's own calls
    only; SessionStart says when the `julieta` the shell finds is neither
