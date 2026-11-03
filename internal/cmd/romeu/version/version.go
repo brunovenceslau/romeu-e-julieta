@@ -29,8 +29,13 @@ var executable = osExecutable
 // osExecutable is the executable of the process.
 var osExecutable = os.Executable
 
-// report is the --json document of romeu version.
-type report struct {
+// Schema is the value of the schema field of the --json document of
+// romeu version, the format romeu-version.v1 (REQ-0161).
+const Schema = "romeu-version/v1"
+
+// Report is the --json document of romeu version, whose schema,
+// romeu-version.v1, is generated from this type (tools/ci/internal/schema).
+type Report struct {
 	Version  string `json:"version"`
 	Commit   string `json:"commit"`
 	Date     string `json:"date"`
@@ -41,6 +46,8 @@ type report struct {
 	// Versions are the versions of sbx, git, macOS and each project's
 	// live render (REQ-0286).
 	Versions Versions `json:"versions"`
+	// Schema is "romeu-version/v1".
+	Schema string `json:"schema"`
 }
 
 // versionSeams are the seams the versions object is read through; a
@@ -74,7 +81,7 @@ var _ = cli.Register(func() cli.Command {
 				if err := c.Context().Err(); err != nil {
 					return err
 				}
-				doc := report{Version: v.Version, Commit: v.Commit, Date: v.Date, Go: runtime.Version(), Protocol: v.Protocol, SHA256: sum, GOARCH: runtime.GOARCH}
+				doc := Report{Version: v.Version, Commit: v.Commit, Date: v.Date, Go: runtime.Version(), Protocol: v.Protocol, SHA256: sum, GOARCH: runtime.GOARCH, Schema: Schema}
 				doc.Versions = readVersions(c.Context(), env, versionSeams())
 				if err := c.Context().Err(); err != nil {
 					return err

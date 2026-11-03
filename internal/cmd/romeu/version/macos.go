@@ -22,10 +22,10 @@ const maxMacOS = 32
 // number without a leading zero, such as 15.1 or 14.6.1. The numbers are
 // read by golang.org/x/mod/semver (ADR 0038), which takes v15.1 as the
 // shorthand of v15.1.0; a prerelease, a build suffix and a bare major
-// are refused here. A value that does not parse is the error internal
-// (RJ-348): no row of 04 4.4 names that state, which no macOS romeu
-// supports reaches, since every one answers kern.osproductversion; the
-// value is quoted escaped and cut, so it reaches the report as data.
+// are refused here. A value that does not parse is the error
+// upstream-shape (RJ-310), an output the product does not own that is
+// not a shape romeu reads (REQ-0064); the value is quoted escaped and
+// cut, so it reaches the report as data.
 func parseMacOS(s string) (string, error) {
 	v := "v" + s
 	if len(s) <= maxMacOS && strings.Contains(s, ".") && semver.IsValid(v) &&
@@ -35,5 +35,11 @@ func parseMacOS(s string) (string, error) {
 	if len(s) > maxMacOS {
 		s = s[:maxMacOS]
 	}
-	return "", cli.Internal.New(fmt.Sprintf("the macOS version %+q is not major.minor or major.minor.patch", s))
+	return "", upstreamShape(fmt.Sprintf("the macOS version %+q is not major.minor or major.minor.patch", s))
+}
+
+// upstreamShape returns the error upstream-shape (RJ-310) for the macOS
+// kernel, the upstream of the version; the details name it.
+func upstreamShape(message string) *cli.Error {
+	return cli.UpstreamShape.New(message, cli.Detail{Key: "upstream", Value: "macOS"})
 }

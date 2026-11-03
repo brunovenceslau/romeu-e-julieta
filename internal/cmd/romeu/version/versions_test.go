@@ -6,7 +6,9 @@
 package version
 
 import (
+	"bytes"
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"os"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -235,10 +238,10 @@ func TestReadVersions(t *testing.T) {
 			name:     "sbx, git and macOS that do not read, each by its id",
 			sbxErr:   shape,
 			gitErr:   floor,
-			macOSErr: cli.Internal.New("the macOS version is not one"),
+			macOSErr: cli.UpstreamShape.New("the macOS version is not one"),
 			calls:    calls{1, 1},
 			want: Versions{Projects: []ProjectVersions{}, Errors: []ReadError{
-				{ID: "RJ-348", Slug: "internal", Read: readMacOS, Message: "the macOS version is not one"},
+				{ID: "RJ-310", Slug: "upstream-shape", Read: readMacOS, Message: "the macOS version is not one"},
 				{ID: shape.ID, Slug: shape.Slug, Read: readSbx, Message: shape.Error()},
 				{ID: "RJ-344", Slug: "git-floor", Read: readGit, Message: floor.Error()},
 			}},
@@ -434,8 +437,8 @@ func TestKitPins(t *testing.T) {
 }
 
 // TestParseMacOS: the product version of macOS is major.minor or
-// major.minor.patch, and any other value is the error internal, quoted
-// escaped and cut.
+// major.minor.patch, and any other value is the error upstream-shape
+// (RJ-310), quoted escaped and cut.
 func TestParseMacOS(t *testing.T) {
 	t.Parallel()
 	for _, ok := range []string{"15.1", "14.6.1", "26.0", "10.13.4"} {
@@ -447,7 +450,7 @@ func TestParseMacOS(t *testing.T) {
 		got, err := parseMacOS(bad)
 		require.Error(t, err, "%q", bad)
 		assert.Empty(t, got)
-		assert.Equal(t, "RJ-348", cli.Of(err).ID, "%q", bad)
+		assert.Equal(t, "RJ-310", cli.Of(err).ID, "%q", bad)
 		assert.NotContains(t, err.Error(), "\x1b", "%q", bad)
 		assert.LessOrEqual(t, len(err.Error()), 200, "%q", bad)
 	}
@@ -462,4 +465,49 @@ func TestMessage(t *testing.T) {
 	got := message(long)
 	assert.NotContains(t, got, `\x`)
 	assert.Equal(t, "a"+strings.Repeat("é", (maxMessage-1)/2)+"...", got)
+}
+
+// compileVersionSchema compiles schemas/romeu-version.v1.json, the
+// generated schema of the format.
+func compileVersionSchema(t *testing.T) *jsonschema.Schema {
+	t.Helper()
+	sch, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "schemas", "romeu-version.v1.json"))
+	require.NoError(t, err)
+	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(sch))
+	require.NoError(t, err)
+	c := jsonschema.NewCompiler()
+	require.NoError(t, c.AddResource("romeu-version.v1.json", schemaDoc))
+	compiled, err := c.Compile("romeu-version.v1.json")
+	require.NoError(t, err)
+	return compiled
+}
+
+// TestReportIsItsSchema: the --json document with every member filled,
+// and one with none of the optional ones, validates against
+// schemas/romeu-version.v1.json and names the format; a member the
+// schema does not list fails it, so the format is closed.
+func TestReportIsItsSchema(t *testing.T) {
+	t.Parallel()
+	compiled := compileVersionSchema(t)
+	base := Report{Version: "v1.2.3", Commit: "abc1234", Date: "2026-10-18T00:00:00Z", Go: "go1.26", Protocol: 7,
+		SHA256: strings.Repeat("a", 64), GOARCH: "arm64", Schema: Schema}
+	full := base
+	full.Versions = Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1",
+		Projects: []ProjectVersions{{Name: "shop", Workload: workloadDigest,
+			Kits:   []KitPin{{Kit: "julieta", Digest: julietaDigest}},
+			Errors: []ReadError{{ID: "RJ-344", Slug: "state-record-unreadable", Read: readRecord, Message: "m"}}}},
+		Errors: []ReadError{{ID: "RJ-310", Slug: "upstream-shape", Read: readMacOS, Message: "m"}}}
+	empty := base
+	empty.Versions = Versions{Projects: []ProjectVersions{}, Errors: []ReadError{}}
+	for name, rep := range map[string]Report{"every member": full, "no optional member": empty} {
+		b, err := json.Marshal(rep, json.Deterministic(true))
+		require.NoError(t, err)
+		inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
+		require.NoError(t, err, name)
+		require.NoError(t, compiled.Validate(inst), "%s: %s", name, b)
+		assert.Contains(t, string(b), `"schema":"romeu-version/v1"`, name)
+	}
+	extra, err := jsonschema.UnmarshalJSON(strings.NewReader(`{"version":"v1","commit":"c","date":"d","go":"g","protocol":1,"sha256":"s","goarch":"a","schema":"romeu-version/v1","versions":{"projects":[],"errors":[]},"extra":1}`))
+	require.NoError(t, err)
+	assert.Error(t, compiled.Validate(extra), "a member the schema does not list")
 }
