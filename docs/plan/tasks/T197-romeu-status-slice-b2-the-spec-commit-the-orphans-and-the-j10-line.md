@@ -13,6 +13,7 @@ needs:
   - T048
 after:
   - T185
+  - T174
 ask_first:
   - formats
   - gates
@@ -50,6 +51,11 @@ the small part it needs and names who unifies it, as T048 says.
     on the word `orphaned` (REQ-0334).
   - The J10 step 1 line is a fixture: `absent; generation <G> open;
     snapshot <T>; refs/sandboxes last fetched <T2>`.
+  - Per repo, from host state and without the lock: the unimported
+    snapshots, the `createdAt` of the newest `snapshot/heads.json`
+    (`internal/salvage/snapshot.go`), `disabled`, and the newest stamp's
+    dirty and stash counts (03 3.10), which T174 writes; moved from
+    T048's acceptance with slice B2 (re-plan of 2026-10-31).
   - `status --json` carries the new members, the schema is regenerated,
     and T048's `TestStatus*` cases still pass unchanged.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestStatusB2' -v`, which

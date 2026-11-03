@@ -7,6 +7,10 @@ package status
 
 import "time"
 
+// Schema is the value of the schema field of the --json document of
+// romeu status, the format romeu-status.v1 (REQ-0161).
+const Schema = "romeu-status/v1"
+
 // The sandbox states status reports beside the ones sbx prints
 // (running, stopped).
 const (
@@ -27,9 +31,13 @@ const (
 	RecordUnreadable = "unreadable"
 )
 
+// RecordStates are the values of a block's record, in the order above.
+var RecordStates = []string{RecordPresent, RecordAbsent, RecordUnreadable}
+
 // Report is the document of romeu status --json (04 4.2, REQ-0327): one
 // block per project, in name order. Its schema, romeu-status.v1, is
-// generated once the report is whole (T048, the last slice).
+// generated from this type (tools/ci/internal/schema), with RecordStates
+// and ToolchainStates as the values its two closed members admit.
 type Report struct {
 	// Toolchain is the state of gate 1 on this machine (01 1.4); absent
 	// when it was not read.
@@ -42,6 +50,8 @@ type Report struct {
 	Errors []ReadError `json:"errors"`
 	// Projects are the blocks of the report.
 	Projects []Project `json:"projects"`
+	// Schema is "romeu-status/v1".
+	Schema string `json:"schema"`
 }
 
 // The states of the toolchain acknowledgement (gate 1, 01 1.4).
@@ -56,6 +66,10 @@ const (
 	// ToolchainUnknown: a read the comparison needs failed.
 	ToolchainUnknown = "unknown"
 )
+
+// ToolchainStates are the values of the toolchain's state, in the order
+// above.
+var ToolchainStates = []string{ToolchainAcknowledged, ToolchainStale, ToolchainMissing, ToolchainUnknown}
 
 // Toolchain is the state of gate 1: status reports a mismatch and does
 // not stop on it (REQ-0062).
@@ -113,8 +127,9 @@ type Generation struct {
 	Adopted bool `json:"adopted"`
 	// CreatedAt is when it was created or adopted.
 	CreatedAt time.Time `json:"createdAt"`
-	// ClosedAt is when it closed; absent while it lives.
-	ClosedAt *time.Time `json:"closedAt,omitzero"`
+	// ClosedAt is when it closed; absent while it lives, the zero time
+	// being left out.
+	ClosedAt time.Time `json:"closedAt,omitzero"`
 	// Salvage are its salvage records, the newest last.
 	Salvage []Salvage `json:"salvage"`
 }

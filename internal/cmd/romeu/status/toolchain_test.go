@@ -289,6 +289,32 @@ func TestRunFloorCheckFails(t *testing.T) {
 	}
 }
 
+// TestRunFloorCheckFailsWithNoHostState: with no host state the
+// toolchain is not read, and a failed floor check is still printed once
+// at the head of the report, each named block keeping only the listing
+// it prevents (REQ-0329).
+func TestRunFloorCheckFailsWithNoHostState(t *testing.T) {
+	t.Parallel()
+	floor := sbxdrv.SbxFloor.New("sbx 0.48.0 is below the floor 0.49.2")
+	sbx := fakeSbx{version: sbxdrv.Release{Minor: 48}, versionErr: floor}
+	var out bytes.Buffer
+	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
+	err := run(t.Context(), env, host{sbx: sbx}, []string{"shop", "acme"})
+	require.Error(t, err)
+	assert.Equal(t, 1, cli.ExitCode(err))
+	assert.Contains(t, err.Error(), "1 read(s) failed")
+	rep := decode(t, out.String())
+	assert.Nil(t, rep.Toolchain, "no host state: the toolchain is not read")
+	require.Len(t, rep.Errors, 1, "the floor check is the report's own error")
+	assert.Equal(t, "sbx version", rep.Errors[0].Read)
+	assert.Equal(t, sbxdrv.SbxFloor.ID, rep.Errors[0].ID)
+	require.Len(t, rep.Projects, 2)
+	for _, p := range rep.Projects {
+		require.Len(t, p.Errors, 1, p.Name)
+		assert.Equal(t, "sbx ls", p.Errors[0].Read, p.Name)
+	}
+}
+
 func TestRunCallsNoSbxWithoutHostState(t *testing.T) {
 	t.Parallel()
 	calls := &sbxCalls{}

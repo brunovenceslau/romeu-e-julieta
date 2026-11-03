@@ -23,7 +23,9 @@ type version struct {
 	rc                  bool
 }
 
-// String returns the version as git writes it, without a build suffix.
+// String returns the parsed version the floor compares: major.minor.patch,
+// with ".rc" for a release candidate and no rc number or build suffix, so
+// it is not always the text git prints (Version returns that).
 func (v version) String() string {
 	s := fmt.Sprintf("%d.%d.%d", v.major, v.minor, v.patch)
 	if v.rc {
@@ -138,13 +140,9 @@ func quoteVersion(out string) string {
 // it can trust. A command that starts git checks it before gate 1
 // (04 4.2).
 func (r *Runner) CheckFloor(ctx context.Context) error {
-	out, err := r.output(ctx, "", nil, "version")
+	v, _, err := r.readVersion(ctx)
 	if err != nil {
 		return err
-	}
-	v, err := parseVersion(out)
-	if err != nil {
-		return &FloorError{Found: quoteVersion(out), err: err}
 	}
 	if !atFloor(v) {
 		return &FloorError{Found: v.String()}

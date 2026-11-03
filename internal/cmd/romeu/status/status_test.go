@@ -74,7 +74,15 @@ func TestRunReportsTheHostStateOfEveryProject(t *testing.T) {
 	require.Len(t, shop.Generations, 2)
 	assert.Equal(t, gen2, shop.Generations[1].ID, "generations in record order, the newest last")
 	assert.Equal(t, "open", shop.Generations[1].State)
-	assert.Nil(t, shop.Generations[1].ClosedAt)
+	assert.True(t, shop.Generations[1].ClosedAt.IsZero())
+	var raw struct {
+		Projects []struct {
+			Generations []map[string]any `json:"generations"`
+		} `json:"projects"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &raw))
+	assert.NotContains(t, raw.Projects[1].Generations[1], "closedAt", "an open generation has no closedAt")
+	assert.Contains(t, raw.Projects[1].Generations[0], "closedAt")
 	assert.Equal(t, "complete", shop.Generations[0].Salvage[0].Result)
 	assert.Equal(t, "refs/romeu/salvage/shop/"+slv1+"/", shop.Generations[0].Salvage[0].RefsPrefix)
 	assert.Empty(t, shop.Errors)
