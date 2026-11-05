@@ -2,12 +2,12 @@
 
 A copy of the directory `schema/` of
 [docker/sandbox-kit-spec](https://github.com/docker/sandbox-kit-spec) at
-the tag `v3.0.0-m.11` (commit
-`92835bb7934a3e2e2bbb7e85b1d72dee24a0f00c`; the annotated tag object is
-`589ed3603a865e0de3d41af361b7aff166108155`), fetched from
-`https://github.com/docker/sandbox-kit-spec/tarball/v3.0.0-m.11`
-on 2026-10-28; the schema hint of a descriptor still names the files at
-`https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.11/schema/`
+the tag `v3.0.0-m.12` (commit
+`6b0bc2504942eb9335447d5035425536d9c495d6`; the annotated tag object is
+`7062cc504e63f2e0cd7ca128df3e09a9a7099608`), fetched from
+`https://github.com/docker/sandbox-kit-spec/tarball/v3.0.0-m.12`
+on 2026-11-05; the schema hint of a descriptor still names the files at
+`https://raw.githubusercontent.com/docker/sandbox-kit-spec/v3.0.0-m.12/schema/`
 (kitSpecURL), the same bytes. It is Apache-2.0, `Copyright 2026 Docker, Inc.`;
 `REUSE.toml` here records it. This product includes software developed
 at Docker, Inc. One change was made: in
