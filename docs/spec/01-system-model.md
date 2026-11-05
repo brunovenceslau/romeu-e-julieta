@@ -177,8 +177,8 @@ so upload-capable ones of the runtime phase appear in `egressGated`
 and gate 2 flags them; those of the install phase stay out of the
 derivation, and sbx, not romeu, applies those of the runtime phase
 ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress), step 6). `REQ-0070` A personal kit that
-declares a network, mount, volume, credential or ssh-agent capability
-is refused (sync error). Its other capabilities (install steps,
+declares a network, mount, volume, credential, ssh-agent, docker-auth or
+host-port capability is refused (sync error). Its other capabilities (install steps,
 privileges, lifecycle hooks) are not refused: they are shown in the
 gate 2 diff.
 
