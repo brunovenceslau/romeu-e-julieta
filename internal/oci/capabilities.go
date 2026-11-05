@@ -61,6 +61,15 @@ type Capabilities struct {
 	InteractiveSessions *InteractiveSessions `json:"interactiveSessions,omitzero"`
 	// ACP are the acp@1 requests, one per agent.
 	ACP []ACP `json:"acp,omitempty"`
+	// Dockerd is the dockerd@1 request: a Docker Engine inside the
+	// sandbox, with the elevation of privileged@1 and a private store.
+	Dockerd *Dockerd `json:"dockerd,omitzero"`
+	// HostPorts are the host-port@1 requests: host loopback services
+	// reached at the sandbox's loopback.
+	HostPorts []HostPort `json:"hostPorts,omitempty"`
+	// DockerAuth are the docker-auth@1 requests: the registries the host
+	// authenticates to for the sandbox.
+	DockerAuth []DockerAuth `json:"dockerAuth,omitempty"`
 	// Flags are the requests that take no config: privileged execution,
 	// the sandbox-agent platform, a long-running workload, the git
 	// identity and the kit registry.
@@ -435,6 +444,46 @@ type ACP struct {
 	Env map[string]string `json:"env,omitempty"`
 	// ProtocolVersion is the protocol version, as written; absent is 1.
 	ProtocolVersion string `json:"protocolVersion,omitempty"`
+	// Optional is the request's optional flag.
+	Optional bool `json:"optional,omitzero"`
+}
+
+// Dockerd is a dockerd@1: a request for a Docker Engine inside the
+// sandbox. It counts as privileged@1 plus private storage at
+// /var/lib/docker, so it widens a grant the way those two do.
+type Dockerd struct {
+	// AutoStart is "true" or "false", or a whole kit arg reference, as
+	// written; absent is true. It decides who starts the engine, not what
+	// the sandbox may do.
+	AutoStart string `json:"autoStart,omitempty"`
+	// Optional is the request's optional flag.
+	Optional bool `json:"optional,omitzero"`
+}
+
+// HostPort is a host-port@1: one host loopback service reached at the
+// sandbox's IPv4 loopback. It is raw TCP or UDP access the network
+// policy does not constrain.
+type HostPort struct {
+	// Host is the host loopback port, as written.
+	Host string `json:"host"`
+	// Container is the sandbox loopback port, as written; absent or 0
+	// means the host port.
+	Container string `json:"container,omitempty"`
+	// Transport is "tcp" or "udp", as written; absent means tcp.
+	Transport string `json:"transport,omitempty"`
+	// Family is the host address family, "ipv4", "ipv6" or "dual", as
+	// written; absent means ipv4.
+	Family string `json:"family,omitempty"`
+	// Optional is the request's optional flag.
+	Optional bool `json:"optional,omitzero"`
+}
+
+// DockerAuth is a docker-auth@1: registries the host authenticates to
+// for the sandbox through run-scoped placeholders. It grants no egress.
+type DockerAuth struct {
+	// Registries are the registry DNS names, sorted, or kit arg
+	// references.
+	Registries []string `json:"registries"`
 	// Optional is the request's optional flag.
 	Optional bool `json:"optional,omitzero"`
 }

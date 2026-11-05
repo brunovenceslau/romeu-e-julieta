@@ -38,6 +38,9 @@ const (
 	typeContext     = "com.docker.sandbox/agent-context@1"
 	typeLongRunning = "com.docker.sandbox/long-running@1"
 	typeGitIdentity = "com.docker.sandbox/git-identity@1"
+	typeDockerd     = "com.docker.sandbox/dockerd@1"
+	typeHostPort    = "com.docker.sandbox/host-port@1"
+	typeDockerAuth  = "com.docker.sandbox/docker-auth@1"
 )
 
 // capabilityTypes are the capability types the grammar models: the
@@ -46,7 +49,7 @@ var capabilityTypes = []string{
 	typeNetwork1, typeNetwork2, typeCredential, typeSSHAgent, typeSkills, typeSkill,
 	typeVolume, typeHostMount, typePort, typeUSB, typeResources, typePrivileged, typeSbx,
 	typeKitRegistry, typeSessions, typeLifecycle, typeContext, typeLongRunning, typeGitIdentity,
-	typeInteractive, typeACP, typeContext2,
+	typeInteractive, typeACP, typeContext2, typeDockerd, typeHostPort, typeDockerAuth,
 }
 
 // builder collects the capabilities of one descriptor.
@@ -165,6 +168,12 @@ func (b *builder) item(at string, it itemDoc, inherited bool) error {
 		return b.interactiveSessions(it.Config, optional)
 	case typeACP:
 		return b.acp(it.Config, optional)
+	case typeDockerd:
+		return b.dockerd(it.Config, optional)
+	case typeHostPort:
+		return b.hostPort(it.Config, optional)
+	case typeDockerAuth:
+		return b.dockerAuth(it.Config, optional)
 	case typePrivileged, typeSbx, typeKitRegistry, typeLongRunning, typeGitIdentity:
 		if len(it.Config) > 0 {
 			return invalid("%s takes no config", b.at)
@@ -833,6 +842,8 @@ func (c *Capabilities) sort() {
 	c.Credentials = sortedSet2(c.Credentials)
 	c.SSHAgent = sortedSet2(c.SSHAgent)
 	c.Ports = sortedSet2(c.Ports)
+	c.HostPorts = sortedSet2(c.HostPorts)
+	c.DockerAuth = sortedSet2(c.DockerAuth)
 	c.Devices = sortedSet2(c.Devices)
 	c.Context = sortedSet2(c.Context)
 	c.ACP = sortedSet2(c.ACP)
@@ -1023,5 +1034,140 @@ func (b *builder) agentContext2(cfg jsontext.Value, optional bool) error {
 		}
 	}
 	b.caps.Context = append(b.caps.Context, Context{Filename: d.Filename, Content: d.Content, Directory: dir, Version: 2, Optional: optional})
+	return nil
+}
+
+// ---- m.12 types
+
+// dockerd adds a dockerd@1, a singleton. autoStart is a boolean or one
+// whole kit arg; it decides who starts the engine, and the elevation and
+// the engine store are granted either way. The rule that a volume or
+// host-mount may not sit at or under /var/lib/docker beside it is not
+// modeled: the set shows each request, and the frontend refuses the pair
+// at build.
+func (b *builder) dockerd(cfg jsontext.Value, optional bool) error {
+	if err := b.singleton(b.caps.Dockerd != nil); err != nil {
+		return err
+	}
+	var d struct {
+		AutoStart jsontext.Value `json:"autoStart"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	auto := ""
+	if len(d.AutoStart) > 0 {
+		switch d.AutoStart.Kind() {
+		case 't', 'f':
+			auto = string(d.AutoStart)
+		case '"':
+			var s string
+			if err := jsonv2.Unmarshal(d.AutoStart, &s); err != nil || !wholeRef.MatchString(s) {
+				return invalid("%s: autoStart is not a boolean or one whole kit arg", b.at)
+			}
+			auto = s
+		default:
+			return invalid("%s: autoStart is not a boolean or one whole kit arg", b.at)
+		}
+	}
+	b.caps.Dockerd = &Dockerd{AutoStart: auto, Optional: optional}
+	return nil
+}
+
+// portNumber reads a port that is a whole number in [lo, 65535] or one
+// whole kit arg, and returns it as written. An absent value is "".
+func (b *builder) portNumber(name string, v jsontext.Value, lo int) (string, error) {
+	if len(v) == 0 {
+		return "", nil
+	}
+	switch v.Kind() {
+	case '0':
+		n, err := strconv.Atoi(string(v))
+		if err != nil || n < lo || n > 65535 {
+			return "", invalid("%s: %s is not a whole number from %d to 65535", b.at, name, lo)
+		}
+		return string(v), nil
+	case '"':
+		var s string
+		if err := jsonv2.Unmarshal(v, &s); err == nil && wholeRef.MatchString(s) {
+			return s, nil
+		}
+	}
+	return "", invalid("%s: %s is not a whole number from %d to 65535 or one whole kit arg", b.at, name, lo)
+}
+
+// oneOf reports whether s is empty, one of the values or holds a kit arg
+// reference, which stands in for the value until create.
+func oneOf(s string, values ...string) bool {
+	return s == "" || isRef(s) || slices.Contains(values, s)
+}
+
+// hostPort adds a host-port@1: one host loopback service, keyed by its
+// effective container port and transport. The rules across entries, one
+// key claimed twice and a port@1 on the same key, are not modeled: the
+// frontend refuses them at build.
+func (b *builder) hostPort(cfg jsontext.Value, optional bool) error {
+	var d struct {
+		Host      jsontext.Value `json:"host"`
+		Container jsontext.Value `json:"container"`
+		Family    string         `json:"family"`
+		Transport string         `json:"transport"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	host, err := b.portNumber("host", d.Host, 1)
+	if err != nil {
+		return err
+	}
+	if err := b.need("host port", host); err != nil {
+		return err
+	}
+	container, err := b.portNumber("container", d.Container, 0)
+	if err != nil {
+		return err
+	}
+	if !oneOf(d.Transport, "tcp", "udp") {
+		return invalid("%s: transport is not tcp or udp", b.at)
+	}
+	if !oneOf(d.Family, "ipv4", "ipv6", "dual") {
+		return invalid("%s: family is not ipv4, ipv6 or dual", b.at)
+	}
+	b.caps.HostPorts = append(b.caps.HostPorts, HostPort{Host: host, Container: container, Transport: d.Transport, Family: d.Family, Optional: optional})
+	return nil
+}
+
+// registryName is the form of a registry in docker-auth@1: a lowercase
+// DNS name with a dot and labels of at most 63 characters, not an IPv4
+// address. The pattern is the kit schema's.
+var (
+	registryName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$`)
+	registryIPv4 = regexp.MustCompile(`^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$`)
+)
+
+// dockerAuth adds a docker-auth@1. Entries are not a singleton: identical
+// ones collapse and distinct ones keep their registries and optionality.
+func (b *builder) dockerAuth(cfg jsontext.Value, optional bool) error {
+	var d struct {
+		Registries []string `json:"registries"`
+	}
+	if err := strict(b, cfg, &d); err != nil {
+		return err
+	}
+	if len(d.Registries) == 0 {
+		return invalid("%s has no registries", b.at)
+	}
+	seen := make(map[string]bool, len(d.Registries))
+	for _, r := range d.Registries {
+		ok := isRef(r) || (len(r) <= 253 && registryName.MatchString(r) && !registryIPv4.MatchString(r))
+		if !ok {
+			return invalid("%s: %s is not a lowercase registry DNS name with a dot", b.at, quote(r))
+		}
+		if seen[r] {
+			return invalid("%s: the registry %s is listed twice", b.at, quote(r))
+		}
+		seen[r] = true
+	}
+	b.caps.DockerAuth = append(b.caps.DockerAuth, DockerAuth{Registries: sortedSet(d.Registries), Optional: optional})
 	return nil
 }
