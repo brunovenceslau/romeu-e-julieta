@@ -42,13 +42,16 @@ const (
 	claudeMemory = "/var/lib/julieta-claude/agent-memory"
 	claudeSkills = "/home/agent/.claude/skills"
 	agentHome    = "/home/agent"
-	docsDir      = "/e2e-docs"
+	// claudeLauncher is the launcher the kit installs (REQ-1353).
+	claudeLauncher = "/usr/local/bin/julieta"
+	docsDir        = "/e2e-docs"
 )
 
 // The install hooks of julieta-claude by position.
 const (
 	claudeHookPayload = iota
 	claudeHookSettings
+	claudeHookLauncher
 	claudeHookMemory
 	claudeHookSkillsDir
 	claudeHookSkills
@@ -83,6 +86,7 @@ func TestKitJulietaClaudeDescriptor(t *testing.T) {
 		assert.Equal(t, want, h.User, "hook %d", i)
 	}
 	assert.Equal(t, []string{"JULIETA_BIN"}, hooks[claudeHookSettings].Env)
+	assert.Equal(t, []string{"JULIETA_BIN"}, hooks[claudeHookLauncher].Env)
 }
 
 // keysOf returns the keys of m.
@@ -485,9 +489,10 @@ func TestKitJulietaClaudeGuard(t *testing.T) {
 
 // TestKitJulietaClaudeMountAbsent holds the wrappers to REQ-0673 when
 // julieta cannot run, as with the .romeu/bin mount absent after an sbx
-// change: each session hook prints one stdout line naming the failure
-// and julieta status and exits 0, and the PreToolUse guard exits 2
-// (REQ-0599).
+// change: each session hook prints on stdout the alert block of
+// REQ-1352, whose fix is the host command that recreates the sandbox
+// named by SANDBOX_NAME, and exits 0, and the PreToolUse guard prints
+// the block on stderr and exits 2 (REQ-0599).
 func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 	w := workload(t)
 	k := startClaudeKit(t, false, guardDocs(t))
@@ -500,7 +505,7 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 		stdout, stderr, code := k.hookRun(s.hookCommand(t, "PreToolUse", "Bash"), "merge.json")
 		assert.Equal(t, 2, code, stderr)
 		assert.Empty(t, stdout)
-		assert.Contains(t, stderr, "julieta hooks guard failed: "+w.Julieta+" could not run, so the tool call is refused")
+		assert.Contains(t, stderr, mountAbsentBlock("julieta hooks guard did not run, so the tool call is refused", w.Julieta, "<name>"))
 	})
 	for _, c := range []struct{ event, matcher, what string }{
 		{"SessionStart", "startup", "julieta handoff show --hook"},
@@ -509,10 +514,62 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 		{"SessionStart", "compact", "julieta handoff show --hook"},
 		{"SessionEnd", "", "julieta handoff write --facts"},
 	} {
-		stdout, stderr, code := k.hookRun(s.hookCommand(t, c.event, c.matcher), "recorded.json")
+		cmd := s.hookCommand(t, c.event, c.matcher)
+		stdout, stderr, code := k.hookRun(cmd, "recorded.json")
 		assert.Zero(t, code, "%s %s: %s", c.event, c.matcher, stderr)
-		assert.Equal(t, c.what+" failed: "+w.Julieta+" could not run, the .romeu/bin mount may be absent; run julieta status\n", stdout, c.event)
+		assert.Equal(t, mountAbsentBlock(c.what+" did not run", w.Julieta, "<name>"), stdout, c.event)
+		stdout, _, code = k.hookRun("export SANDBOX_NAME=shop; "+cmd, "recorded.json")
+		assert.Zero(t, code)
+		assert.Equal(t, mountAbsentBlock(c.what+" did not run", w.Julieta, "shop"), stdout, c.event)
 	}
+
+	// The name is reduced (REQ-0673): no line, sequence or option gets
+	// through, and nothing left is <name>.
+	start := s.hookCommand(t, "SessionStart", "startup")
+	for name, want := range map[string]string{
+		`a\nb;$(touch /tmp/pwned)\033[31m`: "abtouchtmppwned31m", "-f --all": "f--all", "..": "<name>", "": "<name>",
+	} {
+		stdout, _, code := k.hookRun("export SANDBOX_NAME=\"$(printf %b '"+name+"')\"; "+start, "recorded.json")
+		assert.Zero(t, code, name)
+		assert.Equal(t, mountAbsentBlock("julieta handoff show --hook did not run", w.Julieta, want), stdout, name)
+	}
+	_, code = k.sh("0", "test ! -e /tmp/pwned")
+	assert.Zero(t, code, "the name ran a command")
+
+	// A julieta that ran and failed or was killed is no absent mount: the
+	// session hook prints nothing and exits 0, the guard prints no block
+	// and exits 2; a julieta the shell cannot execute (126) is one.
+	stub := "printf '#!/bin/sh\\nexit %s\\n' \"$1\" >" + w.Julieta + " && chmod 0755 " + w.Julieta
+	out, code := k.sh("0", "mkdir -p $(dirname "+w.Julieta+")")
+	require.Zero(t, code, out)
+	guard := s.hookCommand(t, "PreToolUse", "Bash")
+	for _, status := range []string{"1", "2", "137"} {
+		out, code = k.sh("0", "set -- "+status+"; "+stub)
+		require.Zero(t, code, out)
+		stdout, stderr, code := k.hookRun(start, "recorded.json")
+		assert.Zero(t, code, status)
+		assert.Empty(t, stdout+stderr, status)
+		stdout, stderr, code = k.hookRun(guard, "merge.json")
+		assert.Equal(t, 2, code, status)
+		assert.Empty(t, stdout, status)
+		assert.NotContains(t, stderr, "!! ", status)
+	}
+	out, code = k.sh("0", "chmod 0644 "+w.Julieta)
+	require.Zero(t, code, out)
+	stdout, _, code := k.hookRun(start, "recorded.json")
+	assert.Zero(t, code)
+	assert.Equal(t, mountAbsentBlock("julieta handoff show --hook did not run", w.Julieta, "<name>"), stdout, "status 126")
+}
+
+// mountAbsentBlock is the alert block of REQ-1352 a wrapper prints when
+// the julieta at path cannot run (REQ-0673), for the sandbox name.
+func mountAbsentBlock(fault, path, name string) string {
+	return "\n" +
+		"!! julieta cannot run: " + fault + "\n" +
+		"   binary: " + path + "\n" +
+		"   cause:  the .romeu/bin mount is likely absent\n" +
+		"   fix:    on the host, romeu recreate " + name + " (not built yet, T068: until then recreate the sandbox by hand)\n" +
+		"\n"
 }
 
 // TestKitJulietaClaudeHostileArg is the fault test of the arg: a
@@ -521,12 +578,14 @@ func TestKitJulietaClaudeMountAbsent(t *testing.T) {
 // written and no command run from the value.
 func TestKitJulietaClaudeHostileArg(t *testing.T) {
 	k := startClaudeKit(t, false, nil)
-	h := k.d.hooks(t)[claudeHookSettings]
-	for _, bad := range []string{"", "relative/julieta", "/a b", "/a;touch /tmp/pwned", "/a#b", "/a&b", "/a$(touch /tmp/pwned)", "/a\n/b"} {
-		out, code := k.run(h, "JULIETA_BIN="+bad)
-		assert.Equal(t, 1, code, "%q: %s", bad, out)
-		_, absent := k.sh("0", "test ! -e "+claudeDropIn+" && test ! -e /tmp/pwned")
-		assert.Zero(t, absent, "%q wrote the drop-in or ran its command", bad)
+	for _, i := range []int{claudeHookSettings, claudeHookLauncher} {
+		h := k.d.hooks(t)[i]
+		for _, bad := range []string{"", "relative/julieta", "/a b", "/a;touch /tmp/pwned", "/a#b", "/a&b", "/a$(touch /tmp/pwned)", "/a\n/b"} {
+			out, code := k.run(h, "JULIETA_BIN="+bad)
+			assert.Equal(t, 1, code, "%q: %s", bad, out)
+			_, absent := k.sh("0", "test ! -e "+claudeDropIn+" && test ! -e "+claudeLauncher+" && test ! -e /tmp/pwned")
+			assert.Zero(t, absent, "%q wrote the drop-in or the launcher, or ran its command", bad)
+		}
 	}
 }
 
@@ -545,4 +604,15 @@ func TestKitJulietaClaudeOwners(t *testing.T) {
 	assert.Equal(t, "/etc/claude-code root 755\n/etc/claude-code/managed-settings.d root 755\n"+agentHome+"/.claude agent 755\n"+claudeSkills+" agent 755\n", modes)
 	out, code = k.sh("agent", "mkdir -p "+agentHome+"/.claude/projects "+agentHome+"/.claude/todos")
 	assert.Zero(t, code, "the agent still writes its state below ~/.claude: %s", out)
+
+	// The launcher (REQ-1353): root's, not the agent's to rewrite, and
+	// julieta resolves by name through it before any setup.
+	modes, code = k.sh("0", "stat -c '%n %U %G %a' "+claudeLauncher)
+	require.Zero(t, code, modes)
+	assert.Equal(t, claudeLauncher+" root root 755\n", modes)
+	out, code = k.sh("agent", "echo x >>"+claudeLauncher)
+	assert.NotZero(t, code, "the agent rewrote the launcher: %s", out)
+	out, code = k.exec("agent", []string{"HOME=" + agentHome, "PATH=/usr/local/bin:/usr/bin:/bin"}, "sh", "-c", "command -v julieta && julieta version")
+	require.Zero(t, code, out)
+	assert.True(t, strings.HasPrefix(out, claudeLauncher+"\n"), out)
 }

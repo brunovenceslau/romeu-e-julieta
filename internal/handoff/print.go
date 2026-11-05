@@ -49,6 +49,9 @@ type Session struct {
 	Hook bool
 	// Warnings are julieta's warnings, finished lines, never cut.
 	Warnings []string
+	// Alerts are the alert blocks of AlertBlock, printed after the
+	// warnings and never cut (REQ-1352).
+	Alerts []string
 	// Latest is the answer of the handoff reader; Count counts new
 	// commits for the gap line.
 	Latest Latest
@@ -60,26 +63,52 @@ type Session struct {
 	Limit int
 }
 
+// AlertField is one "<label>: <value>" line of an alert block.
+type AlertField struct{ Label, Value string }
+
+// AlertBlock returns the alert block of REQ-1352 (08 8.2): an empty
+// line, "!! " and the fault, a line per field indented three spaces
+// with the values aligned, and an empty line, so the block stands apart
+// from the one-line warnings around it. The last field is the fix. The
+// caller escapes the text.
+func AlertBlock(fault string, fields ...AlertField) string {
+	width := 0
+	for _, f := range fields {
+		width = max(width, len(f.Label))
+	}
+	var b strings.Builder
+	b.WriteString("\n!! " + fault + "\n")
+	for _, f := range fields {
+		fmt.Fprintf(&b, "   %-*s %s\n", width+1, f.Label+":", f.Value)
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
 // block is a piece of the print that is shown whole or not at all.
 type block struct {
 	text    string
 	entries int // entries it holds
 }
 
-// Render returns the print: the warnings, the fixed line, the gap line
-// and the latest narrative, the facts now, the open entries not tagged
-// lesson, and the lessons (REQ-0664). Each item carries its repo label
-// and each agent-written text sits under AgentTextLine. When the print
-// of a hook passes Limit it is cut after whole blocks, the narrative
-// after whole lines, and its last line is "<n> more entries: julieta
-// memory list" (REQ-0667), or, when no entry was left out, a line that
-// says the print is cut; the warnings and the fixed line are never
-// cut, so they may pass Limit by themselves.
+// Render returns the print: the warnings and the alerts, the fixed
+// line, the gap line and the latest narrative, the facts now, the open
+// entries not tagged lesson, and the lessons (REQ-0664). Each item
+// carries its repo label and each agent-written text sits under
+// AgentTextLine. When the print of a hook passes Limit it is cut after
+// whole blocks, the narrative after whole lines, and its last line is
+// "<n> more entries: julieta memory list" (REQ-0667), or, when no entry
+// was left out, a line that says the print is cut; the warnings, the
+// alerts and the fixed line are never cut, so they may pass Limit by
+// themselves.
 func (s Session) Render() string {
 	var fixed strings.Builder
 	if s.Hook {
 		for _, w := range s.Warnings {
 			fixed.WriteString(w + "\n")
+		}
+		for _, a := range s.Alerts {
+			fixed.WriteString(a)
 		}
 		fixed.WriteString(BuiltinMemoryLine + "\n")
 	}

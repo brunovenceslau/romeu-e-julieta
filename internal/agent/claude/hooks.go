@@ -41,6 +41,9 @@ const (
 	// dropInName is the name of the drop-in the kit installs its
 	// settings file as, in managed-settings.d.
 	dropInName = "50-julieta-claude.json"
+	// LauncherPath is the launcher the kit installs, which runs julieta
+	// by the path julietaBin (06 6.4, REQ-1353).
+	LauncherPath = "/usr/local/bin/julieta"
 	// SkillsDir is the agent's skills directory, relative to $HOME.
 	SkillsDir = ".claude/skills"
 )
@@ -64,18 +67,20 @@ type Command struct {
 // Commands returns the hook commands the kit wires for julieta at the
 // absolute path julieta, quoted by internal/shquote (REQ-0596): each is
 // a shell wrapper that, when julieta cannot run (the .romeu/bin mount
-// absent), prints one line naming the failure and julieta status and
-// exits 0 for a session hook, and exits 2 for the PreToolUse guard,
-// which fails closed (REQ-0673). A status of 126 or more is the shell's
-// for a program it could not run.
+// absent), prints the alert block of REQ-1352 with the host command
+// that brings the mount back (REQ-0673) and exits 0 for a session hook,
+// and prints it on stderr and exits 2 for the PreToolUse guard, which
+// fails closed. A status of 126 or 127 is the shell's for a program it
+// could not run; a julieta that ran and failed or was killed prints no
+// block.
 func Commands(julieta string) ([]Command, error) {
 	q, err := shquote.Quote(julieta)
 	if err != nil {
 		return nil, err
 	}
 	session := func(args, what string) (string, error) {
-		line, err := shquote.Quote(what + " failed: " + julieta + " could not run, the .romeu/bin mount may be absent; run julieta status")
-		return q + " " + args + " || [ $? -lt 126 ] || echo " + line + "; exit 0", err
+		block, err := cannotRun(what+" did not run", julieta)
+		return q + " " + args + " || case $? in 126|127) " + block + ";; esac; exit 0", err
 	}
 	start, err := session("handoff show --hook", "julieta handoff show --hook")
 	if err != nil {
@@ -85,7 +90,7 @@ func Commands(julieta string) ([]Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	line, err := shquote.Quote("julieta hooks guard failed: " + julieta + " could not run, so the tool call is refused (the guard fails closed); the .romeu/bin mount may be absent; run julieta status")
+	guard, err := cannotRun("julieta hooks guard did not run, so the tool call is refused", julieta)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +100,38 @@ func Commands(julieta string) ([]Command, error) {
 	}
 	return append(cmds,
 		Command{Event: SessionEnd, Command: end},
-		Command{Event: PreToolUse, Matcher: "Bash", Command: q + " hooks guard || { [ $? -eq 2 ] || echo " + line + " >&2; exit 2; }"},
+		Command{Event: PreToolUse, Matcher: "Bash", Command: q + " hooks guard || { case $? in 126|127) " + guard + " >&2;; esac; exit 2; }"},
 	), nil
+}
+
+// recreateFix is the fix line of the alert block of a julieta that
+// cannot run (REQ-0673). It is the one argument the shell expands: the
+// name of the sandbox sbx runs in, every character outside A-Za-z0-9._-
+// removed, then any leading - or ., cut at 64 characters, or <name>
+// when that leaves nothing, so the value cannot add a line, a terminal
+// sequence or an option (REQ-1352). The text after the command goes
+// when romeu recreate is built (T068).
+const recreateFix = `   fix:    on the host, romeu recreate $(printf %s "${SANDBOX_NAME:-}" | tr -cd 'A-Za-z0-9._-' | sed 's/^[-.]*//' | cut -c1-64 | grep . || echo '<name>')` +
+	" (not built yet, T068: until then recreate the sandbox by hand)"
+
+// cannotRun returns the shell command that prints the alert block of
+// REQ-1352 for a julieta at the path julieta that cannot run, whose
+// first line names fault: printf with one quoted line per argument.
+func cannotRun(fault, julieta string) (string, error) {
+	var cmd strings.Builder
+	cmd.WriteString("printf '%s\\n' ''")
+	for _, l := range []string{
+		"!! julieta cannot run: " + fault,
+		"   binary: " + julieta,
+		"   cause:  the .romeu/bin mount is likely absent",
+	} {
+		q, err := shquote.Quote(l)
+		if err != nil {
+			return "", err
+		}
+		cmd.WriteString(" " + q)
+	}
+	return cmd.String() + ` "` + recreateFix + `" ''`, nil
 }
 
 // Settings is the part of a settings file of the agent julieta reads.

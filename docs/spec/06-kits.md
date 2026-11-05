@@ -155,7 +155,7 @@ obligation of the row above:
    synced or pushed (08 8.1); a run that leaves the sandbox unusable
    records the hook failure `Setup` (08 8.2, REQ-0675) and a clean run
    clears it. When julieta cannot run at all (the `.romeu/bin` mount
-   absent), the wrapper rule of REQ-0673 prints its line and nothing is
+   absent), the wrapper rule of REQ-0673 prints its alert block and nothing is
    recorded. The hook is outside the digest of REQ-0587: it is no
    installed file `setup` can read. `romeu run` step 6 (REQ-0357) stays
    the authoritative run: it is where a sandbox left unusable stops the
@@ -163,6 +163,18 @@ obligation of the row above:
    romeu renders the sandboxes, this hook replaces step 7 of the sandbox
    definitions repository's julieta runbook, which the operator ran by
    hand after each recreate (decided on 2026-10-28).
+8. `REQ-1353` A launcher at `/usr/local/bin/julieta`, root-owned, mode
+   0755, a `sh` script that runs `exec <julietaBin> "$@"`, so `julieta`
+   resolves by name in every sandbox with the kit, before any `julieta
+   setup`, and the agent user cannot rewrite it; where the agent has
+   root, as through `sudo`, it can, so the launcher is a convenience and
+   not a boundary. The hooks and the guard keep the absolute path. `$HOME/.local/bin` comes first on the agent's
+   `PATH` and is the agent's, so a `julieta` there, the link of REQ-0397
+   or any other file, shadows the launcher for the agent's own calls
+   only; SessionStart says when the `julieta` the shell finds is neither
+   the launcher nor the running julieta (08 8.2, REQ-1351). Added on
+   2026-11-03, after a sandbox where `setup` had not run lost its
+   handoff to a file because the skills call `julieta` by name.
 
 `julieta-claude` replaces the agent's built-in memory with
 `julieta memory` on purpose

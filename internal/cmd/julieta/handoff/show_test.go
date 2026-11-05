@@ -85,6 +85,41 @@ func TestShowHookPrintsInOrder(t *testing.T) {
 	assert.Contains(t, plain, "the newest facts differ")
 }
 
+// TestShowHookAlertsJulietaOffPath prints the alert block
+// julieta-link-missing (REQ-1351, REQ-1352) after the one-line warnings
+// and before the fixed line, set apart by empty lines: when julieta is
+// not on PATH, with the setup of the running julieta as its fix, and
+// when the julieta on PATH is another program, with its removal. With
+// julieta on PATH as setup links it there is no alert.
+func TestShowHookAlertsJulietaOffPath(t *testing.T) {
+	s := newSandbox(t)
+	s.setupState(t, setup.Warning{Slug: "lock-stale", Message: "api mise.lock is behind mise.toml"})
+	assert.NotContains(t, s.ok(t, "", "handoff", "show", "--hook"), "!! ", "julieta is on PATH")
+
+	link := filepath.Join(s.home, ".local", "bin", "julieta")
+	require.NoError(t, os.Remove(link))
+	restore := handoff.SetExecutable(func() (string, error) { return "/opt/a b/julieta-linux-arm64", nil })
+	defer restore()
+	const warning = "warning lock-stale: api mise.lock is behind mise.toml\n"
+	const fixed = "built-in memory is disabled, use julieta memory add\n"
+	out := s.ok(t, "", "handoff", "show", "--hook")
+	assert.True(t, strings.HasPrefix(out, warning+"\n"+
+		"!! julieta is not on PATH (julieta-link-missing)\n"+
+		"   fix: '/opt/a b/julieta-linux-arm64' setup\n"+
+		"\n"+fixed), out)
+
+	// Another program shadows the launcher.
+	require.NoError(t, os.WriteFile(link, []byte("#!/bin/sh\n"), 0o700))
+	out = s.ok(t, "", "handoff", "show", "--hook")
+	assert.True(t, strings.HasPrefix(out, warning+"\n"+
+		"!! julieta on PATH is another program (julieta-link-missing)\n"+
+		"   found: "+link+"\n"+
+		"   fix:   rm "+link+"\n"+
+		"\n"+fixed), out)
+	// Without --hook: no alert.
+	assert.NotContains(t, s.ok(t, "", "handoff", "show"), "!! ")
+}
+
 // TestShowHookPrintsSnapshotsDisabled prints the warning
 // snapshots-disabled setup recorded, as every warning of julieta state,
 // and keeps it: a SessionStart clears no warning (REQ-0665).

@@ -18,3 +18,11 @@ func SetBeforeGit(f func()) (restore func()) {
 	beforeGit = f
 	return func() { beforeGit = old }
 }
+
+// SetExecutable sets the seam that finds the running julieta and
+// returns the function that restores it.
+func SetExecutable(f func() (string, error)) (restore func()) {
+	old := executable
+	executable = f
+	return func() { executable = old }
+}

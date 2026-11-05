@@ -6,17 +6,21 @@ package handoff
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 
 	"github.com/spf13/cobra"
 
+	"github.com/brunovenceslau/romeu-e-julieta/internal/agent/claude"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cli"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/cmd/julieta/setup"
 	hf "github.com/brunovenceslau/romeu-e-julieta/internal/handoff"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/hooks"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/manifest"
 	"github.com/brunovenceslau/romeu-e-julieta/internal/memstore"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/procgroup"
+	"github.com/brunovenceslau/romeu-e-julieta/internal/shquote"
 )
 
 var _ = cli.Register(func() cli.Command {
@@ -98,6 +102,7 @@ func render(ctx context.Context, repo string, hook bool) (string, error) {
 		if s.Warnings, err = warnings(sb.home); err != nil {
 			return "", err
 		}
+		s.Alerts = pathAlert()
 	}
 	return s.Render(), nil
 }
@@ -167,4 +172,49 @@ func warnings(home string) ([]string, error) {
 		out = append(out, "hook failure: the store of hook failures is partly unreadable: "+oneLine(ferr.Error()))
 	}
 	return out, nil
+}
+
+// executable finds the running julieta; a test replaces it.
+var executable = os.Executable
+
+// pathAlert returns the alert block julieta-link-missing (REQ-1351):
+// when julieta is not found on PATH, with the setup of the running
+// julieta as its fix, and when the julieta found is neither the kit's
+// launcher nor the running julieta, with its removal as the fix; nil
+// otherwise. A path is shell-quoted, then escaped, so the fix can be
+// pasted.
+func pathAlert() []string {
+	exe, exeErr := executable()
+	found, err := procgroup.LookPath("julieta")
+	if err != nil {
+		fix := "<the absolute path of julieta> setup"
+		if exeErr == nil {
+			fix = quoted(exe) + " setup"
+		}
+		return []string{hf.AlertBlock("julieta is not on PATH (julieta-link-missing)",
+			hf.AlertField{Label: "fix", Value: fix})}
+	}
+	if found == claude.LauncherPath || (exeErr == nil && sameFile(found, exe)) {
+		return nil
+	}
+	return []string{hf.AlertBlock("julieta on PATH is another program (julieta-link-missing)",
+		hf.AlertField{Label: "found", Value: esc(found)},
+		hf.AlertField{Label: "fix", Value: "rm " + quoted(found)})}
+}
+
+// quoted returns p quoted for a shell, then escaped for the terminal.
+func quoted(p string) string {
+	q, err := shquote.Quote(p)
+	if err != nil {
+		return "<path>"
+	}
+	return esc(q)
+}
+
+// sameFile reports whether a and b, symbolic links followed, are the
+// same file.
+func sameFile(a, b string) bool {
+	ia, errA := os.Stat(a)
+	ib, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(ia, ib)
 }
