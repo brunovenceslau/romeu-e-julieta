@@ -19,8 +19,11 @@ var kitSpecDigests = map[string]string{
 	"capabilities/com.docker.sandbox/agent-skill@1.schema.json":                "91dd731450f0d0f1a3494106fc336f478e606b0ff0201bc669aa1d771c662298",
 	"capabilities/com.docker.sandbox/agent-skills@1.schema.json":               "fb3021c7ab6efc0d1c06915d5e1257ec4fb6791434acac84586c8bebf1477179",
 	"capabilities/com.docker.sandbox/credential@1.schema.json":                 "8fcb59a22ee96e3d77fff6da1dc409b530a7e917cfeacd0e86918a8876f2e217",
+	"capabilities/com.docker.sandbox/docker-auth@1.schema.json":                "8a4609570a1f34914e6c628b787a77ea00f5f9278a488269b373716ca4b16789",
+	"capabilities/com.docker.sandbox/dockerd@1.schema.json":                    "7485a7dda66fa923906a3f4644ccac5ae5ac1de3439d5a8f455381789d96ccf8",
 	"capabilities/com.docker.sandbox/git-identity@1.schema.json":               "df8997e0c26722c7a8fd29c2dbb5124e26cd9080c686e7039eb6b2d667200d6d",
 	"capabilities/com.docker.sandbox/host-mount@1.schema.json":                 "130b62338ac3d4ae947fa808094304330090f853422f10f95e245a2ac1417657",
+	"capabilities/com.docker.sandbox/host-port@1.schema.json":                  "15c303872663677d79b198efb4ddaa78337dbe329ac04087e00096490b5736d7",
 	"capabilities/com.docker.sandbox/kit-registry@1.schema.json":               "416244181629a7a59e404d02e7e913962bc12ba17c8042d127fb6671d3c2e377",
 	"capabilities/com.docker.sandbox/lifecycle@1.schema.json":                  "77157604b65c6e9162d9d649405a863cbaa715586f470f273edce09a3581cc34",
 	"capabilities/com.docker.sandbox/long-running@1.schema.json":               "9579d79f36fa7014115d4d4134e9dd88b53534e54c847fa87139aa0ac2e9e6b7",
@@ -34,5 +37,5 @@ var kitSpecDigests = map[string]string{
 	"capabilities/com.docker.sandbox/usb-device@1.schema.json":                 "b4398c03cac4e9de33d6deb711c8c1b3c8bc35a8325aaf3af1fafe0a984eadf7",
 	"capabilities/com.docker.sandbox/volume@1.schema.json":                     "027eeb47a2078c85f2411cc86d1dfc7c405d8653326ee41acd35db0f7c542a16",
 	"definitions/kit-arg.schema.json":                                          "2817f5948805d6a431b41f64155b19848bb3c903efab2908648586413480eab3",
-	"kit.schema.json":                                                          "ae3eac2e6798165f474fe2d62c672e7c1e550e815735b43973fe7444d59b1605",
+	"kit.schema.json":                                                          "4e81d01e7de774a27bfc9258f7810545137bf627497d4e9966eaa557ae8918a6",
 }

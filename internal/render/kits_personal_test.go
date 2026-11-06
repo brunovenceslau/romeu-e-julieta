@@ -214,17 +214,20 @@ func TestPersonalKitsMaterializeFromTheConfigCommit(t *testing.T) {
 	assertOnlyCandidate(t, parent)
 }
 
-// TestPersonalKitsRefuseTheFiveCapabilities: a personal kit that
-// declares a network, mount, volume, credential or ssh-agent capability
-// is a sync error naming the kit and the type, and nothing is written.
-func TestPersonalKitsRefuseTheFiveCapabilities(t *testing.T) {
+// TestPersonalKitsRefuseTheSevenCapabilities: a personal kit that
+// declares a network, mount, volume, credential, ssh-agent, docker-auth or
+// host-port capability is a sync error naming the kit and the type, and
+// nothing is written.
+func TestPersonalKitsRefuseTheSevenCapabilities(t *testing.T) {
 	t.Parallel()
 	caps := map[string]string{
-		"network":    "  - type: com.docker.sandbox/network-policy@2\n    config:\n      runtime: {allow: [a.example]}\n",
-		"mount":      "  - type: com.docker.sandbox/host-mount@1\n    config: {path: /m}\n",
-		"volume":     "  - type: com.docker.sandbox/volume@1\n    config: {path: /data}\n",
-		"credential": "  - type: com.docker.sandbox/credential@1\n    config: {service: svc, phase: runtime, apiKey: {name: KEY}}\n",
-		"ssh-agent":  "  - type: com.docker.sandbox/ssh-agent@1\n    config: {phase: runtime, unrestricted: false, sign: [git]}\n",
+		"network":     "  - type: com.docker.sandbox/network-policy@2\n    config:\n      runtime: {allow: [a.example]}\n",
+		"mount":       "  - type: com.docker.sandbox/host-mount@1\n    config: {path: /m}\n",
+		"volume":      "  - type: com.docker.sandbox/volume@1\n    config: {path: /data}\n",
+		"credential":  "  - type: com.docker.sandbox/credential@1\n    config: {service: svc, phase: runtime, apiKey: {name: KEY}}\n",
+		"ssh-agent":   "  - type: com.docker.sandbox/ssh-agent@1\n    config: {phase: runtime, unrestricted: false, sign: [git]}\n",
+		"docker-auth": "  - type: com.docker.sandbox/docker-auth@1\n    config: {registries: [ghcr.io]}\n",
+		"host-port":   "  - type: com.docker.sandbox/host-port@1\n    config: {host: 5432}\n",
 	}
 	files := map[string]string{}
 	for typ, c := range caps {

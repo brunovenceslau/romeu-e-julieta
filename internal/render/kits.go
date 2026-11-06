@@ -47,8 +47,8 @@ var goarchForm = regexp.MustCompile(`^[a-z0-9]+$`)
 const ConfigKitsDir = "kits"
 
 // ErrPersonalCapability is the error of a personal kit that declares a
-// network, mount, volume, credential or ssh-agent capability, which a
-// personal kit may not (06 6.1, REQ-0574; I28, REQ-0514): a sync error.
+// network, mount, volume, credential, ssh-agent, docker-auth or host-port
+// capability, which a personal kit may not (06 6.1, REQ-0574; I28, REQ-0514): a sync error.
 var ErrPersonalCapability = errors.New("render: a capability a personal kit may not declare")
 
 // ErrPersonalKind is the error of a personal kit whose descriptor kind
@@ -336,8 +336,8 @@ func crossCheck(prefix string, modes map[string]string, dirs []string, reads map
 
 // refusedCapability returns the first capability type of c a personal
 // kit may not declare, in the order of REQ-0574, or "" when c declares
-// none: network, mount (a host mount), volume, credential and
-// ssh-agent.
+// none: network, mount (a host mount), volume, credential, ssh-agent,
+// docker-auth and host-port.
 func refusedCapability(c oci.Capabilities) string {
 	switch {
 	case c.Network != nil:
@@ -350,6 +350,10 @@ func refusedCapability(c oci.Capabilities) string {
 		return "credential"
 	case len(c.SSHAgent) > 0:
 		return "ssh-agent"
+	case len(c.DockerAuth) > 0:
+		return "docker-auth"
+	case len(c.HostPorts) > 0:
+		return "host-port"
 	}
 	return ""
 }

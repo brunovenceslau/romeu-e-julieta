@@ -318,6 +318,39 @@
                         },
                         "type": "array"
                       },
+                      "dockerAuth": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "registries": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "registries"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "dockerd": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "autoStart": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
                       "dockerfile": {
                         "type": "string"
                       },
@@ -334,6 +367,33 @@
                           },
                           "required": [
                             "type"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "hostPorts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "container": {
+                              "type": "string"
+                            },
+                            "family": {
+                              "type": "string"
+                            },
+                            "host": {
+                              "type": "string"
+                            },
+                            "optional": {
+                              "type": "boolean"
+                            },
+                            "transport": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "host"
                           ],
                           "type": "object"
                         },
@@ -1267,6 +1327,39 @@
                       },
                       "type": "array"
                     },
+                    "dockerAuth": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "registries": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "registries"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "dockerd": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "autoStart": {
+                          "type": "string"
+                        },
+                        "optional": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
                     "dockerfile": {
                       "type": "string"
                     },
@@ -1283,6 +1376,33 @@
                         },
                         "required": [
                           "type"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "hostPorts": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "container": {
+                            "type": "string"
+                          },
+                          "family": {
+                            "type": "string"
+                          },
+                          "host": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "transport": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "host"
                         ],
                         "type": "object"
                       },
