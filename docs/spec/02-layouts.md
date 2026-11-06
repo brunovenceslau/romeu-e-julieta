@@ -262,7 +262,7 @@ $ROMEU_ROOT/                            default $HOME/Developer; never a VS Code
    │  ├─ render.json                    derived: spec source, SHAs, file digests, egress, digests, promotion marker
    │  ├─ candidates/<candidate-id>/     at most one unapproved candidate (sbxenv.yaml, render.json, kits/); never referenced by a live file
    │  ├─ kits/<kit>-<digest12>/         approved kit sources, content-addressed and immutable, referenced as ./.romeu/kits/<kit>-<digest12>
-   │  └─ bin/                           julieta-linux-<GOARCH>, SHA256SUMS; mounted read-only into the sandbox
+   │  └─ bin/                           julieta-linux-<GOARCH>, SHA256SUMS, julieta (a relative link to the binary, 06 6.3); mounted read-only into the sandbox at /opt/julieta/bin
    ├─ <dir>/                            host clone of each repo (primary is the sbx workspace, clone mode)
    ├─ review/<dir>/                     hardened review checkout (created by `romeu pull`)
    ├─ memory/<dir>/                     per-repo memory, mounted rw into this project's sandbox only; sync creates it 0700, julieta writes its files 0600
@@ -304,9 +304,26 @@ world-accessible.
 host clone is read-only from the sandbox), `./memory/_shared` and `./memory/<dir>` for every
 repo (direct, rw) and `./.romeu/bin` (direct, read-only). `.romeu/bin`
 is a fixed mount: no spec field names it and each project has it.
+`REQ-1355` Each of those mounts but the primary clone's, which clone
+mode keeps at its host path, names its in-sandbox `target` (sbx 0.51,
+`additionalWorkspaces[].target`), a path named after its consumer, as
+the FHS places a package: `/opt/julieta/bin` for `./.romeu/bin`,
+`/var/lib/julieta/memory/_shared` and `/var/lib/julieta/memory/<dir>`
+for the memory dirs (2.5), so no other host path reaches the sandbox,
+and a kit names julieta by one constant path
+([06 6.3](06-kits.md#63-julieta-delivery)). `/opt/julieta` and
+`/var/lib/julieta` are romeu's: no product kit lays a file under either
+**[review]**, and the hook wrappers check the mount point before they
+run julieta (REQ-1372, [08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)).
+Decided on 2026-11-06; no sandbox romeu created exists before `run` is
+built, and the sandboxes of the by-hand bridge
+([docs/notes/julieta-by-hand.md](../notes/julieta-by-hand.md)) get the
+targets in their hand-written definitions before the kit that names the
+path is pinned, so nothing migrates.
 `sbxenv.yaml` and the rest of `.romeu/` sit outside every mount; paths
 in the file are `./x`, relative to the file; no `..`, no absolute path.
-Confirmed by probes A3 and A5. The runtime ledger's two mounts of
+Confirmed by probes A3 and A5; A3 also checks that each mount is at its
+target. The runtime ledger's two mounts of
 [13 13.1](13-runtime-ledger.md#131-stores) are not in v1.
 
 `REQ-0143` Host git refs written by romeu in each host clone, all in romeu-owned
@@ -375,10 +392,10 @@ store is the table of [01 1.2](01-system-model.md#where-data-lives).
 | What | Path | Owner |
 |---|---|---|
 | primary repo | same absolute path as the host clone (sbx clone mode) | sbx |
-| julieta binaries | same absolute path as `<name>-env/.romeu/bin/` (read-only mount); `REQ-0151` romeu always invokes them by that absolute path | romeu |
-| `julieta` on `PATH` | `REQ-0152` `$HOME/.local/bin/julieta`, a symlink to the running binary, created by `julieta setup` at runtime | julieta |
+| julieta binaries | `/opt/julieta/bin`, the fixed target of the read-only mount of `<name>-env/.romeu/bin/` (2.3, REQ-0142; decided on 2026-11-06); `REQ-0151` romeu always invokes them by that absolute path, `/opt/julieta/bin/julieta-linux-<GOARCH>` ([06 6.3](06-kits.md#63-julieta-delivery), step 3) | romeu |
+| `julieta` on `PATH` | `/usr/local/bin/julieta`, the link the `julieta-claude` kit installs ([06 6.4](06-kits.md#64-product-kits), item 8, REQ-1353); the two entry points are 06 6.3 item 5; the `$HOME/.local/bin/julieta` link of `julieta setup` is retired (REQ-0152, 2026-11-06, [12 12.11](12-engineering.md#1211-requirement-ids)) | `julieta-claude` kit |
 | secondary repos | `REQ-0153` `$HOME/src/<name>/<dir>` | julieta (`julieta setup`) |
-| memory dirs | same absolute path as on the host (direct mount) | host tree |
+| memory dirs | `/var/lib/julieta/memory/<dir>` and `/var/lib/julieta/memory/_shared`, the fixed targets of the direct mounts (REQ-0142; decided on 2026-11-06) | host tree |
 | julieta state | `REQ-0154` `$HOME/.local/state/julieta/` (manifest cache, install digests, snapshot timestamps, recorded hook failures, the recorded system hooks path, the report of the last `setup` in `setup.log`, the setup lock, and `snapshot/<dir>/`, where the snapshot of the repo `<dir>` builds its bundle) | julieta |
 | julieta hook dispatcher | `$HOME/.local/share/julieta/hooks/` (global `core.hooksPath`) | julieta |
 | mise | `$HOME/.local/bin/mise`, data in `$HOME/.local/share/mise` | julieta product kit |

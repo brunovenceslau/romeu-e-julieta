@@ -140,6 +140,7 @@ naming the host-only rules it did not check.
 | `agent` | `REQ-1259` `^[a-z0-9][a-z0-9._-]{0,62}$`: sbx takes a built-in agent's name or a kit's, and publishes no pattern; narrowest form, decided on 2026-10-22 | both |
 | `sandboxOptions.cpus` | `REQ-1260` a whole number from 0 to 256, 0 being sbx's default (the host's); that the host has that many CPUs is checked at run time. Source: [sbx environment files](https://docs.docker.com/ai/sandboxes/configuration/environment-files/), `sandboxOptions` | both |
 | `sandboxOptions.memory` | `REQ-1261` a whole number followed by `m` or `g`, binary units, at least `512m`; the host's maximum is checked at run time. Source: [sbx create](https://docs.docker.com/reference/cli/sbx/create/), `--memory` | both |
+| `sandboxOptions.rootSize`, `sandboxOptions.dockerSize`, `sandboxOptions.clonedWorkspaceSize` | `REQ-1356` each a whole number followed by `m` or `g`, binary units, as `memory` is written, with no minimum of romeu's (`512m`, `20g`); the release notes name the keys and no bound: `rootSize` sizes the sandbox's root overlay (sbx 0.51), `dockerSize` its Docker volume (the setting `DOCKER_SANDBOXES_DOCKER_SIZE` carried since 0.42) and `clonedWorkspaceSize` its cloned workspace volume (`DOCKER_SANDBOXES_CLONED_WORKSPACE_SIZE`, 0.38); omitted, sbx's default holds; what sbx refuses of a value is sbx's own error at run time, and A15 records what a change does under a stopped sandbox. Source: [sbx v0.51.0 release notes](https://github.com/docker/sbx-releases/releases/tag/v0.51.0), `sandboxOptions` (added on 2026-11-06) | both |
 | `ports[]` | `REQ-1262` `[[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL]`, protocols `tcp`, `tcp4`, `tcp6`, `udp`, `udp4`, `udp6`, each port from 1 to 65535 with no leading zero; `HOST_IP` only `127.0.0.1`, because another address would expose the sandbox's port to the network; none is loopback, as in sbx. Deferred: the IPv6 loopback as `HOST_IP`; trigger: the IPv6 host-IP form measured against a real sbx (T029), when the row widens (decided on 2026-10-22). Source: [sbx ports](https://docs.docker.com/reference/cli/sbx/ports/) | both |
 | `salvage.excludeIgnored[]` | `REQ-1263` a clean relative path, an optional trailing `/`, no `..` element, no leading `-`; narrowest form, decided on 2026-10-22 | both |
 | `egress.tools` key | `REQ-1264` `<backend>:<tool>` as `mise.lock` writes it, `^[a-z0-9][a-z0-9-]*:[A-Za-z0-9@][A-Za-z0-9._/@-]*$`; narrowest form, decided on 2026-10-22 | both |
@@ -173,6 +174,7 @@ kits:                         # order is kept; product kits come from the romeu 
 sandboxOptions:
   cpus: 4
   memory: 8g
+  rootSize: 20g               # optional, with dockerSize and clonedWorkspaceSize (3.1)
 secrets: [github]             # names only; resolved via host settings "github@shop"
 memory:
   remote: https://github.com/example/shop-memory   # the private repository that keeps <name>-env/memory/ (08 8.1); `none` opts out
@@ -225,12 +227,16 @@ What the tags decide:
 
 - `ref` decides which commit egress derives from, so it is widening
   with the rest of `repos`.
-- `workload` and `kits` are widening with their capabilities.
+- `workload` and `kits` are widening with their capabilities, and
+  apply at recreate: `run` hands the changed env file to sbx, which
+  applies it to the existing sandbox where it can
+  ([01 1.7](01-system-model.md#17-vocabulary), recreate needed).
 - `secrets` applies at recreate; it becomes `live` if probe A10
   confirms it (Q18).
 - `salvage.excludeIgnored` is widening, since it defines acknowledged
   loss.
-- `REQ-0192` `sandboxOptions` (`cpus` and `memory` only) is ungated and
+- `REQ-0192` `sandboxOptions` (`cpus`, `memory`, `rootSize`, `dockerSize`
+  and `clonedWorkspaceSize`) is ungated and
   applies at recreate: `status` reports recreate needed, it is stripped
   from `renderDigest`, and it is on the list of deliberately ungated
   fields (01 1.4), an accepted risk of
@@ -274,7 +280,8 @@ later version could delegate readiness to mise daemons.
 
 `REQ-0198` Produced only by `internal/render` through the YAML marshaller. The key
 names below follow the documented env-file schema and the documented v3
-workload pattern; `REQ-0199` the golden files are **probe-confirmed**: probe A5
+workload pattern, with `skills` (sbx 0.43), `additionalWorkspaces[].target`
+and `cmd` (sbx 0.51) from the release notes that introduced them; `REQ-0199` the golden files are **probe-confirmed**: probe A5
 runs `sbx env plan` on them and records the hash of each golden's
 normalized form (decoded and re-encoded with sorted keys by one
 function in `internal/canon`), and `tools/ci probes` compares that
@@ -290,16 +297,21 @@ name: shop
 agent: sbx-kit-claude
 workspace: ./shop-api
 additionalWorkspaces:
-  - ./memory/_shared
-  - ./memory/shop-api
-  - ./memory/shop-web
+  - path: ./memory/_shared
+    target: /var/lib/julieta/memory/_shared
+  - path: ./memory/shop-api
+    target: /var/lib/julieta/memory/shop-api
+  - path: ./memory/shop-web
+    target: /var/lib/julieta/memory/shop-web
   - path: ./.romeu/bin
+    target: /opt/julieta/bin
     readOnly: true
+skills: off
+cmd: [/opt/julieta/bin/julieta, layout, up]
 kits:
   - source: docker.io/docker/sbx-kit-claude@sha256:<64 hex>
   - source: ./.romeu/kits/julieta-<digest12>
   - source: ./.romeu/kits/julieta-claude-<digest12>
-    args: {julietaBin: "<abs root>/<name>-env/.romeu/bin"}
   - source: ./.romeu/kits/os-base-<digest12>
     args: {tz: Etc/UTC}
   - source: ./.romeu/kits/git-ssh-sign-<digest12>
@@ -318,7 +330,22 @@ hooks (they re-prompt on every invocation and `preRemove` only warns);
 argv with a scrubbed environment; romeu only ever renders `command`,
 never a literal value; `REQ-0202` clone mode comes from romeu's `sbx env run
 --clone`. `./.romeu/bin` is a fixed mount, rendered for each project
-from no spec field. `REQ-0203` romeu names this file by path; probe A5 records
+from no spec field. `REQ-1357` Every additional workspace carries a
+`target`, the fixed in-sandbox path of
+[02 2.5](02-layouts.md#25-in-sandbox-paths) (sbx 0.51), and
+`./.romeu/bin` its `readOnly`. `REQ-1358` `skills` is written as `off`:
+sbx's default shares the host's skills store read-only into every
+sandbox (sbx 0.43, `skills.defaultMode`), content no gate reads, and the
+skills a sandbox of romeu gets are its kits'
+([06 6.4](06-kits.md#64-product-kits)); sharing the store is a row of
+[Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-06).
+`REQ-1370` `cmd` is `[/opt/julieta/bin/julieta, layout, up]` (sbx 0.51),
+the command of an attached `sbx env run <dir>`, so `romeu run` attaches
+through that call ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
+step 7) and an operator who starts the sandbox with `sbx env run <dir>`
+by hand gets the run layout from the manifest julieta cached (REQ-0425;
+without one, `layout up` says so and opens a shell, 04 4.3); no
+`entrypoint` is written (decided on 2026-11-06). `REQ-0203` romeu names this file by path; probe A5 records
 whether sbx also reads a sandbox configuration from the workspace tree,
 and if it does, that file joins the plant list of I3 and the drift
 check refuses it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
@@ -480,12 +507,12 @@ says in the pull request which kind the member is.
   "project": "shop",
   "specCommit": "<sha>",
   "generation": "01j9zc2q8x7w4t6y3r5e1v9k0p",
-  "sharedMemory": "/abs/root/shop-env/memory/_shared",
+  "sharedMemory": "/var/lib/julieta/memory/_shared",
   "repos": [
     {"dir": "shop-api", "url": "https://github.com/example/shop-api", "primary": true, "ref": "main",
-     "path": "/abs/root/shop-env/shop-api", "memory": "/abs/root/shop-env/memory/shop-api", "base": ["<sha>"]},
+     "path": "/abs/root/shop-env/shop-api", "memory": "/var/lib/julieta/memory/shop-api", "base": ["<sha>"]},
     {"dir": "shop-web", "url": "https://github.com/example/shop-web", "primary": false, "ref": "main",
-     "path": "/home/agent/src/shop/shop-web", "memory": "/abs/root/shop-env/memory/shop-web", "base": ["<sha>"]}
+     "path": "/home/agent/src/shop/shop-web", "memory": "/var/lib/julieta/memory/shop-web", "base": ["<sha>"]}
   ],
   "salvage": {"excludeIgnored": ["node_modules/", ".venv/", "target/"], "capBytes": 1073741824},
   "salvageRun": {"id": "01j9zd0a1b2c3d4e5f6g7h8j9k"},
@@ -511,7 +538,9 @@ decisions:
 3. `REQ-0221` `repos[].path` is the primary's host path (clone mode
    keeps it); a secondary's is `<home>/src/<project>/<dir>`, where
    `<home>` is the workload user's home, measured by probe A4 and
-   stored with the workload pin in `kits/pins.yaml`.
+   stored with the workload pin in `kits/pins.yaml`; `repos[].memory`
+   and `sharedMemory` are the in-sandbox targets of the memory dirs
+   ([02 2.5](02-layouts.md#25-in-sandbox-paths); amended on 2026-11-06).
 4. `REQ-0222` `repos[].base` are origin SHAs the host clone already
    has, each held by the create-only ref
    `refs/romeu/base/<name>/<generation>/<dir>`
@@ -542,6 +571,7 @@ julieta accepts manifests, is described in
     "sbxenv.yaml": "<sha256>",
     ".romeu/kits/julieta-3f9a1c2b7d4e": "<kit-tree digest>",
     ".romeu/bin/julieta-linux-arm64": "<sha256>",
+    ".romeu/bin/julieta": "link:julieta-linux-arm64",
     ".romeu/bin/SHA256SUMS": "<sha256>"
   },
   "egress": {"auto": ["dl.google.com"], "gated": [{"domain": "github.com", "reason": "upload"}], "effectiveDigest": "<hex>"},
@@ -561,6 +591,10 @@ pointer.
 `REQ-0227` `previousFiles` is the `files` map before the promotion, which
 recovery writes back when the candidate no longer verifies. The julieta
 binary digest here is what the compatibility check compares against.
+The entry of the `julieta` link ([06 6.3](06-kits.md#63-julieta-delivery))
+holds `link:` and its target, a plain sibling file name with no `/`,
+which the drift check reads with `readlink` and never follows (added on
+2026-11-06).
 
 ## 3.8 Host state (schemas `state-*.v1`)
 
@@ -569,7 +603,7 @@ binary digest here is what the compatibility check compares against.
 ```json
 {
   "schema": "state-toolchain/v1",
-  "sbxVersion": "0.49.2",
+  "sbxVersion": "0.51.0",
   "romeu": {"version": "v1.0.0", "sha256": "<hex>"},
   "julieta": {"version": "v1.0.0", "protocol": 1, "sha256": "<hex>"},
   "catalogDigest": "<hex>",
@@ -590,7 +624,7 @@ says which states persist; the candidate states do not):
   "retiring": null,
   "generations": [
     {"id": "01j9zc2q8x7w4t6y3r5e1v9k0p", "state": "open", "adopted": false,
-     "createdAt": "2026-10-02T09:14:07Z", "createdWith": "<recreateDigest>",
+     "createdAt": "2026-10-02T09:14:07Z", "createdWith": "<recreateDigest>", "sbxVersion": "0.51.0",
      "workspacePath": "/abs/root/shop-env/shop-api",
      "repos": [{"dir": "shop-api", "url": "https://github.com/example/shop-api", "primary": true},
                {"dir": "shop-web", "url": "https://github.com/example/shop-web", "primary": false}],
@@ -617,7 +651,8 @@ both forms.
 | `retiring` | `REQ-0230` `null`, or `{"attic": "<UTC-ts>"}` while the retire steps of 01 1.6 run |
 | `generations[]` | `REQ-0231` every generation of the project; v1 keeps them all, so the record grows by one generation per recreate and has no bound. `doctor` warns past 256 KiB, and compaction is a row of [Deferred decisions](../spec.md#in-the-product) |
 | `generations[].state` | `REQ-0232` `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
-| `generations[].createdWith` | `REQ-0233` the recreate digest at create; `null` for an adopted generation (status reports "recreate digest unknown") |
+| `generations[].createdWith` | `REQ-0233` the recreate digest at create, or at the last env file sbx applied to the sandbox in place ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3; amended on 2026-11-07); `null` for an adopted generation (status reports "recreate digest unknown") |
+| `generations[].sbxVersion` | `REQ-1359` the sbx version that created the sandbox, read after the create from the field sbx 0.51 records for it (`sbx inspect`; A4 records the field and its shape); absent for a generation created before this member, by an older sbx or by `adopt`; `status` prints it beside the live `sbx version` (added on 2026-11-06) |
 | `salvage[].manifestSha256` | `REQ-0234` plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
 | `salvage[].id` | `REQ-0235` a ULID, as the generation's id is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
 | `salvage[].fingerprint` | `REQ-0236` `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the `fingerprint` digest (3.12) of the values the list **Fingerprint** after this table names, not read again at that write. That list is the one home of what a fingerprint is; the pages that compare one cite it. A field of the state format, under the version rule of the opening of this page |

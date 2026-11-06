@@ -24,9 +24,11 @@ The same holds for the two mounts julieta reads. The memory directory
 of [08 8.1](../spec/08-memory-handoff-salvage.md) is a layout on the
 host, read through `os.Root` with the allowlist and the caps; who
 mounted it is invisible to the reader. The read-only bin directory of
-`.romeu/bin` ([06 6.3](../spec/06-kits.md)) holds a julieta binary and
-its `SHA256SUMS`; `julieta setup` links the binary and checks the sum,
-whoever built it.
+`.romeu/bin` ([06 6.3](../spec/06-kits.md)) holds a julieta binary,
+its `SHA256SUMS` and the `julieta` link, mounted at `/opt/julieta/bin`
+([02 2.5](../spec/02-layouts.md#25-in-sandbox-paths)), the target the
+hand-written definition sets as romeu's render does; the kit's link
+names the binary and `julieta setup` checks the sum, whoever built it.
 
 So julieta runs, whole, in a sandbox built and started by hand, with
 three things supplied by hand: the manifest in its environment
@@ -48,7 +50,9 @@ that period:
   items, and a runbook in the maintainer's config repository records
   each edit and that change with its undo (plan task T111);
 - the `julieta-claude` kit (T079), pinned at a SHA of this repository
-  with its `julietaBin` arg set to the path of the julieta binary in the bin mount, installs the
+  and calling julieta at `/opt/julieta/bin/julieta`, the fixed target of the bin mount
+  ([02 2.5](../spec/02-layouts.md#25-in-sandbox-paths); its `julietaBin` arg set to the
+  host path of the bin mount until plan task T201), installs the
   SessionStart and SessionEnd hook lines of
   [08 8.2](../spec/08-memory-handoff-salvage.md), each as a wrapper
   that exits 0 when the bin mount is absent, and the two skills of

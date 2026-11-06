@@ -149,8 +149,8 @@ On the host the operator opens one terminal window and runs `romeu run
 else runs on the host. See `romeu run` in
 [04](04-cli.md#how-romeu-run-reaches-the-run-layout). J3a: run step 3
 starts a stopped sandbox or reattaches to a running one without
-re-provisioning, and refuses with `recreate-needed` a stopped one whose
-env file changed; `julieta setup` is a no-op when locks are unchanged
+re-provisioning, and hands a changed env file to sbx, which applies it
+to the sandbox, stopped or running; `julieta setup` is a no-op when locks are unchanged
 (S8). J3b: create, record generation, egress, `julieta setup` installs
 everything, then attach. If the tree has an open generation with no
 sandbox, romeu preserves it first (J10). If a sandbox of the project's
@@ -273,8 +273,9 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
   everything as it was -> [H] on `yes`, swaps the binary, records gate
   1 (once per machine) and runs `romeu sync --all`; julieta binaries update
   through the read-only mount without recreate; only projects whose kit
-  content or capabilities changed see gate 2 and need `romeu recreate
-  <name>`. Installing by hand with the `e2e/scenarios/j1/commands.yaml`
+  content or capabilities changed see gate 2, and the next `romeu run`
+  hands the new env file to sbx, which applies it to the existing
+  sandbox (01 1.7, recreate needed). Installing by hand with the `e2e/scenarios/j1/commands.yaml`
   entry of J1 step 2, then `romeu approve --toolchain` and `romeu sync
   --all`, stays the path for a host without `tools.gh`.
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config

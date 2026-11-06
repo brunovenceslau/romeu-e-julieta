@@ -219,17 +219,19 @@ first mutating call.
 | 2 | `REQ-1203` an interrupted promotion is finished (1.6) or reported | 4 |
 | 3 | `REQ-1204` drift of every live derived file against `render.json` | 4 |
 | 4 | `REQ-1205` widening digest recomputed from the live files equals the approval (gate 2) | 3 |
-| 5 | `REQ-1206` host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
-| 6 | `REQ-0076` sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (the error `unknown-sandbox`, `RJ-203`, otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>`; a present sandbox whose generation is `removing` passes for `rm`, `recreate` and `retire`, and any other mutating command, `salvage --from-host` included, exits with `removal-pending` (`RJ-336`) | 2 |
+| 5 | `REQ-1206` host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets, broad allow rules and a user-level env file that sbx merges beneath every env file (I22; the last added on 2026-11-06), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
+| 6 | `REQ-0076` sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (the error `unknown-sandbox`, `RJ-203`, otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>`; `REQ-1354` where the recorded `sbx ls --json` shape lists the sandbox's host bind mounts (sbx 0.51; A4 records the fields), each mount of the render whose repo the open generation records (03 3.8, `repos`), `.romeu/bin` and `_shared`, each at its target of [02 2.5](02-layouts.md#25-in-sandbox-paths), must be listed at that target with its source present, or the step fails with `mounts-mismatch` (`RJ-368`), so an absent or moved mount is seen on the host before the sandbox prints its alert block (08 8.2), while a repo the spec added since the create is `recreate-needed`'s (04 4.2, `run` step 3) and not this step's; a memory mount that is absent also fails the salvage's sandbox half, since `memory check` exits 1 on an unmounted dir (I24, REQ-0508), so a removal after this failure ends as an incomplete salvage (exit 5) and loses nothing silently; a mount romeu did not render (the env file sbx binds since 0.42, the kit and skills mounts of 0.51) is not compared, and `status` prints it; the protective commands print this failure and go on (REQ-0078, below), since a mount gone is what `salvage` and `rm` save work from (added on 2026-11-06); a present sandbox whose generation is `removing` passes for `rm`, `recreate` and `retire`, and any other mutating command, `salvage --from-host` included, exits with `removal-pending` (`RJ-336`) | 2 |
 
 `REQ-0077` The preflight never touches the network: descriptors come from the
 content-addressed cache in host state, filled only by `sync`.
 
 `REQ-0078` The protective commands `salvage`, `salvage --from-host`, `stop` and
 `pull` widen nothing and forward no socket: they print a failure of
-steps 1, 4 or 5 and go on, and stop at step 2, 3 or 6. `rm`, `retire`
-and `recreate` run their salvage half the same way and pass every step
-before their removal half. *Why for us:* a check that cannot widen a
+steps 1, 4 or 5, or of the mounts check of step 6, and go on, and stop
+at step 2, 3 or the identity check of step 6. `rm`, `retire` and
+`recreate` run their salvage half the same way and pass every step but
+the mounts check before their removal half, since a removal replaces
+the mounts. *Why for us:* a check that cannot widen a
 sandbox must not keep the operator from saving work; drift and identity
 still stop every command, because acting on an unknown file or sandbox
 is the harm itself.
@@ -346,7 +348,12 @@ A generation is one sandbox lifetime, identified by a ULID.
 | salvaging | `REQ-1218` the sandbox found absent (crash recovery) | closed-lost | as above |
 
 `REQ-0102` Absent means `sbx ls --json` exited 0, parsed, and did not list the
-sandbox. A non-zero exit is `sbx-unknown` (exit 1), and an output that
+sandbox; a sandbox it lists in a state romeu does not know, among them
+the unreadable state sbx 0.51 reports in place of omitting the sandbox,
+as A4 records it, is present and `upstream-shape` (exit 2), never
+absent, and the hint names the recovery, a restart of the sbx daemon,
+since `rm` and `salvage` stop at step 6 of 1.5 until the state reads
+again (amended on 2026-11-06). A non-zero exit is `sbx-unknown` (exit 1), and an output that
 does not parse is `upstream-shape` (exit 2) by the upstream rule of
 [03](03-formats.md) (opening); either changes nothing. `REQ-0103` A fresh fingerprint is read with `julieta salvage --fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); a stopped sandbox is started for the read and stopped again, as for the sandbox half ([04 4.2](04-cli.md#42-romeu-host)); a read that fails, because the start fails, the daemon is unreachable or julieta exits non-zero, exits 1 with `sbx-unknown` and changes nothing, as a failed `sbx ls --json` does, and the error's details carry the failed subprocess ([04 4.1](04-cli.md#41-conventions-both-binaries)). `REQ-0104` A `run` that
 closes an open generation as lost does not create in the same command:
@@ -454,8 +461,8 @@ generated glossary page is a row of
 | stamp | where every manifest repo's tree was at one moment, measured by julieta: inside a handoff entry, and as a file written at each session's end ([03 3.10](03-formats.md#310-stamp-schema-stampv1)) | - |
 | lesson | a file under `docs/lessons/` of this repository ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review; the session's own feedback in a user's project is a memory entry of type `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)) and is not called a lesson | - |
 | widening set | gate 2's digested content | - |
-| recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
-| recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it, and `run` raises `recreate-needed` ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3) | stale (for the recreate digest) |
+| recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets: the fields of the env file and of the sandbox's identity, which the recreate digest covers ([03 3.12](03-formats.md#312-digests-internalcanon)) | - |
+| recreate needed | the live sandbox's recreate digest differs from the open generation's: the env file changed since the sandbox took it. `run` hands the current env file to sbx, which applies what it can to the existing sandbox, running or stopped, and keeps the instance, its filesystem and the agent's login where it swaps the container (sbx 0.35, 0.48, 0.51); a recreate is needed only when sbx does not apply it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3; decided on 2026-11-07: romeu keeps no apply logic of its own beside sbx's) | stale (for the recreate digest) |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
 | sandbox probe | a block B check that the probe harness runs inside a sandbox, ids C2..C6 (C1 is retired, 11 11.2) | - |
 | runtime ledger | the per-machine, add-only store of runtime events under host state ([13](13-runtime-ledger.md), designed, not built in v1); "the ledger" on its own means this | - |
