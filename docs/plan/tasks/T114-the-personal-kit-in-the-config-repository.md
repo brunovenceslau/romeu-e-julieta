@@ -27,6 +27,17 @@ The pull request whose Evidence carries sitting M2's output names this
 task in its body and writes `merged:` and `pr:` into this file, the one
 write rule 1 allows outside its own file.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): from sitting M3 `romeu` renders `skills: off`
+(REQ-1358), and the mounts check refuses a host bind off its closed list,
+a mount of the host's skills store among them (REQ-1381), so a romeu
+sandbox gets only the skills its kits bundle. Which skills move into
+this kit is read, not guessed: the operator lists the skills the
+maintainer's daily sessions read from the host store, and each one that
+neither `julieta-claude` nor a pinned plugin carries ships here as a
+bundled skill of an `agent-skill@1` entry (06 6.4 item 1's route). The
+kit declares no `dockerd@1`, which a personal kit may not (REQ-0574).
+
 - Implements: REQ-0608 (06 6.5).
 - Operator: builds a daily sandbox with it.
 - Acceptance:
@@ -43,6 +54,10 @@ write rule 1 allows outside its own file.
     which a `--report` flag on the hook's command counts. Decided on
     2026-10-31: the router lives in this personal kit, not in
     `julieta-claude`, which every adopter gets.
+  - The skills list of the amendment above is in the runbook, each
+    skill marked bundled here, carried by `julieta-claude` or a plugin,
+    or dropped; a skill neither bundled nor dropped is reported as the
+    trigger of the `skills` row of Deferred decisions before sitting M3.
 - Verify: one daily sandbox, read at sitting M2: its SessionStart output
   shows the instructions and the status line, `julieta status --json`
   reports no `agent-hooks-missing`, and the plugin list shows the pinned

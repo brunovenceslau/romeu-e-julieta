@@ -48,9 +48,11 @@ grammar of 06 6.1 stays the gate's rule whichever way.
 
 - Implements: none: a spike that measures; it changes no behaviour and
   cites the index row it serves.
-- Operator: yes, the decision that follows the note, as a memory entry
-  and an edit of the deferred row (ask-first `spec`, in the pull
-  request that decides).
+- Operator: yes: `sbx kit inspect --offline --format json <fixture>` on
+  the host for each fixture of item 2, its output pasted redacted
+  (amended on 2026-11-07, V2.45); then the decision that follows the
+  note, as a memory entry and an edit of the deferred row (ask-first
+  `spec`, in the pull request that decides).
 - Acceptance:
   - The note records the module version, the API read, the fixture
     comparison (equal, differing, refused) per capability type, the

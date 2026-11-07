@@ -1,6 +1,6 @@
 ---
 id: T199
-title: "julieta resolves by name through a launcher, and SessionStart says when it cannot run or is not on PATH, with the fix"
+title: "SessionStart says when julieta cannot run or is not on PATH, with the fix"
 milestone: M2
 module: kits
 fate: new
@@ -22,7 +22,7 @@ ask_first:
 sitting: none
 ---
 
-# T199 - julieta resolves by name through a launcher, and SessionStart says when it cannot run or is not on PATH, with the fix
+# T199 - SessionStart says when julieta cannot run or is not on PATH, with the fix
 
 Goal: `julieta` resolves by name in every sandbox with the kit, and a
 session that starts without a usable julieta says so in a block that
@@ -53,18 +53,26 @@ had not run wrote a handoff to a file instead.
    <running julieta> setup`; when the one found is neither the launcher
    nor the running julieta, the same slug with `fix: rm <its path>`.
 
-Deferred: when T068 merges, the fix line of item 3 drops the "not built
-yet" line; that merge is the trigger.
+Deferred: when T068 merges, the fix lines of items 3 and 4 drop the
+"not built yet" line; that merge is the trigger.
 
-Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
-launcher of item 1 and its acceptance line are history: the
-specification now names a root-owned symbolic link
+Amended on 2026-11-06 and 2026-11-07 (the sbx 0.51 and kit schema m.12
+amendments, as decided on 2026-11-07): item 1 and its acceptance line
+are not built: the specification names a root-owned symbolic link
 `/usr/local/bin/julieta` to `/opt/julieta/bin/julieta` (REQ-1353), which
-T201 installs in place of the `sh` launcher once the mount has its fixed
-target (T200); the alert block, the wrappers and `handoff show --hook`
-are unchanged, and the launcher the block names is now the link.
+T201 installs, so REQ-1353 is T201's alone. The first block of item 4
+changed: since `setup` makes no `PATH` link (REQ-0397), a missing link
+means the kit layer is missing, and only a recreate restores it, so
+`julieta-link-missing` with `julieta` off `PATH` now prints `cause: the
+julieta-claude kit is not in the sandbox's kit set, or its link
+/usr/local/bin/julieta was removed` and `fix: on the host, romeu
+recreate <name>`, `<name>` reduced from `SANDBOX_NAME` and the line
+marked not built yet until T068 merges, as item 3 does (REQ-1351). The
+second block (`found: <its path>`, `fix: rm <its path>`) is unchanged,
+and the program it compares with is the link. The alert block and the
+wrappers are unchanged.
 
-- Implements: REQ-1353 (06 6.4), REQ-1351 (08 8.2), REQ-1352 (08 8.2), REQ-0673 (08 8.2).
+- Implements: REQ-1351 (08 8.2), REQ-1352 (08 8.2), REQ-0673 (08 8.2).
 - Operator: yes, the approval line for `kits/**` (ask-first `kits`),
   then the sandbox definitions repository's pin of the kit and a
   recreate, so the new wrappers reach a sandbox.
@@ -72,10 +80,11 @@ are unchanged, and the launcher the block names is now the link.
   - The kit e2e runs each session wrapper with julieta absent and
     asserts the whole block on stdout and exit 0, with and without
     `SANDBOX_NAME`; the guard case asserts the block on stderr and exit 2.
-  - The kit e2e installs the launcher root-owned 0755, the agent cannot
-    rewrite it, and `julieta version` runs by name through it; a
-    hostile `julietaBin` writes no launcher.
   - A unit test of `handoff show --hook` prints each block after the
     warnings and before the built-in memory line: `julieta` off `PATH`,
-    and another program on `PATH`; with `julieta` on `PATH` no block.
+    with the `cause:` line and `fix: on the host, romeu recreate <name>`
+    for a `SANDBOX_NAME` that holds a character outside `A-Za-z0-9._-`,
+    and the not-built-yet line; and another program on `PATH`, with
+    `found:` and `fix: rm <its path>`; with `julieta` on `PATH` no
+    block.
 - Verify: `go run ./tools/ci all`.

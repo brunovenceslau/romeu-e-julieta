@@ -26,18 +26,51 @@ the re-plan; `needs` lists its earlier dependencies with a folded id
 replaced by the id that absorbed it, and `owns` is written when the task
 reopens.
 
-Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
-the table of 11 11.1 gains A18 (the caches across sandboxes and
-recreates, REQ-1368) and A19 (the engine of the `sbx/claude` workload
-and `dockerd@1`, REQ-1369), and extends A3 (each mount at its target of
-02 2.5, the `julieta` link), A4 (`sbx inspect`, the mount fields and the
-unreadable state of `sbx ls --json`, exit 125 of `env exec`, `--no-input`
-per argv shape and the two offers of sbx 0.51), A5 (the goldens with
-`target`, `skills: off` and `cmd`, a planted `~/.sbxenv.yaml`), A9 (the
-`--created-via` value and the host and port deny of Q2) and A15 (the
-size options, `sbx env run -d` with a changed kit set, running and stopped, `cmd` on an attached, a
-detached and a cloned `env run`); the argv list of REQ-0997 grows with
-`sbx inspect`, the attached `sbx env run <dir>` and `--no-input`.
+Amended on 2026-11-06 and 2026-11-07 (the sbx 0.51 and kit schema m.12
+amendments, as decided on 2026-11-07): the table of 11 11.1 gains A18
+(the caches across sandboxes and recreates, REQ-1368) and A19 (the
+engine of the `sbx/claude` workload and `dockerd@1`, REQ-1369; its
+workload part is measured first by hand inside T205's measurement,
+beside A9's deny, and this probe re-records it), and extends:
+- A3: each mount at its target of 02 2.5, the `julieta` link, and a
+  write, as the agent and as root, to each bind sbx makes itself (the
+  env file, each kit source, each skill dir of an `agent-skill@1` entry),
+  whose read-only flag is recorded;
+- A4: `sbx inspect`, the mount fields of `sbx ls --json` for a running
+  and for a stopped sandbox (an empty list included) and the source,
+  target and read-only flag of each bind sbx adds itself, the unreadable
+  state, exit 125 of `env exec` and its status when the daemon is
+  stopped, `--no-input` per argv shape and the two offers of sbx 0.51,
+  each provoked where the harness can; a shape provoked on neither host
+  is recorded as `not-provoked`, keeps no `--no-input`, and is named in
+  the result, whose synthetic session 10 10.3 admits (REQ-0924);
+- A5: the goldens with `target`, `skills: off` (whether sbx reads the
+  quoted `"off"` as the mode off) and `cmd`, and a `~/.sbxenv.yaml`
+  planted under a home the harness creates, never the operator's: the
+  harness refuses to start while the operator's own file exists and
+  removes its plant on every exit path;
+- A9: the `--created-via` value, and the host and port deny of Q2, read
+  again beside a portless allow of the same host and after a same-name
+  `sbx env rm` and `sbx env run -d --clone`;
+- A15: `sbx env exec <dir> -- true` on a stopped sandbox whose env file
+  in `<dir>` changed, and `sbx env exec` on a running one with a changed
+  env file, each read back through `sbx ls --json`, `sbx inspect`, `sbx
+  policy ls`, a marker and the sandbox id (T210 records both first by
+  hand); and the in-place apply measurement T210 records first by hand
+  and this probe re-records: on a running and on a stopped sandbox, `sbx
+  env run -d <dir>` with the env file changed in one kind at a time (a
+  kit added, changed, removed; the workload; a `ports` entry; each size
+  option of 03 3.1; `agent`; a repo added, removed; a `target` or
+  `readOnly`; a secrets binding added, removed), whether the instance
+  stays and the change took effect as read back through sbx, an apply
+  repeated and one killed mid-apply, a declined plan, the attached `sbx
+  env run <dir>` on an equal env file with and without `--no-input`, and
+  `cmd` on an attached, a detached and a cloned `env run`; A15 is
+  re-run at each floor bump.
+The argv list of REQ-0997 grows with `sbx inspect`, the attached `sbx
+env run <dir>`, `--no-input`, `sbx secret ls` and the settings listing.
+A18 and A19 record only, so each passes once its observations are
+recorded (10 10.3, REQ-0950).
 
 - Implements: REQ-0142 (02 2.3), REQ-0158 (02 2.6), REQ-0199 (03 3.3),
   REQ-0203 (03 3.3), REQ-0566 (06 6.1), REQ-0588 (06 6.3), REQ-0928 (10
@@ -110,6 +143,12 @@ detached and a cloned `env run`); the argv list of REQ-0997 grows with
     observations, `globalRuleRowSeen` and `globalSecretRowSeen`. The
     recorded shape of that listing is what the synthesized I22 fixtures
     of T046 and T049 must parse as.
+  - A4's provoked sandbox, one whose state sbx cannot read or whose sbx
+    records were removed by hand, is named in the result and removed
+    before the run ends, by the recovery of REQ-0102 (a daemon restart,
+    announced before A4 starts); the harness skips the provocation, and
+    records it as `not-provoked`, while other sandboxes run on the host
+    (amended on 2026-11-07).
   - A2 sets the global `env.rememberHostCommands` (11 11.1) and records
     the prior value in its result. A12's agent is one the harness
     starts, with a key it generates.

@@ -22,6 +22,13 @@ the one written before the re-plan; `needs` lists its earlier
 dependencies with a folded id replaced by the id that absorbed it, and
 `owns` is written when the task reopens.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): a synthetic session whose shape the A4 result
+records as `not-provoked` on both hosts is admitted at the release
+candidate, named in that result and re-tried at each floor bump; any
+other synthetic session left fails `tools/ci probes` (10 10.3,
+REQ-0924). When this task reopens it gains the fixture of each case.
+
 - Implements: REQ-0199 (03 3.3), REQ-0565 (06 6.1), REQ-0579 (06 6.2),
   REQ-0846 (10 10.2), REQ-0943 (10 10.4), REQ-0979 (11 (opening)),
   REQ-1026 (11 11.3), REQ-1027 (11 11.3), REQ-1028 (11 11.4), REQ-1031

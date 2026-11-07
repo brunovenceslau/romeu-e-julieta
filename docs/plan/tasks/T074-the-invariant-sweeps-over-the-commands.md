@@ -64,8 +64,16 @@ once T203 lands.
     `salvage --from-host` and `pull` print the failure and go on, and
     widen nothing (01 1.5; I7).
   - With a step-5 failure planted, `stop`, `salvage`, `salvage
-    --from-host` and `pull` print it and go on; with drift, an abandoned
-    interrupted promotion or an unknown sandbox they stop (01 1.5).
+    --from-host` and `pull` print it and go on, except that a failed
+    `sbx-env-base` or `sbx-global-secret` check stops any of them that
+    would start a stopped sandbox (05 5.4, REQ-1390; amended on
+    2026-11-07); with drift, an abandoned interrupted promotion or an
+    unknown sandbox they stop (01 1.5).
+  - With the mounts check of step 6 failing (`mounts-mismatch`, T203),
+    `run` and `sync` stop before a mutating call; `stop`, `salvage` and
+    `pull` print it and go on; `rm`, `retire` and `recreate` pass every
+    step but it before their removal half (01 1.5, REQ-0078; amended on
+    2026-11-07).
   - Each **P** command prints `sbx-untested` on an sbx outside the
     tested window and goes on.
   - No e2e run reaches the fake `sbx`'s exit 99 for `--auto-approve`

@@ -43,6 +43,13 @@ request whose Evidence carries sitting M2's output names this task in
 its body and writes `merged:` and `pr:` into this file, the one write
 rule 1 allows outside its own file.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): the wave does not wait for T201, so it has no
+edge to it. A slot that runs before T201 merges pins the kit with its
+`julietaBin` arg; a slot after it pins a SHA with T201 and sets the
+mounts at their targets of 02 2.5, the manifest re-encoded with them
+(T111's amendment). The runbook records which form each slot used.
+
 - Implements: REQ-0548 (05 5.4), REQ-0549 (05 5.4), REQ-0602 (06 6.4),
   REQ-1002 (11 11.2).
 - Operator: runs the slots as part 2 of sitting M2.

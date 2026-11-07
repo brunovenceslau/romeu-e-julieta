@@ -22,6 +22,16 @@ before the re-plan; `needs` lists its earlier dependencies with a folded
 id replaced by the id that absorbed it, and `owns` is written when the
 task reopens.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): block A also settles Q33 (A19). Its default
+is checkable text ("the agent user holds no root and no root-equivalent
+socket in the sandbox"), so settling it compares A19's record with that
+sentence, and an A19 that records a reach either finds the row of 05 5.4
+that accepts it by name (REQ-1386, written by the pull request that
+moves Q2's pin) or reopens Q33 as an amendment of the specification
+under `spec`; A18 settles the caches row of Deferred decisions, not a
+question.
+
 - Implements: REQ-0979 (11 (opening)), REQ-1030 (11 11.4), REQ-1168 (12
   12.5), REQ-1169 (12 12.5), REQ-1170 (12 12.5), REQ-1171 (12 12.5).
 - Operator: no.
@@ -29,9 +39,9 @@ task reopens.
 - Acceptance:
   - Each question that block A settles alone, by the "Settled by" column
     of the index, leaves the table: Q7 (A11), Q15 (A4), Q16 (A13), Q18
-    (A10), Q20 (A12), Q21 (A4), Q28 (A12) and Q32 (A14); it becomes an
-    ADR when the decision is expensive to reverse or its probe
-    overturned the default (index, Open questions; 12 12.5).
+    (A10), Q20 (A12), Q21 (A4), Q28 (A12), Q32 (A14) and Q33 (A19); it
+    becomes an ADR when the decision is expensive to reverse or its
+    probe overturned the default (index, Open questions; 12 12.5).
   - A question whose probe is arch-sensitive is settled only with a
     result from each host (11, opening).
   - The review may ask for one pull request per record; the task is all

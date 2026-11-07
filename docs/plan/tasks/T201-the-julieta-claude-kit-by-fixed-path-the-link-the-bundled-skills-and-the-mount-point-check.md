@@ -10,6 +10,14 @@ owns:
   - internal/cmd/julieta/setup/hooks_path*.go
   - internal/cmd/julieta/setup/link*.go
   - e2e/kit_julieta_claude_test.go
+  - internal/cmd/julieta/setup/steps.go
+  - internal/cmd/julieta/setup/report.go
+  - internal/cmd/julieta/setup/setup.go
+  - internal/cmd/julieta/setup/setup_test.go
+  - internal/cmd/julieta/setup/skills_stale*.go
+  - internal/cmd/julieta/setup/testdata/**
+  - e2e/julieta_setup_test.go
+  - internal/hooks/install_test.go
 needs:
   - T079
   - T179
@@ -17,6 +25,7 @@ needs:
 after: []
 ask_first:
   - kits
+  - formats
 sitting: none
 ---
 
@@ -67,13 +76,43 @@ same target in its hand-written env file, so one kit serves both.
    unchanged; a bundled skill that sbx did not expose is `skills-stale`,
    the line SessionStart prints.
 
+Amended on 2026-11-07 (as decided on 2026-11-07; V2.14, V2.15, V2.33,
+V2.45, V2.47, V2.48, V3.0):
+
+- Item 2: T199 builds no `sh` launcher, so "the `sh` launcher of T199
+  goes" is history; the link of REQ-1353 is this task's alone. With the
+  PATH link gone from `setup`, the report's `link` member stays in
+  `julieta-setup/v1`, written as its zero value and marked deprecated
+  (REQ-1310); the regenerated schema carries the `formats` approval
+  line, and `setup`'s steps, report and tests are in `owns`.
+- Item 3: the mount-point check covers each wrapper of REQ-0673, the
+  `lifecycle.startup` hook's included, since that hook runs `setup` at
+  every boot.
+- Item 4: the discovery directory is `$HOME/.claude/skills` unless the
+  first recreate on sbx 0.51 shows another, and `claude.SkillsDir`
+  follows the recorded fact. The base64 payload step skips itself when
+  a skill's `SKILL.md` is already there, so the two routes cannot
+  collide. On a go (both skills seen at the discovery directory with
+  `skills: off`), the payload step is removed in a pull request of its
+  own; on a no-go, the payload stays and the `agent-skill@1` entries
+  go. That removal has no task yet: its home is an open item of the
+  re-plan of 2026-11-07.
+- Item 5: the expected hook lines are built from the kit's constant
+  `/opt/julieta/bin/julieta`, not from `os.Executable`, which resolves
+  to `/opt/julieta/bin/julieta-linux-<GOARCH>`, so `skills-stale` and
+  `agent-hooks-missing` compare what the kit ships.
+- The kit e2e that removes the link asserts the hint of REQ-1351, `fix:
+  on the host, romeu recreate <name>`.
+
 - Implements: REQ-1373 (06 6.3), REQ-0587 (06 6.3), REQ-0397 (04 4.3),
   REQ-0595 (06 6.4), REQ-0596 (06 6.4),
   REQ-1308 (06 6.4), REQ-1353 (06 6.4), REQ-1372 (08 8.2), REQ-0673 (08
-  8.2).
-- Operator: yes, the approval line for `kits/**` and `skills/**`
-  (ask-first `kits`), then the sandbox definitions repository's pin of
-  the kit, the `target` in its hand-written env file, and a recreate.
+  8.2), REQ-0741 (10 10.1), REQ-0744 (10 10.1).
+- Operator: yes, the approval lines for `kits/**` and `skills/**`
+  (ask-first `kits`) and `schemas/**` (ask-first `formats`), then the
+  sandbox definitions repository's pin of the kit, the `target` in its
+  hand-written env file, and a recreate; and `sbx kit inspect --offline`
+  on the built kit, its output pasted under Evidence.
 - Acceptance:
   - The kit e2e asserts each hook, the guard and the startup hook name
     `/opt/julieta/bin/julieta` and that the descriptor declares no
@@ -84,20 +123,28 @@ same target in its hand-written env file, so one kit serves both.
   - Each session wrapper, run with `/opt/julieta/bin` present as a plain
     directory holding an executable `julieta`, prints the alert block
     with the mount-point cause and exits 0 without running the file;
-    the guard case prints it on stderr and exits 2; with the path a
-    mount point (a bind mount in the container e2e) the wrapper runs
-    julieta.
-  - `julieta setup` creates no `$HOME/.local/bin/julieta`, and the
-    dispatcher scripts it writes exec `/opt/julieta/bin/julieta`, the
-    fixed path (04 4.3, REQ-0397); the T051 and T054 cases that
-    asserted the link are replaced.
-  - With the skills exposed at the discovery directory, `setup` reports
-    no `skills-stale`; with one skill's directory missing there, it
-    does.
+    the startup hook does the same, runs nothing and exits 0; the guard
+    case prints it on stderr and exits 2; with the path a mount point
+    (a bind mount in the container e2e) the wrapper runs julieta.
+  - With the link removed, the SessionStart alert block's `fix:` line
+    is `on the host, romeu recreate <name>` (REQ-1351).
+  - `julieta setup` creates no `$HOME/.local/bin/julieta`, its `--json`
+    report carries `link` as the zero value, and the dispatcher scripts
+    it writes exec `/opt/julieta/bin/julieta`, the fixed path (04 4.3,
+    REQ-0397); the T051 and T054 cases that asserted the link are
+    replaced.
+  - `setup` run as `/opt/julieta/bin/julieta-linux-<GOARCH>` against the
+    kit's installed hooks and skills reports neither `skills-stale` nor
+    `agent-hooks-missing`; with one skill's directory missing at the
+    discovery directory, it reports `skills-stale`.
+  - The payload step, run with a skill's `SKILL.md` already at the
+    discovery directory, writes nothing.
   - The descriptor's `agent-skill@1` entries parse in `internal/oci`'s
     grammar, and `sbx kit inspect --offline` on the built kit lists the
     two skills (the fact recorded by hand until A11).
-- Verify: `go test -tags e2e ./e2e/... -run '^TestKitJulietaClaude' -v`.
-  The pattern names the `TestKitJulietaClaude*` functions this task
-  adds or changes, and the reviewer reads them in the `-v` output (10
-  10.8).
+- Verify: `go test -tags e2e ./e2e/... -run
+  '^(TestKitJulietaClaude|TestJulietaSetup)' -v && go test
+  ./internal/cmd/julieta/setup/... ./internal/hooks/... -run
+  '^(TestSetupNoLink|TestSkillsStaleConstantPath|TestInstall)' -v`. The
+  patterns name the functions this task adds or changes, and the
+  reviewer reads them in the `-v` output (10 10.8).
