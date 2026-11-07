@@ -90,8 +90,11 @@ are derived from the same data this page specifies.
    `sbxdrv`, `gitsafe`, the secret-argv and `gh-floor` rows of `doctor`
    and the gh and preview steps of `upgrade`, and `syscall.Exec` to
    the swap step of `upgrade` and to the one function of `sbxdrv`
-   that REQ-1384 names, so romeu starts no other program (amended on
-   2026-11-07). `REQ-1384` The attach of `run` step 7 replaces
+   that REQ-1384 names, and admits the other calls that start or
+   replace a process (`os.StartProcess`, `syscall.ForkExec`,
+   `syscall.StartProcess`, `golang.org/x/sys/unix.Exec`, a raw
+   `SYS_EXECVE` or `SYS_EXECVEAT` syscall) nowhere, as I16 lists them,
+   so romeu starts no other program (amended on 2026-11-07). `REQ-1384` The attach of `run` step 7 replaces
    romeu's process through one named function of `sbxdrv`, which
    applies the I4 and I25 guards (05 5.2), the floor check of 12 12.1
    and the scrubbed environment of this item before it calls
@@ -470,9 +473,10 @@ dir`, see J13).
 
 `REQ-0359` Resolve the project and repo from `<dir>` (must be inside
 `$ROMEU_ROOT/<name>-env/`); preflight; then, before any exec, the
-running check of REQ-0360 for the primary repo and, for any repo, the
 refusal of REQ-1387 on a stopped sandbox whose recreate digests differ
-or whose generation was adopted (exit 5, `recreate-needed`; amended on
+or whose generation was adopted, for any repo (exit 5,
+`recreate-needed`, with the stopped hint of REQ-1377), and after it the
+running check of REQ-0360 for the primary repo (amended on
 2026-11-07); compatibility check (06 6.3);
 `julieta snapshot --all` and `julieta status --json` via exec; `REQ-0360` primary:
 the sandbox must be running, else exit 2 with the error
