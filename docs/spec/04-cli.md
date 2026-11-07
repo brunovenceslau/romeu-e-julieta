@@ -446,7 +446,9 @@ dir`, see J13).
    is a deferred task of the plan that A15's record opens; it re-runs
    the drift check of `sbxenv.yaml` (01 1.5, step 3) right before the
    attach, since sbx reads the env file after steps 5 and 6 ran code in
-   the sandbox (decided on 2026-11-07). When the run
+   the sandbox, and a sandbox whose digests differ or whose generation
+   was adopted (step 3, REQ-1376, REQ-1378) keeps the `sbx env exec -it`
+   form, which hands sbx no env file (decided on 2026-11-07). When the run
    layout fails, `layout up` exits with `layout-failed`, whose fix hint
    is the host command that opens a shell in the sandbox without it
    (`sbx env exec -it <dir> -- /bin/bash -l`, with `<dir>` filled in).

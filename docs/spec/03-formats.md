@@ -345,7 +345,7 @@ skills a sandbox of romeu gets are its kits'
 `REQ-1370` `cmd` is `[/opt/julieta/bin/julieta, layout, up]` (sbx 0.51),
 the command of an attached `sbx env run <dir>`, so `romeu run` attaches
 through that call once A15 records it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
-step 7; until then the `sbx env exec -it` of REQ-0358; the switch re-runs the drift check of this file right before the attach) and an operator who starts the sandbox with `sbx env run <dir>`
+step 7; until then the `sbx env exec -it` of REQ-0358, and after it for a sandbox whose recreate digests differ or whose generation was adopted; the switch re-runs the drift check of this file right before the attach) and an operator who starts the sandbox with `sbx env run <dir>`
 by hand gets the run layout from the manifest julieta cached (REQ-0425;
 without one, `layout up` says so and opens a shell, 04 4.3); no
 `entrypoint` is written (decided on 2026-11-06). `REQ-0203` romeu names this file by path; probe A5 records
