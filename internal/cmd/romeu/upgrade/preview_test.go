@@ -116,7 +116,7 @@ func TestPreviewReadsTheRecord(t *testing.T) {
 	require.NoError(t, err)
 	lk, err := st.Lock()
 	require.NoError(t, err)
-	live, err := approve.Measure(sbxdrv.Release{Major: 0, Minor: 49, Patch: 2}, cli.Version{Version: "v1.0.0-alpha.1", Protocol: 1})
+	live, err := approve.Measure(sbxdrv.Release{Major: 0, Minor: 51, Patch: 0}, cli.Version{Version: "v1.0.0-alpha.1", Protocol: 1})
 	require.NoError(t, err)
 	require.NoError(t, approve.Acknowledge(st, lk, live, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)))
 	lk.Unlock()

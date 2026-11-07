@@ -152,7 +152,7 @@ func newUpgradeFixture(t *testing.T) upgradeFixture {
 	h := all.HostSettings{Config: all.ConfigRepo{Project: "cfg", URL: "https://github.com/owner/cfg", Ref: "main"}}
 	h.Tools.Gh = gh
 	e.WriteSettings(t, h)
-	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.49.2", "handshake.jsonl"))
+	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.51.0", "handshake.jsonl"))
 	require.NoError(t, err)
 	require.NoError(t, e.SetSbxSession(session))
 	// The machine runs the old romeu, acknowledged by gate 1.

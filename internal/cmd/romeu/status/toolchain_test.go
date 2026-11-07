@@ -66,8 +66,8 @@ func toolchainOutput(t *testing.T, dir string, f fakeSbx, jsonOut bool) (string,
 
 func TestRunReportsTheToolchain(t *testing.T) {
 	t.Parallel()
-	recorded := sbxdrv.Release{Major: 0, Minor: 49, Patch: 2}
-	untested := sbxdrv.Release{Major: 0, Minor: 50, Patch: 1}
+	recorded := sbxdrv.Release{Major: 0, Minor: 51, Patch: 0}
+	untested := sbxdrv.Release{Major: 0, Minor: 52, Patch: 1}
 	tests := []struct {
 		name     string
 		ack      string
@@ -75,17 +75,17 @@ func TestRunReportsTheToolchain(t *testing.T) {
 		want     Toolchain
 		warnings []Finding
 	}{
-		{"acknowledged", "0.49.2", recorded, Toolchain{State: ToolchainAcknowledged, Sbx: "0.49.2", Changes: []ToolchainChange{}}, []Finding{}},
+		{"acknowledged", "0.51.0", recorded, Toolchain{State: ToolchainAcknowledged, Sbx: "0.51.0", Changes: []ToolchainChange{}}, []Finding{}},
 		{
-			"stale after an sbx upgrade, outside the tested window", "0.49.2", untested,
-			Toolchain{State: ToolchainStale, Sbx: "0.50.1", Changes: []ToolchainChange{{Member: "sbxVersion", Recorded: "0.49.2", Live: "0.50.1"}}},
-			[]Finding{{Slug: "sbx-untested", Message: "sbx 0.50.1 is outside the tested window: 0.49.2"}},
+			"stale after an sbx upgrade, outside the tested window", "0.51.0", untested,
+			Toolchain{State: ToolchainStale, Sbx: "0.52.1", Changes: []ToolchainChange{{Member: "sbxVersion", Recorded: "0.51.0", Live: "0.52.1"}}},
+			[]Finding{{Slug: "sbx-untested", Message: "sbx 0.52.1 is outside the tested window: 0.51.0"}},
 		},
-		{"never acknowledged", "", recorded, Toolchain{State: ToolchainMissing, Sbx: "0.49.2", Changes: allChanges("0.49.2")}, []Finding{}},
+		{"never acknowledged", "", recorded, Toolchain{State: ToolchainMissing, Sbx: "0.51.0", Changes: allChanges("0.51.0")}, []Finding{}},
 		{
-			"a prerelease of a recorded version is untested", "0.49.2-rc.1", sbxdrv.Release{Minor: 49, Patch: 2, Pre: "rc.1"},
-			Toolchain{State: ToolchainAcknowledged, Sbx: "0.49.2-rc.1", Changes: []ToolchainChange{}},
-			[]Finding{{Slug: "sbx-untested", Message: "sbx 0.49.2-rc.1 is outside the tested window: 0.49.2"}},
+			"a prerelease of a recorded version is untested", "0.51.0-rc.1", sbxdrv.Release{Minor: 51, Patch: 0, Pre: "rc.1"},
+			Toolchain{State: ToolchainAcknowledged, Sbx: "0.51.0-rc.1", Changes: []ToolchainChange{}},
+			[]Finding{{Slug: "sbx-untested", Message: "sbx 0.51.0-rc.1 is outside the tested window: 0.51.0"}},
 		},
 	}
 	for _, tt := range tests {
@@ -123,11 +123,11 @@ func allChanges(sbx string) []ToolchainChange {
 func TestRunToolchainText(t *testing.T) {
 	t.Parallel()
 	dir := stateDir(t, nil, nil)
-	acknowledge(t, dir, "0.49.2")
-	out, errOut, err := toolchainOutput(t, dir, fakeSbx{version: sbxdrv.Release{Minor: 50, Patch: 1}}, false)
+	acknowledge(t, dir, "0.51.0")
+	out, errOut, err := toolchainOutput(t, dir, fakeSbx{version: sbxdrv.Release{Minor: 52, Patch: 1}}, false)
 	require.NoError(t, err)
-	assert.Equal(t, "toolchain: stale (sbxVersion 0.49.2 -> 0.50.1); run romeu approve --toolchain\nno projects: run romeu sync\n", out)
-	assert.Equal(t, "warning sbx-untested: sbx 0.50.1 is outside the tested window: 0.49.2\n", errOut)
+	assert.Equal(t, "toolchain: stale (sbxVersion 0.51.0 -> 0.52.1); run romeu approve --toolchain\nno projects: run romeu sync\n", out)
+	assert.Equal(t, "warning sbx-untested: sbx 0.52.1 is outside the tested window: 0.51.0\n", errOut)
 }
 
 func TestRunToolchainFailedReads(t *testing.T) {
@@ -146,7 +146,7 @@ func TestRunToolchainFailedReads(t *testing.T) {
 		t.Parallel()
 		dir := stateDir(t, nil, nil)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "toolchain.json"), []byte("{"), state.FileMode))
-		out, _, err := toolchainOutput(t, dir, fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, true)
+		out, _, err := toolchainOutput(t, dir, fakeSbx{version: sbxdrv.Release{Minor: 51, Patch: 0}}, true)
 		require.Error(t, err)
 		rep := decode(t, out)
 		assert.Equal(t, ToolchainUnknown, rep.Toolchain.State)
@@ -169,7 +169,7 @@ func TestRunToolchainMeasureFails(t *testing.T) {
 	defer func() { require.NoError(t, store.Close()) }()
 	var out bytes.Buffer
 	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
-	err = run(t.Context(), env, host{store: store, sbx: fakeSbx{version: sbxdrv.Release{Minor: 50}}, measure: measureFails}, nil)
+	err = run(t.Context(), env, host{store: store, sbx: fakeSbx{version: sbxdrv.Release{Minor: 52}}, measure: measureFails}, nil)
 	require.Error(t, err)
 	rep := decode(t, out.String())
 	assert.Equal(t, ToolchainUnknown, rep.Toolchain.State)
@@ -215,8 +215,8 @@ func TestRunToolchainTextLines(t *testing.T) {
 		sbx  fakeSbx
 		want string
 	}{
-		{"acknowledged", "0.49.2", fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, "toolchain: acknowledged\nno projects: run romeu sync\n"},
-		{"missing", "", fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, "toolchain: not acknowledged; run romeu approve --toolchain\nno projects: run romeu sync\n"},
+		{"acknowledged", "0.51.0", fakeSbx{version: sbxdrv.Release{Minor: 51, Patch: 0}}, "toolchain: acknowledged\nno projects: run romeu sync\n"},
+		{"missing", "", fakeSbx{version: sbxdrv.Release{Minor: 51, Patch: 0}}, "toolchain: not acknowledged; run romeu approve --toolchain\nno projects: run romeu sync\n"},
 		{
 			"unknown, with a hostile error kept on its line", "", fakeSbx{versionErr: errors.New("boom\nerror RJ-999 forged\x1b[2J")},
 			"toolchain: unknown, see the error below\nerror RJ-359 status-incomplete (sbx version): boom\\nerror RJ-999 forged\\u001b[2J\nno projects: run romeu sync\n",
@@ -249,7 +249,7 @@ func TestRunGoesOnPastAnUnlistedProjectsDir(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(projects, state.DirMode) })
 	var out bytes.Buffer
 	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
-	h := host{store: store, sbx: fakeSbx{version: sbxdrv.Release{Minor: 49, Patch: 2}}, measure: func(v sbxdrv.Release) (approve.Live, error) { return liveToolchain(v), nil }}
+	h := host{store: store, sbx: fakeSbx{version: sbxdrv.Release{Minor: 51, Patch: 0}}, measure: func(v sbxdrv.Release) (approve.Live, error) { return liveToolchain(v), nil }}
 	err = run(t.Context(), env, h, nil)
 	assert.Equal(t, 1, cli.ExitCode(err))
 	rep := decode(t, out.String())
@@ -267,7 +267,7 @@ func TestRunFloorCheckFails(t *testing.T) {
 	defer func() { require.NoError(t, store.Close()) }()
 	calls := &sbxCalls{}
 	below := sbxdrv.Release{Minor: 48}
-	floor := sbxdrv.SbxFloor.New("sbx 0.48.0 is below the floor 0.49.2")
+	floor := sbxdrv.SbxFloor.New("sbx 0.48.0 is below the floor 0.51.0")
 	sbx := fakeSbx{version: below, versionErr: floor, calls: calls}
 	var out bytes.Buffer
 	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}
@@ -295,7 +295,7 @@ func TestRunFloorCheckFails(t *testing.T) {
 // it prevents (REQ-0329).
 func TestRunFloorCheckFailsWithNoHostState(t *testing.T) {
 	t.Parallel()
-	floor := sbxdrv.SbxFloor.New("sbx 0.48.0 is below the floor 0.49.2")
+	floor := sbxdrv.SbxFloor.New("sbx 0.48.0 is below the floor 0.51.0")
 	sbx := fakeSbx{version: sbxdrv.Release{Minor: 48}, versionErr: floor}
 	var out bytes.Buffer
 	env := &cli.Env{Stdout: cli.NewWriter(&out), Stderr: cli.NewWriter(&out), JSON: true}

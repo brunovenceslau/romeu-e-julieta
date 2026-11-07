@@ -93,7 +93,7 @@ func TestFinish(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	assert.Equal(t, "v1.0.0-alpha.1", rec.Romeu.Version)
-	assert.Equal(t, "0.49.2", rec.SbxVersion)
+	assert.Equal(t, "0.51.0", rec.SbxVersion)
 	assert.NoFileExists(t, filepath.Join(m.stateHome, "romeu", tokenName), "the token is consumed")
 
 	m.writeToken(t, "v1.0.0-alpha.0", oldBinary, expiry)

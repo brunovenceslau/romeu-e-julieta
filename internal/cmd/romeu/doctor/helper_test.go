@@ -85,7 +85,7 @@ func newFixture(t *testing.T) *fixture {
 		configHome: filepath.Join(tmp, "config"),
 		stateHome:  filepath.Join(tmp, "state"),
 		sbx: &fakeSbx{
-			release:  sbxdrv.Release{Major: 0, Minor: 49, Patch: 2},
+			release:  sbxdrv.Release{Major: 0, Minor: 51, Patch: 0},
 			policies: "[]\n",
 			secrets:  "SCOPE SERVICE SECRET\n",
 		},

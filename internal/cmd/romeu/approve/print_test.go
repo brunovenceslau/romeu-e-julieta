@@ -42,7 +42,7 @@ func TestTextOneLine(t *testing.T) {
 
 	got := text(t, rec, live)
 	assert.NotContains(t, got, "\n")
-	assert.Equal(t, "gate 1: sbx 0.49.2 (newest recorded 0.49.2; tested window 0.49.2), romeu v0.0.0-dev+aaaa -> v0.0.0-dev+bbbb, "+
+	assert.Equal(t, "gate 1: sbx 0.51.0 (newest recorded 0.51.0; tested window 0.51.0), romeu v0.0.0-dev+aaaa -> v0.0.0-dev+bbbb, "+
 		"sha256 010000000000 -> bb0000000000; julieta and the catalog are unchanged; "+Question, got)
 }
 
@@ -56,9 +56,9 @@ func TestTextSbx(t *testing.T) {
 	tests := []struct {
 		name, recorded, live, want string
 	}{
-		{"a newer sbx", "0.49.2", "0.50.0", "sbx 0.49.2 -> 0.50.0 (newest recorded 0.49.2; tested window 0.49.2; 0.50.0 is outside it, untested)"},
-		{"a downgrade", "0.50.0", "0.49.2", "sbx 0.50.0 -> 0.49.2 downgrade (newest recorded 0.49.2; tested window 0.49.2)"},
-		{"the same sbx", "0.49.2", "0.49.2", "sbx 0.49.2 (newest recorded 0.49.2; tested window 0.49.2)"},
+		{"a newer sbx", "0.51.0", "0.52.0", "sbx 0.51.0 -> 0.52.0 (newest recorded 0.51.0; tested window 0.51.0; 0.52.0 is outside it, untested)"},
+		{"a downgrade", "0.52.0", "0.51.0", "sbx 0.52.0 -> 0.51.0 downgrade (newest recorded 0.51.0; tested window 0.51.0)"},
+		{"the same sbx", "0.51.0", "0.51.0", "sbx 0.51.0 (newest recorded 0.51.0; tested window 0.51.0)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestTextJulieta(t *testing.T) {
 
 	got := text(t, rec, live)
 	assert.Equal(t, "gate 1: the toolchain of this machine\n"+
-		"  sbx 0.49.2 (newest recorded 0.49.2; tested window 0.49.2)\n"+
+		"  sbx 0.51.0 (newest recorded 0.51.0; tested window 0.51.0)\n"+
 		"  romeu v1.0.0, sha256 010000000000\n"+
 		"  julieta v1.0.0 -> v1.1.0, protocol 1, sha256 020000000000 -> cc0000000000\n"+
 		"  catalog "+live.CatalogDigest.String()[:12]+", unchanged\n"+Question, got)
@@ -147,7 +147,7 @@ func TestTextFirstAcknowledgement(t *testing.T) {
 	got, err := Text(nil, sampleLive(t), map[string][]string{"shop": nil})
 	require.NoError(t, err)
 	assert.Contains(t, got, "gate 1: the toolchain of this machine\n"+
-		"  sbx 0.49.2 (none recorded) (newest recorded 0.49.2; tested window 0.49.2)\n"+
+		"  sbx 0.51.0 (none recorded) (newest recorded 0.51.0; tested window 0.51.0)\n"+
 		"  romeu v1.0.0 (none recorded), sha256 010000000000 (none recorded)\n"+
 		"  julieta v1.0.0 (none recorded), protocol 1 (none recorded), sha256 020000000000 (none recorded)\n")
 	assert.Contains(t, got, "    meta: + mise.example; projects: shop\n")

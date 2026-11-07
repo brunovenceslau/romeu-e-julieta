@@ -135,7 +135,7 @@ holds already; the host binaries link two modules for them, cobra and
 pflag, and the document generator stays in `internal/cli/clidoc`,
 which no binary imports (ADR 0015).
 
-`REQ-1056` External tools at runtime: `sbx` (host, >= v0.49.2; decided on 2026-11-06: the floor moves to v0.51.0, the first version with `additionalWorkspaces[].target`, `cmd`, `--no-input`, `sandboxOptions.rootSize` and the mount fields of `sbx ls --json`, which this specification uses since that day, when the first recording set at 0.51 lands with the floor (T202), since the floor is never above the lowest recorded version; `REQ-1057` the versions with a
+`REQ-1056` External tools at runtime: `sbx` (host, >= v0.51.0; raised from v0.49.2 on 2026-11-07, since this specification uses what 0.51.0 added: `additionalWorkspaces[].target`, `cmd`, `--no-input`, `sandboxOptions.rootSize` and the mount fields of `sbx ls --json`; `REQ-1057` the versions with a
 recording set are the tested window,
 [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)), `git`
 (host and sandbox, floor in

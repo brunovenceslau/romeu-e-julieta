@@ -10,7 +10,7 @@ owns:
   - internal/cmd/romeu/doctor/sbx_allowed_sources*.go
   - internal/gitsafe/host_config*.go
   - internal/sbxdrv/settings_ls*.go
-  - e2e/testdata/sbx/0.49.2/secrets-settings.jsonl
+  - e2e/testdata/sbx/0.51.0/secrets-settings.jsonl
 needs:
   - T049
 after: []
@@ -42,7 +42,7 @@ name a verb and a builder (`global.go`, `secret_ls.go`); both are
 ask-first (`gitsafe`, `sbxdrv`), so each carries its approval line. The
 session of the settings read is a line of the session file of the
 secrets and settings calls,
-`e2e/testdata/sbx/0.49.2/secrets-settings.jsonl`, which the builder's
+`e2e/testdata/sbx/0.51.0/secrets-settings.jsonl`, which the builder's
 test holds (T029's rule: a builder has a session).
 
 - Implements: REQ-0370 (04 4.2), REQ-0373 (04 4.2), REQ-0374 (04 4.2).

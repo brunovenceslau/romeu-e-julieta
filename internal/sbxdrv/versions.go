@@ -17,19 +17,22 @@ import (
 )
 
 // Floor is the lowest sbx version romeu runs against (12 12.1,
-// REQ-1056), as sbx prints it without the leading v. The parsers and
-// the sessions model the shapes of v0.49.2: its help and its ls output
-// were checked. Before v0.48.0 sbx ls --json was the object
+// REQ-1056), as sbx prints it without the leading v, raised from
+// 0.49.2 on 2026-11-07, since the specification uses what sbx 0.51.0
+// added (additionalWorkspaces target, cmd, --no-input). The parsers and
+// the sessions model the shapes of v0.49.2, whose help and ls output
+// were checked; block A re-measures them at 0.51. Before v0.48.0 sbx
+// ls --json was the object
 // {"sandboxes": [...]} and the approval of a plan was --auto-approve,
 // so nothing here reads them. A test holds it to the page and to the
 // lowest recorded version.
-const Floor = "0.49.2"
+const Floor = "0.51.0"
 
 // RecordedVersions are the sbx versions with a session set under
 // e2e/testdata/sbx/<version>/: the tested window (10 10.3, REQ-0932),
 // which every parser is written for and runs over (REQ-0930). A test
 // holds the list to the directories.
-var RecordedVersions = []string{"0.49.2"}
+var RecordedVersions = []string{"0.51.0"}
 
 // maxVersionOutput is the most output of sbx version a parser reads: a
 // version line is a few bytes, and a larger output is not one.

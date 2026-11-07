@@ -12,7 +12,6 @@ owns:
   - internal/sbxdrv/envrun*.go
   - internal/sbxdrv/envexec*.go
   - internal/sbxdrv/call*.go
-  - internal/sbxdrv/versions*.go
   - internal/sbxdrv/builders_test.go
   - e2e/fakesbx/**
   - e2e/testdata/sbx/**
@@ -40,13 +39,11 @@ amended first: the sbx 0.51 and kit schema m.12 amendments of 01 1.6,
 are hand-written sessions marked `synthetic: true` (rule 10 of
 `docs/plan.md`) until A4 records them (T019, T026).
 
-1. The floor (REQ-1056): `>= 0.51.0`, which gate 1 and `doctor` name;
-   it lands with a recording set at 0.51.0 under `e2e/testdata/sbx/`,
-   hand-written and marked `synthetic: true` until A4 records it (10
-   10.3), since the floor is never above the lowest recorded version
-   (`TestFloorIsTheLowestRecordedVersion`) and the spec sentence of 12
-   12.1 moves to `>= v0.51.0` in the same pull request
-   (`TestFloorIsTheSpecs`).
+1. The floor (REQ-1056): raised to 0.51.0 on 2026-11-07 with the
+   session set moved to `e2e/testdata/sbx/0.51.0/`, still marked
+   `synthetic: true`, by the pull request that amended the spec; this
+   task brings the sessions to the shapes of 0.51 where A4 or the
+   maintainer's host shows they differ.
 2. `--no-input` (REQ-1360): every builder but the two interactive calls
    of 04 4.1 Output carries it where the recorded shape accepts it; a
    prompt under it ends the call with sbx's error in the details; the
@@ -78,9 +75,6 @@ are hand-written sessions marked `synthetic: true` (rule 10 of
   - A fake session where a non-interactive call prompts under
     `--no-input` ends with sbx's error in the details, not a hang:
     asserted with the fake's prompt failure mode.
-  - `sbx version` below 0.51.0 fails gate 1 and the preflight with the
-    floor named; 0.51.0 passes; the tested-window warning
-    `sbx-untested` names the window.
   - `sbx inspect` parses the creating-version field of the synthetic
     session, and a shape without it is `upstream-shape`.
   - `sbx ls --json` with the mount fields parses to a mount list with

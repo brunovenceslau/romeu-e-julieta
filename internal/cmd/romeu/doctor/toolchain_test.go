@@ -35,7 +35,7 @@ func TestDoctorToolchain(t *testing.T) {
 		t.Parallel()
 		f := newFixture(t)
 		f.acknowledged = false
-		f.acknowledge(t, sbxdrv.Release{Major: 0, Minor: 49, Patch: 1})
+		f.acknowledge(t, sbxdrv.Release{Major: 0, Minor: 50, Patch: 9})
 
 		rep, out, _ := f.output(t)
 

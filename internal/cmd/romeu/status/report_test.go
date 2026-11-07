@@ -50,7 +50,7 @@ func TestReportIsItsSchema(t *testing.T) {
 	}{
 		{
 			name: "every member",
-			sbx:  fakeSbx{version: sbxdrv.Release{Minor: 50, Patch: 1}, list: []sbxdrv.Sandbox{{Name: "shop", Status: "running"}}},
+			sbx:  fakeSbx{version: sbxdrv.Release{Minor: 52, Patch: 1}, list: []sbxdrv.Sandbox{{Name: "shop", Status: "running"}}},
 			want: []string{`"state":"stale"`, `"slug":"sbx-untested"`, `"closedAt":`, `"slug":"drift-detected"`, `"record":"unreadable"`, `"id":"RJ-334"`},
 		},
 		{
@@ -63,7 +63,7 @@ func TestReportIsItsSchema(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dir := stateDir(t, world(t), map[string]string{"bad": "{"})
-			acknowledge(t, dir, "0.49.2")
+			acknowledge(t, dir, "0.51.0")
 			root := t.TempDir()
 			env := tree(t, root, canon.Sum[canon.RecreateKind]{1}, nil)
 			require.NoError(t, os.WriteFile(filepath.Join(env, render.LiveEnvFile), []byte("edited\n"), 0o600))

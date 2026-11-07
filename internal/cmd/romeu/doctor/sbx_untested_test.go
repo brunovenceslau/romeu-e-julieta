@@ -20,13 +20,13 @@ import (
 func TestDoctorSbxUntested(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
-	f.sbx.release = sbxdrv.Release{Major: 0, Minor: 50, Patch: 1}
+	f.sbx.release = sbxdrv.Release{Major: 0, Minor: 52, Patch: 1}
 
 	rep, out, err := f.output(t)
 
 	require.NoError(t, err, out)
 	c := check(t, rep, "sbx-untested")
 	assert.Equal(t, resultWarn, c.Result)
-	assert.Contains(t, c.Message, "0.50.1")
+	assert.Contains(t, c.Message, "0.52.1")
 	assert.Contains(t, c.Message, sbxdrv.RecordedVersions[0])
 }
