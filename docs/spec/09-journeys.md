@@ -155,7 +155,9 @@ running one, and step 7 attaches. With a changed env file `run`
 makes no `sbx env run` with it, since the in-place apply is a row of
 [Deferred decisions](../spec.md#in-the-product) (REQ-1376): on a
 running sandbox it warns `recreate-needed`, hint `romeu recreate
-<name>` (REQ-1377, J6), and attaches through `sbx env exec`; a stopped
+<name>` (REQ-1377, J6), and attaches through `sbx env exec`, unless
+step 6 refuses with `mounts-mismatch` (a repo removed or a mount target
+changed, REQ-1354); a stopped
 one it does not start and exits 5 with `recreate-needed` (`RJ-305`),
 whose hint is to undo the change that moved the digest (the spec, or
 a secret's argv in the host settings; a change that came only from a
