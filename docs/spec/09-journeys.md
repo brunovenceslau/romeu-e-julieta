@@ -157,8 +157,10 @@ makes no `sbx env run` with it, since the in-place apply is a row of
 running sandbox it warns `recreate-needed`, hint `romeu recreate
 <name>` (REQ-1377, J6), and attaches through `sbx env exec`; a stopped
 one it does not start and exits 5 with `recreate-needed` (`RJ-305`),
-whose hint is to undo the change that moved the digest (the spec, a
-secret's argv in the host settings, or the romeu release) and run
+whose hint is to undo the change that moved the digest (the spec, or
+a secret's argv in the host settings; a change that came only from a
+romeu release has no romeu route until T210, so J9 starts the sandbox
+before the upgrade) and run
 `romeu sync <name>` so the digests match again, then rerun, and warns
 that undoing re-approves what the change removed (REQ-1377), since
 `rm` and `recreate` would
