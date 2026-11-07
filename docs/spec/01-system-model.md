@@ -190,7 +190,7 @@ privileges, lifecycle hooks) are not refused: they are shown in the
 gate 2 diff.
 
 `REQ-0071` The gate diff is never truncated. It starts with a summary that lists
-first, marked, the changed capabilities, gated domains, secret argv and
+first, marked, the changed capabilities (a `privileged@1` grant from any kit marked root-equivalent, REQ-1396, added on 2026-11-07), gated domains, secret argv and
 the workload repository, then content-only kit changes with file and
 line counts (a golden holds that order); then it shows every changed
 field, a file-level diff of kit sources (added, removed, changed paths
