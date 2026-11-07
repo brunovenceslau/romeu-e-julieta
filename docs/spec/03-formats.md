@@ -698,9 +698,10 @@ record's `capabilities` member is required: a record without it, or
 with `null`, is unreadable and is never read as an empty set. When a
 second index lists a manifest already cached, the entry keeps the first
 index. Each record also holds `normalization`, the version of the
-normalization that produced `capabilities`; a record of an older version
-than the running romeu's is derived again from its descriptor, never read
-as it is (05 5.4, REQ-1391; added on 2026-11-07).
+normalization that produced `capabilities`; a record whose
+`normalization` differs from the running romeu's, or that lacks it, is a
+cache miss and is derived again from its descriptor, never read as it is
+(05 5.4, REQ-1391; added on 2026-11-07).
 
 ## 3.9 Memory entry (schema `memory-entry.v1`)
 
