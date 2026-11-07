@@ -112,6 +112,13 @@ does not keep it between commands; this task owns `skills/handoff/**`
 and its kit copy, so the example changes here whichever of T174 and
 this task lands first (`--repo` is a flag of `add` today).
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+the delivery route of REQ-0595 and the fixed path and wrapper of
+REQ-0596 and REQ-1372 are T201's; this task changes only the
+subcommands of the two hook lines and the `handoff` skill's content, in
+the path form the kit holds when it lands, so its Implements entry for
+REQ-0595 covers the skill content only.
+
 - Implements: REQ-0659 (08 8.1), REQ-0663 (08 8.2), REQ-0664 (08 8.2),
   REQ-0665 (08 8.2), REQ-0667 (08 8.2), REQ-0669 (08 8.2), REQ-1291
   (08 8.2), REQ-1294 (08 8.2), REQ-0681 (08 8.3), REQ-0682 (08 8.3),

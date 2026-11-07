@@ -38,6 +38,10 @@ Re-plan (2026-10-12): Runs at sitting M0, once T012 merged: it needs the
 pin file only, and a record (T123) is a review order, not a dependency;
 the earlier plan ran it as part 1 of sitting M2.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+`julietaBin` arg named in the paragraph above went with the fixed target
+of 02 2.5 (T200, T201); the go/no-go facts stand as measured.
+
 - Implements: REQ-0566 (06 6.1), REQ-0572 (06 6.1).
 - Operator: runs it at sitting M0.
 - Acceptance:

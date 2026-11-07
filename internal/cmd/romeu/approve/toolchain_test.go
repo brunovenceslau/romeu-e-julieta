@@ -105,7 +105,7 @@ func sampleLive(t *testing.T) Live {
 	sum, err := canon.Digest(canon.Catalog, d)
 	require.NoError(t, err)
 	return Live{
-		Sbx:           "0.49.2",
+		Sbx:           "0.51.0",
 		Romeu:         state.Binary{Version: "v1.0.0", SHA256: state.SHA256{1}},
 		Julieta:       state.JulietaBinary{Version: "v1.0.0", Protocol: 1, SHA256: state.SHA256{2}},
 		Catalog:       d,
@@ -133,7 +133,7 @@ func TestChanges(t *testing.T) {
 		change func(*Live)
 		member string
 	}{
-		{"the sbx version", func(l *Live) { l.Sbx = "0.50.0" }, "sbxVersion"},
+		{"the sbx version", func(l *Live) { l.Sbx = "0.52.0" }, "sbxVersion"},
 		{"romeu's version", func(l *Live) { l.Romeu.Version = "v1.1.0" }, "romeu.version"},
 		{"romeu's sha256", func(l *Live) { l.Romeu.SHA256 = state.SHA256{9} }, "romeu.sha256"},
 		{"the embedded julieta's sha256", func(l *Live) { l.Julieta.SHA256 = state.SHA256{9} }, "julieta.sha256"},
@@ -209,11 +209,11 @@ func TestCheck(t *testing.T) {
 		st := openStore(t)
 		write(t, st, recordOf(t, live))
 		other := live
-		other.Sbx = "0.50.0"
+		other.Sbx = "0.52.0"
 		err := Check(st, other)
 		testsupport.RequireID(t, "RJ-302", err)
 		assert.Contains(t, err.Error(), "sbxVersion")
-		assert.Contains(t, cli.Of(err).Details, cli.Detail{Key: "sbxVersion", Value: "0.49.2 -> 0.50.0"})
+		assert.Contains(t, cli.Of(err).Details, cli.Detail{Key: "sbxVersion", Value: "0.51.0 -> 0.52.0"})
 	})
 	t.Run("a record that does not decode", func(t *testing.T) {
 		t.Parallel()
@@ -261,9 +261,9 @@ func TestMeasure(t *testing.T) {
 	romeuSHA256 = func() (state.SHA256, error) { return fileSHA256(func() (string, error) { return bin, nil }) }
 	t.Cleanup(func() { romeuSHA256 = old })
 
-	live, err := Measure(sbxdrv.Release{Major: 0, Minor: 49, Patch: 2}, cli.Version{Version: "v1.0.0", Protocol: 1})
+	live, err := Measure(sbxdrv.Release{Major: 0, Minor: 51, Patch: 0}, cli.Version{Version: "v1.0.0", Protocol: 1})
 	require.NoError(t, err)
-	assert.Equal(t, "0.49.2", live.Sbx)
+	assert.Equal(t, "0.51.0", live.Sbx)
 	assert.Equal(t, state.Binary{Version: "v1.0.0", SHA256: sha256.Sum256([]byte("a build"))}, live.Romeu)
 	assert.Equal(t, state.JulietaBinary{Version: "v0.0.0-placeholder", Protocol: 1, SHA256: sha256.Sum256(nil)}, live.Julieta,
 		"a source build embeds the placeholder")

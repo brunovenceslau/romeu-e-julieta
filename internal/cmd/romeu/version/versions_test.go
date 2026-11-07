@@ -195,19 +195,19 @@ func TestReadVersions(t *testing.T) {
 				liveRender(t, f.root, nil)
 			},
 			calls: calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
 				Projects: []ProjectVersions{{Name: "shop", Workload: workloadDigest, Kits: pins, Errors: []ReadError{}}}},
 		},
 		{
 			name:  "no host state: no project, and no failed read",
 			calls: calls{1, 1},
-			want:  Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Projects: []ProjectVersions{}, Errors: []ReadError{}},
+			want:  Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Projects: []ProjectVersions{}, Errors: []ReadError{}},
 		},
 		{
 			name:    "a record never approved and a project never promoted",
 			records: map[string]*state.Project{"shop": state.NewProject()},
 			calls:   calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
 				Projects: []ProjectVersions{{Name: "shop", Errors: []ReadError{}}}},
 		},
 		{
@@ -220,7 +220,7 @@ func TestReadVersions(t *testing.T) {
 				})
 			},
 			calls: calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
 				Projects: []ProjectVersions{{Name: "shop", Workload: workloadDigest, Errors: []ReadError{}}}},
 		},
 		{
@@ -231,7 +231,7 @@ func TestReadVersions(t *testing.T) {
 				liveRender(t, f.root, func(r *render.Record) { r.Files = map[string]string{render.LiveEnvFile: strings.Repeat("3", 64)} })
 			},
 			calls: calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
 				Projects: []ProjectVersions{{Name: "shop", Kits: []KitPin{}, Errors: []ReadError{}}}},
 		},
 		{
@@ -250,7 +250,7 @@ func TestReadVersions(t *testing.T) {
 			name:   "an error with no id is internal",
 			gitErr: errors.New("boom"),
 			calls:  calls{1, 1},
-			want: Versions{Sbx: "0.49.2", MacOS: "15.1", Projects: []ProjectVersions{}, Errors: []ReadError{
+			want: Versions{Sbx: "0.51.0", MacOS: "15.1", Projects: []ProjectVersions{}, Errors: []ReadError{
 				{ID: "RJ-348", Slug: "internal", Read: readGit, Message: "boom"},
 			}},
 		},
@@ -282,7 +282,7 @@ func TestReadVersions(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(f.state, "romeu"), nil, 0o600))
 			},
 			calls: calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Projects: []ProjectVersions{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Projects: []ProjectVersions{},
 				Errors: []ReadError{{ID: "RJ-348", Slug: "internal", Read: readState}}},
 		},
 		{
@@ -294,7 +294,7 @@ func TestReadVersions(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(f.root, "shop-env", render.LiveRecord), []byte("{"), 0o600))
 			},
 			calls: calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
 				Projects: []ProjectVersions{{Name: "shop", Errors: []ReadError{
 					{ID: state.RecordUnreadable.ID, Slug: state.RecordUnreadable.Slug, Read: readRecord},
 					{ID: state.RecordUnreadable.ID, Slug: state.RecordUnreadable.Slug, Read: readRender},
@@ -310,7 +310,7 @@ func TestReadVersions(t *testing.T) {
 				})
 			},
 			calls: calls{1, 1},
-			want: Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
+			want: Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1", Errors: []ReadError{},
 				Projects: []ProjectVersions{{Name: "shop", Errors: []ReadError{
 					{ID: state.RecordUnreadable.ID, Slug: state.RecordUnreadable.Slug, Read: readRender},
 				}}}},
@@ -324,7 +324,7 @@ func TestReadVersions(t *testing.T) {
 				tt.setup(t, &f)
 			}
 			var c calls
-			got := f.read(t, f.seamsOf(&c, "0.49.2", "2.53.0", "15.1", tt.sbxErr, tt.gitErr, tt.macOSErr))
+			got := f.read(t, f.seamsOf(&c, "0.51.0", "2.53.0", "15.1", tt.sbxErr, tt.gitErr, tt.macOSErr))
 			assert.Equal(t, tt.calls, c)
 			// A message that is the system's is held by its read and id alone.
 			assert.Equal(t, ids(tt.want.Errors), ids(got.Errors))
@@ -360,7 +360,7 @@ func TestReadVersionsEscapesAHostileRender(t *testing.T) {
 	require.NotEqual(t, string(data), edited, "the fixture names its spec source kind")
 	require.NoError(t, os.WriteFile(path, []byte(edited), 0o600))
 	var c calls
-	got := f.read(t, f.seamsOf(&c, "0.49.2", "2.53.0", "15.1", nil, nil, nil))
+	got := f.read(t, f.seamsOf(&c, "0.51.0", "2.53.0", "15.1", nil, nil, nil))
 	require.Len(t, got.Projects, 1)
 	require.Len(t, got.Projects[0].Errors, 1)
 	msg := got.Projects[0].Errors[0].Message
@@ -380,7 +380,7 @@ func TestReadVersionsWritesNothing(t *testing.T) {
 	liveRender(t, f.root, nil)
 	before := tree(t, filepath.Dir(f.root))
 	var c calls
-	f.read(t, f.seamsOf(&c, "0.49.2", "2.53.0", "15.1", nil, nil, nil))
+	f.read(t, f.seamsOf(&c, "0.51.0", "2.53.0", "15.1", nil, nil, nil))
 	assert.Equal(t, before, tree(t, filepath.Dir(f.root)))
 }
 
@@ -492,7 +492,7 @@ func TestReportIsItsSchema(t *testing.T) {
 	base := Report{Version: "v1.2.3", Commit: "abc1234", Date: "2026-10-18T00:00:00Z", Go: "go1.26", Protocol: 7,
 		SHA256: strings.Repeat("a", 64), GOARCH: "arm64", Schema: Schema}
 	full := base
-	full.Versions = Versions{Sbx: "0.49.2", Git: "2.53.0", MacOS: "15.1",
+	full.Versions = Versions{Sbx: "0.51.0", Git: "2.53.0", MacOS: "15.1",
 		Projects: []ProjectVersions{{Name: "shop", Workload: workloadDigest,
 			Kits:   []KitPin{{Kit: "julieta", Digest: julietaDigest}},
 			Errors: []ReadError{{ID: "RJ-344", Slug: "state-record-unreadable", Read: readRecord, Message: "m"}}}},

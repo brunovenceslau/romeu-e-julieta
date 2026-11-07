@@ -63,8 +63,8 @@ func TestStatusAfterSync(t *testing.T) {
 	doc := statusOf(t, res.Stdout)
 	require.NotNil(t, doc.Toolchain)
 	assert.Equal(t, "acknowledged", doc.Toolchain.State)
-	assert.Equal(t, "0.49.2", doc.Toolchain.Sbx)
-	assert.Empty(t, doc.Warnings, "0.49.2 is the tested window")
+	assert.Equal(t, "0.51.0", doc.Toolchain.Sbx)
+	assert.Empty(t, doc.Warnings, "0.51.0 is the tested window")
 	require.Len(t, doc.Projects, 1)
 	p := doc.Projects[0]
 	assert.Equal(t, "foo", p.Name)

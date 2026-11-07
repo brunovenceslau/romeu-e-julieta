@@ -62,8 +62,19 @@ and `e2e/sync_test.go` for it, and stays `after` T185, which edits
 `step2_fetch.go` too. Proposed in that slice on 2026-10-30, for the
 operator to confirm at review; scope this repository.
 
-- Implements: none: the exit of the kit errors of REQ-0573 and REQ-0574
-  (06 6.1), which T038 and T043 implement.
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): a personal kit that declares `dockerd@1` is
+refused, beside docker-auth and host-port, until A19 records the
+elevation and Q33 is amended or a 05 5.4 row accepts it by name
+(REQ-0070, REQ-0514, REQ-0574): `refusedCapability` of
+`internal/render/kits.go` gains a `dockerd` case after `host-port`, so
+the refusal is `ErrPersonalCapability` and exits 2 with `kit-refused`
+as the other refused capabilities do. `privileged@1` stays admitted in a
+personal kit. The exit of the other kit errors of REQ-0573 and REQ-0574
+stays T038's and T043's; this task cites only the dockerd refusal, and
+REQ-0514 (05 5.2), which says the same, keeps its five implementers.
+
+- Implements: REQ-0070 (01 1.4), REQ-0574 (06 6.1).
 - Operator: no.
 - Acceptance:
   - A spec naming a kit id that no product kit and no personal kit dir
@@ -81,6 +92,11 @@ operator to confirm at review; scope this repository.
     assert that exit (from T043, 2026-10-30).
   - A kit file whose read fails on the host for another reason exits 1
     naming the file.
+  - A unit case of `refusedCapability` returns `dockerd` for a personal
+    kit whose descriptor declares `dockerd@1`, and `""` for one that
+    declares only `privileged@1`; an e2e case of `sync` with such a
+    personal kit exits 2 with `kit-refused` naming the kit and
+    `dockerd`, and promotes nothing.
   - The row of `kit-refused` in 04 4.4 has an id, the contract test of
     `sync` checks it, and `go run ./tools/ci reqs` passes.
 - Verify: `go test -race ./internal/render/ ./internal/cmd/romeu/sync/`.

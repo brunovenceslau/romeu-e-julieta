@@ -38,8 +38,9 @@ built in v1; it waits for its row in
 | Candidate (unapproved) | `<name>-env/.romeu/candidates/<candidate-id>/` (rendered files and materialized kits) | romeu `sync` | the gate; promoted only on approval (1.6) |
 | Derived, live | `<name>-env/sbxenv.yaml`, `.romeu/render.json`, `.romeu/kits/*`, `.romeu/bin/*` | romeu (promotion) | `REQ-0047` drift-checked by hash before every overwrite and before every sbx call of a **P** command (1.5) |
 | Derived from state | `$ROMEU_ROOT/dev.code-workspace`, `$ROMEU_ROOT/review.code-workspace` | romeu (`sync`, once after the last promotion of a run, `retire` and `pull`) | `REQ-0048` written again whole from host state each time, by atomic rename: `sync` lists every clone of every project's record, and a `sync` that promotes nothing leaves them as they were; no record holds their hash, so they are not drift-checked; `doctor` derives them again from host state and reports a difference, and the next `sync` that promotes, `retire` or `pull` overwrites a hand edit |
-| Derived, in sandbox | secondary clones, installed tools, julieta manifest cache, herdr layout, the `julieta` link on `PATH` | julieta | `REQ-0049` disposable; recreated by `julieta setup` |
-| sbx-owned facts romeu reads | sandbox existence, state and workspace path (`sbx ls --json`); the `remote.sandbox-<name>.*` keys sbx writes into the primary host clone's `.git/config`, of which romeu reads the URL; sbx version | sbx | read only |
+| Derived, in sandbox | secondary clones, installed tools, julieta manifest cache, herdr layout | julieta | `REQ-0049` disposable; recreated by `julieta setup` |
+| Kit content, in sandbox | `/usr/local/bin/julieta` ([06 6.4](06-kits.md#64-product-kits) item 8), the kit's skills and hooks | the `julieta-claude` kit | gate 2 reviews the kit's content (1.4); it changes in the sandbox at a recreate, since the in-place apply of a changed env file waits behind the gate of [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout) `run` step 3 (REQ-1376) |
+| sbx-owned facts romeu reads | sandbox existence, state, workspace path and host bind mounts (`sbx ls --json`); the sbx version a sandbox was created with (`sbx inspect`); the `remote.sandbox-<name>.*` keys sbx writes into the primary host clone's `.git/config`, of which romeu reads the URL; sbx version | sbx | read only |
 | Agent output that reaches the host | memory dir files, `snapshot/heads.json` among them; git objects via fetch or bundle; julieta's `--json` stdout read over `sbx env exec` (`version`, `setup`, `status`, `salvage`) | agents / julieta | `REQ-0050` data only: validated, escaped for display, stored in romeu namespaces; never executed, never checked out outside a hardened review checkout |
 | Host facts the agent reads | `REQ-0051` the project's live spec commit: `specCommit` in the manifest ([03 3.6](03-formats.md#36-julieta-manifest-schema-manifestv1)), fresh at each exec | romeu | the manifest schema. The candidate state is host-only: the agent compares `specCommit` with the commit it pushed to learn whether its spec change is live |
 
@@ -168,7 +169,11 @@ and the run layout's pane commands run only inside the sandbox.
 `REQ-0068` Normalized capability set (from v3 descriptors, parsed by one grammar
 in `internal/oci`, which `internal/render` calls for local kits): network
 domains per phase, mounts and volumes, credentials/secrets, ssh-agent
-use, privileges (user, capabilities), lifecycle hooks. Descriptors are
+use, docker-auth, host-port, `dockerd@1` (privileged, with
+`/var/lib/docker`) and the workload image annotation
+`com.docker.sandboxes.start-docker=true`, normalized as the `dockerd@1`
+grant ([06 6.1](06-kits.md#61-decisions), REQ-1385), privileges (user,
+capabilities), lifecycle hooks (amended on 2026-11-07). Descriptors are
 parsed with the strict subset grammar of
 [03](03-formats.md) (opening), and any key or capability type the model
 does not know is a sync error (fail closed); a capability type sbx adds
@@ -177,13 +182,15 @@ so upload-capable ones of the runtime phase appear in `egressGated`
 and gate 2 flags them; those of the install phase stay out of the
 derivation, and sbx, not romeu, applies those of the runtime phase
 ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress), step 6). `REQ-0070` A personal kit that
-declares a network, mount, volume, credential, ssh-agent, docker-auth or
-host-port capability is refused (sync error). Its other capabilities (install steps,
+declares a network, mount, volume, credential, ssh-agent, docker-auth,
+host-port or `dockerd@1` capability is refused (sync error): `dockerd@1`
+hands the sandbox a root-equivalent engine and private storage, refused
+until A19 records the elevation and Q33 is amended or a 05 5.4 row accepts it by name (amended on 2026-11-07). Its other capabilities (install steps,
 privileges, lifecycle hooks) are not refused: they are shown in the
 gate 2 diff.
 
 `REQ-0071` The gate diff is never truncated. It starts with a summary that lists
-first, marked, the changed capabilities, gated domains, secret argv and
+first, marked, the changed capabilities (a `privileged@1` grant from any kit marked root-equivalent, REQ-1396, added on 2026-11-07), gated domains, secret argv and
 the workload repository, then content-only kit changes with file and
 line counts (a golden holds that order); then it shows every changed
 field, a file-level diff of kit sources (added, removed, changed paths
@@ -219,17 +226,23 @@ first mutating call.
 | 2 | `REQ-1203` an interrupted promotion is finished (1.6) or reported | 4 |
 | 3 | `REQ-1204` drift of every live derived file against `render.json` | 4 |
 | 4 | `REQ-1205` widening digest recomputed from the live files equals the approval (gate 2) | 3 |
-| 5 | `REQ-1206` host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets and broad allow rules (I22), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
-| 6 | `REQ-0076` sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (the error `unknown-sandbox`, `RJ-203`, otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>`; a present sandbox whose generation is `removing` passes for `rm`, `recreate` and `retire`, and any other mutating command, `salvage --from-host` included, exits with `removal-pending` (`RJ-336`) | 2 |
+| 5 | `REQ-1206` host checks shared with `doctor` whose failure widens a sandbox or makes agent output executable on the host: sbx global secrets, broad allow rules and a user-level env file that sbx merges beneath every env file (I22; the last added on 2026-11-06), host tools that auto-trust `$ROMEU_ROOT` (I23), and, for a project using `git-ssh-sign`, the signing socket rule of [06 6.4](06-kits.md#64-product-kits). A listing whose shape is not a recorded shape, or that cannot be parsed, fails the step with `upstream-shape` ([03](03-formats.md), opening) | 2 |
+| 6 | `REQ-0076` sandbox identity (I26): an absent sandbox passes; a present one must have an open generation (1.7) romeu recorded (the error `unknown-sandbox`, `RJ-203`, otherwise) and the workspace path `$ROMEU_ROOT/<name>-env/<primary>`; a present sandbox whose generation is `removing` passes for `rm`, `recreate` and `retire`, and any other mutating command, `salvage --from-host` included, exits with `removal-pending` (`RJ-336`). `REQ-1354` Where the recorded `sbx ls --json` shape lists the sandbox's host bind mounts (sbx 0.51; A4 records the fields), each mount of the render whose repo the open generation records (03 3.8, `repos`), `.romeu/bin` and `_shared`, each at its target of [02 2.5](02-layouts.md#25-in-sandbox-paths), must be listed at that target with its source present, or the step fails with `mounts-mismatch` (`RJ-368`), so an absent or moved mount is seen on the host before the sandbox prints its alert block (08 8.2), while a repo the spec added since the create is `recreate-needed`'s (04 4.2, `run` step 3) and not this step's; a repo the spec removed since the create, whose memory bind the listing still holds, and a mount whose target the spec changed fail this step with `mounts-mismatch`, even on a running sandbox that `run` step 3 would otherwise warn about and attach to, so the closed list of REQ-1381 wins over that attach, and the hint is RJ-368's, which depends on the sandbox's state: on a running sandbox it names `romeu recreate <name>`, whose salvage half prints this failure and goes on as the protective commands do and whose removal half passes every step but the mounts check (REQ-0078), and on a stopped one whose digests differ it ends with the stopped hint of REQ-1377 (decided on 2026-11-07); a memory mount that is absent also fails the salvage's sandbox half, since `memory check` exits 1 on an unmounted dir (I24, REQ-0508), so a removal after this failure ends as an incomplete salvage (exit 5) and loses nothing silently; the protective commands print this failure and go on (REQ-0078, below), since a mount gone is what `salvage` and `rm` save work from (added on 2026-11-06). `REQ-1381` A host bind romeu did not render passes only when it is on a closed list: the env file, each kit source of the render and each skill dir of an `agent-skill@1` entry of a rendered kit, each in the shape A4 records for it; any other host bind, a mount of the host's skills store among them, fails the step with `mounts-mismatch` for `run` and `sync`, the protective commands print it and go on, and `status` prints every bind the listing holds (decided on 2026-11-07). `REQ-1382` A listing that shows no mounts for a running sandbox fails the step, since every rendered mount is then missing; one that shows none for a stopped sandbox, for which A4 records whether sbx lists mounts at all, defers the comparison to right after the command starts the sandbox (`run` step 3, the start of a salvage's sandbox half), before any other call, with the same results (decided on 2026-11-07). `REQ-1383` The mounts comparison is skipped whole for an adopted generation (1.6), whose sandbox romeu did not render, and `status` prints its mounts (decided on 2026-11-07) | 2 |
 
 `REQ-0077` The preflight never touches the network: descriptors come from the
 content-addressed cache in host state, filled only by `sync`.
 
 `REQ-0078` The protective commands `salvage`, `salvage --from-host`, `stop` and
 `pull` widen nothing and forward no socket: they print a failure of
-steps 1, 4 or 5 and go on, and stop at step 2, 3 or 6. `rm`, `retire`
-and `recreate` run their salvage half the same way and pass every step
-before their removal half. *Why for us:* a check that cannot widen a
+steps 1, 4 or 5, or of the mounts check of step 6, and go on, and stop
+at step 2, 3 or the identity check of step 6. `rm`, `retire` and
+`recreate` run their salvage half the same way and pass every step but
+the mounts check before their removal half, since a removal replaces
+the mounts. A stopped sandbox whose recreate digests differ, or whose
+generation was adopted, is the one case where `salvage`, the salvage
+half and `pull` stop: they do not start it, since the start would hand sbx the
+changed env file, and its disk persists ([04 4.2](04-cli.md#42-romeu-host),
+REQ-1387; decided on 2026-11-07). *Why for us:* a check that cannot widen a
 sandbox must not keep the operator from saving work; drift and identity
 still stop every command, because acting on an unknown file or sandbox
 is the harm itself.
@@ -325,10 +338,11 @@ A generation is one sandbox lifetime, identified by a ULID.
 | From | Event | To | Effect |
 |---|---|---|---|
 | (none) | `REQ-0088` `run` finds the sandbox absent and is about to create it | open | record id, recreate digest, workspace path, the repo set, written before `sbx env run` |
+| open | `REQ-1379` the `sbx env run` of that same command exits 0 | open | `sbxVersion` written from `sbx inspect` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1), REQ-1359); a read that fails leaves it absent, and `run` warns `sbx-version-unread` ([04 4.1](04-cli.md#41-conventions-both-binaries), Warnings) and goes on (added on 2026-11-07) |
 | open | `REQ-1212` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows no sandbox | (none) | the record just written is removed; exit 1 |
 | open | `REQ-1213` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
 | open | `REQ-0089` the `sbx env run` of that same command times out (`subprocess-timeout`, [04 4.1](04-cli.md#starting-values)), whatever `sbx ls --json` shows | open | the record is kept, because sbx's daemon may finish the create after romeu stopped waiting; exit 1; the next `run` finds the sandbox present and goes on, or absent and closes the generation as lost (the `closed-lost` row), which costs one extra `run` and never a sandbox without a generation |
-| (none) | `REQ-0090` `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated` |
+| (none) | `REQ-0090` `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated`; `run` makes no `sbx env run` with romeu's env file on its sandbox ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1378) |
 | open | `REQ-0091` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
 | salvaging | `REQ-1214` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command ended, killed or failed, while it salvaged, and wrote no later state) | salvaging | new salvage id; the refs the earlier salvage created stay |
 | salvaging | `REQ-0092` the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; `REQ-0093` exit 1, or 128 plus the signal number when a signal to romeu interrupted the exec ([04 4.1](04-cli.md#signals)) |
@@ -346,11 +360,23 @@ A generation is one sandbox lifetime, identified by a ULID.
 | salvaging | `REQ-1218` the sandbox found absent (crash recovery) | closed-lost | as above |
 
 `REQ-0102` Absent means `sbx ls --json` exited 0, parsed, and did not list the
-sandbox. A non-zero exit is `sbx-unknown` (exit 1), and an output that
+sandbox; a sandbox it lists in a state romeu does not know, among them
+the unreadable state sbx 0.51 reports in place of omitting the sandbox,
+as A4 records it, is present and `upstream-shape` (exit 2), never
+absent, and the hint names the recovery, a restart of the sbx daemon,
+since `rm` and `salvage` stop at step 6 of 1.5 until the state reads
+again (amended on 2026-11-06). A non-zero exit is `sbx-unknown` (exit 1), and an output that
 does not parse is `upstream-shape` (exit 2) by the upstream rule of
-[03](03-formats.md) (opening); either changes nothing. `REQ-0103` A fresh fingerprint is read with `julieta salvage --fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); a stopped sandbox is started for the read and stopped again, as for the sandbox half ([04 4.2](04-cli.md#42-romeu-host)); a read that fails, because the start fails, the daemon is unreachable or julieta exits non-zero, exits 1 with `sbx-unknown` and changes nothing, as a failed `sbx ls --json` does, and the error's details carry the failed subprocess ([04 4.1](04-cli.md#41-conventions-both-binaries)). `REQ-0104` A `run` that
+[03](03-formats.md) (opening); either changes nothing. `REQ-0103` A fresh fingerprint is read with `julieta salvage --fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)); a stopped sandbox is started for the read and stopped again, as for the sandbox half ([04 4.2](04-cli.md#42-romeu-host)), except one whose recreate digests differ or whose generation was adopted, which is not started: the command exits 5 with `recreate-needed` and changes nothing (REQ-1387; decided on 2026-11-07); a read that fails, because the start fails, the daemon is unreachable or julieta exits non-zero, exits 1 with `sbx-unknown` and changes nothing, as a failed `sbx ls --json` does, and the error's details carry the failed subprocess ([04 4.1](04-cli.md#41-conventions-both-binaries)). `REQ-0104` A `run` that
 closes an open generation as lost does not create in the same command:
 it prints the lost record and exits 1, and the next `run` creates.
+
+`run` step 3 changes no generation record when the recreate digests
+differ: under the gate of [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout)
+(REQ-1376) it warns about a running sandbox and attaches through
+`sbx env exec`, with no `sbx env run`, and refuses a stopped one before any sbx call starts
+it; the row an in-place apply would add waits with that apply in its row
+of [Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-07).
 
 A romeu killed between the first row's record and the end of
 `sbx env run` leaves an open generation: the next `run` finds the
@@ -454,8 +480,8 @@ generated glossary page is a row of
 | stamp | where every manifest repo's tree was at one moment, measured by julieta: inside a handoff entry, and as a file written at each session's end ([03 3.10](03-formats.md#310-stamp-schema-stampv1)) | - |
 | lesson | a file under `docs/lessons/` of this repository ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review; the session's own feedback in a user's project is a memory entry of type `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)) and is not called a lesson | - |
 | widening set | gate 2's digested content | - |
-| recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets | - |
-| recreate needed | the live sandbox's recreate digest differs from the approved one; `status` reports it, and `run` raises `recreate-needed` ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3) | stale (for the recreate digest) |
+| recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets: the fields of the env file and of the sandbox's identity, which the recreate digest covers ([03 3.12](03-formats.md#312-digests-internalcanon)) | - |
+| recreate needed | the live render's recreate digest differs from the open generation's `createdWith`, or that digest is unknown because the generation was adopted: the env file changed since the sandbox took it, or romeu never rendered it. `run` makes no `sbx env run` with such an env file (whether its `sbx env exec <dir>` reads it on a running sandbox is unmeasured, [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3): on a running sandbox it warns `recreate-needed` and attaches through `sbx env exec`, unless step 6 refuses with `mounts-mismatch` (a repo removed or a mount target changed, REQ-1354), and a stopped one it does not start: `run`, and `salvage`, `rm`, `recreate`, `retire` and `pull`, which would start it for the sandbox half or an exec, exit 5 with `recreate-needed`; `status` and `sync` warn with the same slug. The hint is `romeu recreate <name>` for a running sandbox, and for a stopped one to undo the change that moved the digest (in the spec, or in a secret's argv in the host settings; a change that came only from a romeu release has no romeu route until T210, so such a sandbox is started before the upgrade) and run `romeu sync <name>`, so the promoted render's recreate digest matches the generation's again, then rerun the command, with a warning that undoing re-approves what the change removed; a stopped adopted generation has no romeu route until T210 ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1376 and REQ-1378, and the `salvage` row, REQ-1387; [04 4.1](04-cli.md#41-conventions-both-binaries), Warnings, REQ-1377). Nothing yet shows that sbx applies a changed env file to an existing sandbox and keeps the instance, so the in-place apply waits for its row of [Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-07) | stale (for the recreate digest) |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
 | sandbox probe | a block B check that the probe harness runs inside a sandbox, ids C2..C6 (C1 is retired, 11 11.2) | - |
 | runtime ledger | the per-machine, add-only store of runtime events under host state ([13](13-runtime-ledger.md), designed, not built in v1); "the ledger" on its own means this | - |

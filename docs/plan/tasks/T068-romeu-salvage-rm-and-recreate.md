@@ -37,6 +37,41 @@ risks). Its e2e files are `e2e/salvage_test.go`, `e2e/rm_test.go` and
 T041 is `e2e/internal/romeu/salvage_helpers.go` (rule 1 of
 `docs/plan.md`). The I26 case after `adopt` is T050's.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+REQ-0102 (01 1.6) now reads a sandbox listed in an unreadable state as
+present with `upstream-shape` and the daemon-restart hint (T202), and
+`rm`, `retire` and `recreate` pass every preflight step but the mounts
+check of step 6 before their removal half (T203).
+
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): a stopped sandbox whose live recreate digest
+differs from the open generation's `createdWith`, or whose generation
+was adopted, is not started: `salvage`, `rm` and `recreate` through it,
+and the fingerprint read of REQ-0103, exit 5 with `recreate-needed`
+(`RJ-305`) and the stopped hint of REQ-1377 (T203's function), right
+after the preflight and before the tombstone check and any prompt, make
+no starting sbx call and change no record (REQ-1387). On such a
+generation the salvage half and the fingerprint read re-read `sbx ls
+--json` before each `sbx env exec` and exit 5 with `recreate-needed`
+when the sandbox is not running (REQ-1389). A failed `sbx-env-base` or
+`sbx-global-secret` check of the preflight stops every start of a
+stopped sandbox, with the hint to remove the file or the secret
+(REQ-1390), though the protective commands otherwise go on past a failed
+step 5. The mounts check of step 6 (T203) is printed by `salvage`, which
+goes on; `rm` and `recreate` pass every step but it before their
+removal half (REQ-0078). T069 runs the same cases for `retire`. The
+J13 scenario starts the sandbox (`romeu run --no-attach`) before the
+`sync` that promotes the repo change, as J13 step 2 says, since a
+stopped sandbox is refused once the change is promoted. When the
+listing shows no mounts for a stopped sandbox, the start of the salvage
+half calls T203's comparison right after the start and before any other
+call (REQ-1382, 01 1.5); a failure is printed and the salvage goes on,
+as the protective commands do (REQ-0078), since the stop before exiting
+of REQ-1393 is `run`'s. REQ-1382 and the fingerprint read's case of
+REQ-1390 are built here without a new id on this task's Implements
+line, which is over the cap of 40 and does not grow (OverCap, decided
+on 2026-10-17; recorded for the maintainer on 2026-11-07).
+
 - Implements: REQ-0012 (index), REQ-0052 (01 1.2), REQ-0064 (01 1.4),
   REQ-0074 (01 1.5), REQ-0076 (01 1.5), REQ-0079 (01 1.6), REQ-0080 (01
   1.6), REQ-0083 (01 1.6), REQ-0090 (01 1.6), REQ-0091 (01 1.6),
@@ -70,7 +105,8 @@ T041 is `e2e/internal/romeu/salvage_helpers.go` (rule 1 of
   8.5), REQ-0726 (09 (opening)), REQ-0727 (09 (opening)), REQ-0736 (10
   10.1), REQ-0739 (10 10.1), REQ-0780 (10 10.1), REQ-0784 (10 10.1),
   REQ-1214 (01 1.6), REQ-1215 (01 1.6), REQ-1216 (01 1.6), REQ-1217 (01
-  1.6), REQ-1218 (01 1.6), REQ-1219 (01 1.6).
+  1.6), REQ-1218 (01 1.6), REQ-1219 (01 1.6), REQ-1387 (04 4.2),
+  REQ-1389 (05 5.4), REQ-1390 (05 5.4).
 - Operator: no.
 - Acceptance:
   - `rm` exits 5 for each case that the `E:` case of I17 opening with
@@ -99,6 +135,32 @@ T041 is `e2e/internal/romeu/salvage_helpers.go` (rule 1 of
     sandbox half exits 1 naming `--from-host` and the four kinds of work
     it does not recover. `rm` on a terminal asks when no `tombstone`
     exists, and prints the workload volumes salvage does not cover.
+  - On a stopped sandbox whose recreate digests differ, and on a
+    stopped adopted one, each of `salvage`, `rm`, `recreate` and the
+    fingerprint read of a rerun on a `removing` generation exits 5 with
+    `recreate-needed` (`RJ-305`) and the stopped hint of REQ-1377, before
+    the tombstone check and any prompt: one e2e case per command asserts
+    that the fake `sbx` records no `sbx env run` and no other starting
+    call and that the project record is byte-for-byte unchanged
+    (REQ-1387).
+  - On such a generation, a sandbox the fake reports stopped between two
+    execs of the salvage half exits 5 with `recreate-needed` before the
+    next exec (REQ-1389).
+  - On a stopped sandbox with equal digests and `~/.sbxenv.yaml` present
+    under the test's home, `salvage` exits non-zero with `sbx-env-base`
+    and its hint before any sbx call that starts the sandbox (REQ-1390);
+    the same holds for a failed `sbx-global-secret` check, and for the
+    fingerprint read of a rerun on a `removing` generation, which starts
+    nothing and changes no record.
+  - On a stopped sandbox with equal digests whose listing shows no
+    mounts, `salvage` starts it and the fake records the mounts
+    comparison as the first call after the start; with a mount missing
+    in the listing after the start, `salvage` prints `mounts-mismatch`
+    and goes on, with no `sbx stop` before the sandbox half (REQ-1382).
+  - With the preflight's mounts check failing, `salvage` prints
+    `mounts-mismatch` and goes on; `rm` and `recreate` pass every step
+    but it before their removal half, and a missing memory mount ends
+    the salvage incomplete (exit 5).
   - With the fake sbx failing the create after a complete salvage,
     `recreate` exits 1 with `kit-build-failed`, the generation is
     `closed-removed`, the salvage refs and memory are intact, no sandbox

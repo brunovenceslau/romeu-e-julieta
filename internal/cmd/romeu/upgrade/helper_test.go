@@ -395,7 +395,7 @@ func newMachine(t *testing.T) machine {
 	}
 	require.NoError(t, os.WriteFile(m.exe, []byte(oldBinary), 0o755))
 	sbx := filepath.Join(dir, "sbx")
-	require.NoError(t, os.WriteFile(sbx, []byte("#!/bin/sh\necho 'sbx version v0.49.2 0123456789abcdef'\n"), 0o700))
+	require.NoError(t, os.WriteFile(sbx, []byte("#!/bin/sh\necho 'sbx version v0.51.0 0123456789abcdef'\n"), 0o700))
 	m.writeSettings(t, spec.Tools{Sbx: sbx, Git: "/usr/bin/git", Gh: ghBinary(t)})
 	// The state directory of a machine romeu ran on, with its lock file.
 	st, err := state.Open(filepath.Join(m.stateHome, "romeu"))

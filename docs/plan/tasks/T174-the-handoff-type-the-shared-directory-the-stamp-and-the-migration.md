@@ -156,6 +156,13 @@ overlap of `internal/cmd/julieta/setup/migrate*.go` with their
 until T177 stopped waiting on it. It costs nothing, since this task
 already waits on T043.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+this task lands before T200, so until T200 `sharedMemory` takes the form
+`repos[].memory` has in the code at the time (the mount's in-sandbox
+path, which is its host path), and the render lists `./memory/_shared`
+as a bare path; T200 moves both to the targets of 02 2.5
+(`/var/lib/julieta/memory/_shared`).
+
 - Implements: REQ-0140 (02 2.3), REQ-0177 (03 3.1), REQ-1317 (03 3.6),
   REQ-1295 (03 3.9), REQ-1318 (03 3.9), REQ-1296 (03 3.9), REQ-1297 (03 3.9),
   REQ-1298 (03 3.9), REQ-1299 (03 3.9), REQ-1302 (03 3.9), REQ-0237 (03 3.8), REQ-0244 (03 3.10), REQ-1300

@@ -73,16 +73,22 @@ A command with a schema'd output type adds a type alias of it to its
 import file, so `tools/ci` reaches it through `all` (REQ-0971); the
 task owns `internal/cmd/julieta/all/doc.go`, whose comment says so.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+REQ-0152 (02 2.5) and REQ-0586 (06 6.3), the `$HOME/.local/bin/julieta`
+link `setup` made, were retired on 2026-11-06 (12 12.11): julieta's two
+entry points are the mount's target and the root-owned link of 06 6.4
+item 8, and T201 removes the link from `setup`; the acceptance line on
+the link below is history. REQ-0397 keeps its dispatcher half.
+
 - Implements: REQ-0006 (index), REQ-0016 (index), REQ-0035 (00 0.4),
-  REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01 1.2), REQ-0152 (02
-  2.5), REQ-0153 (02 2.5), REQ-0154 (02 2.5), REQ-0155 (02 2.5),
+  REQ-0037 (00 0.4), REQ-0049 (01 1.2), REQ-0051 (01 1.2), REQ-0153 (02 2.5), REQ-0154 (02 2.5), REQ-0155 (02 2.5),
   REQ-0156 (02 2.6), REQ-0161 (03 (opening)), REQ-0162 (03 (opening)),
   REQ-0163 (03 (opening)), REQ-0164 (03 (opening)), REQ-0165 (03
   (opening)), REQ-0166 (03 (opening)), REQ-0167 (03 (opening)), REQ-0172
   (03 (opening)), REQ-0396 (04 4.3), REQ-0397
   (04 4.3), REQ-0398 (04 4.3), REQ-0399 (04 4.3), REQ-0401 (04 4.3),
-  REQ-0402 (04 4.3), REQ-0424 (04 4.3), REQ-0425 (04 4.3), REQ-0586 (06
-  6.3), REQ-0587 (06 6.3), REQ-0636 (07 7.5), REQ-0665 (08 8.2),
+  REQ-0402 (04 4.3), REQ-0424 (04 4.3), REQ-0425 (04 4.3), REQ-0587 (06
+  6.3), REQ-0636 (07 7.5), REQ-0665 (08 8.2),
   REQ-0707 (08 8.5), REQ-0733 (10 10.1), REQ-0734 (10 10.1), REQ-0740
   (10 10.1), REQ-0747 (10 10.1), REQ-0836 (10 10.2), REQ-1044 (12 12.1),
   REQ-1049 (12 12.1), REQ-1050 (12 12.1), REQ-1107 (12 12.3).

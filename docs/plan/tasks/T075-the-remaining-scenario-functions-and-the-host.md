@@ -25,6 +25,14 @@ below is the one written before the re-plan; `needs` lists its earlier
 dependencies with a folded id replaced by the id that absorbed it, and
 `owns` is written when the task reopens.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+J9 now starts each sandbox that will need a recreate (`romeu run
+--no-attach <name>`) before `romeu upgrade` or the `sync` that promotes
+the change and recreates it while it runs, since the in-place apply is a
+row of Deferred decisions and a stopped sandbox whose recreate digests
+differ is refused (REQ-1376, REQ-1387); the J9 function asserts that
+order and the `recreate-needed` warning on the running sandbox.
+
 - Implements: REQ-0012 (index), REQ-0120 (02 2.1), REQ-0724 (09
   (opening)), REQ-0727 (09 (opening)), REQ-0728 (09 (opening)), REQ-0748
   (10 10.1), REQ-0749 (10 10.1), REQ-0931 (10 10.3), REQ-1079 (12 12.2),

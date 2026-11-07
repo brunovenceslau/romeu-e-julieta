@@ -75,7 +75,7 @@ func newMachine(t *testing.T) machine {
 	}
 	require.NoError(t, os.Mkdir(m.home, 0o700))
 	sbx := filepath.Join(dir, "sbx")
-	script := "#!/bin/sh\necho \"$*\" >> " + m.calls + "\necho 'sbx version v0.49.2 0123456789abcdef'\n"
+	script := "#!/bin/sh\necho \"$*\" >> " + m.calls + "\necho 'sbx version v0.51.0 0123456789abcdef'\n"
 	require.NoError(t, os.WriteFile(sbx, []byte(script), 0o700))
 	data, err := spec.EncodeHostSettings(spec.HostSettings{
 		Schema: "host-settings/v1",
@@ -237,13 +237,13 @@ func TestApproveOnATerminal(t *testing.T) {
 		master, terminal := openPTY(t)
 		got := approveOn(t, m, terminal, int(terminal.Fd()), master, "y\n")
 		require.Equal(t, 0, got.code, got.stderr)
-		assert.Contains(t, got.stderr, "  sbx 0.49.2 (none recorded) (newest recorded 0.49.2; tested window 0.49.2)\n")
+		assert.Contains(t, got.stderr, "  sbx 0.51.0 (none recorded) (newest recorded 0.51.0; tested window 0.51.0)\n")
 		assert.Contains(t, got.stdout, "acknowledged  "+filepath.Join(m.stateHome, "romeu", "toolchain.json"))
 		assert.Empty(t, strings.TrimPrefix(got.stdout, "acknowledged  "+filepath.Join(m.stateHome, "romeu", "toolchain.json")+"\n"),
 			"the prompt goes to stderr, never stdout")
 		rec := m.record(t)
 		require.NotNil(t, rec)
-		assert.Equal(t, "0.49.2", rec.SbxVersion)
+		assert.Equal(t, "0.51.0", rec.SbxVersion)
 		assert.Equal(t, "v1.0.0", rec.Romeu.Version)
 		assert.Equal(t, time.Date(2026, 10, 23, 9, 0, 0, 0, time.UTC), rec.AcknowledgedAt)
 		assert.Equal(t, []string{"version"}, m.sbxCalls(t), "gate 1 reads sbx version and calls nothing else")

@@ -135,7 +135,7 @@ holds already; the host binaries link two modules for them, cobra and
 pflag, and the document generator stays in `internal/cli/clidoc`,
 which no binary imports (ADR 0015).
 
-`REQ-1056` External tools at runtime: `sbx` (host, >= v0.49.2; `REQ-1057` the versions with a
+`REQ-1056` External tools at runtime: `sbx` (host, >= v0.51.0; raised from v0.49.2 on 2026-11-07, since this specification uses what 0.51.0 added: `additionalWorkspaces[].target`, `cmd`, `--no-input`, `sandboxOptions.rootSize` and the mount fields of `sbx ls --json`; `REQ-1057` the versions with a
 recording set are the tested window,
 [10 10.3](10-testing-style.md#103-fake-sbx-fidelity-contract)), `git`
 (host and sandbox, floor in
@@ -297,7 +297,7 @@ module whose id is no directory name owns the paths its row gives.
 | `state` | host state records, the candidate and generation state machines, descriptor cache, toolchain acknowledgement, flock | spec, canon |
 | `egress` | derive egress from `mise.lock` at pinned SHAs; split auto vs gated | catalog, gitsafe, canon |
 | `gate` | widening set, diff, TTY prompt | spec, state, termsafe |
-| `render` | render candidates (`sbxenv.yaml`, workspace files, `render.json`), materialize kits via `os.Root`, promotion commit and recovery (its directories: `internal/render` and `internal/shquote`, the shell quoter `julietaBin` is rendered through) | spec, egress, oci, gitsafe, state |
+| `render` | render candidates (`sbxenv.yaml`, workspace files, `render.json`), materialize kits via `os.Root`, promotion commit and recovery (its directories: `internal/render` and `internal/shquote`, the shell quoter the secret command of 03 3.3 is rendered through) | spec, egress, oci, gitsafe, state |
 | `sbxdrv` | the only code that runs `sbx`; argv builders from recordings; output parsing; version floor | spec, probes |
 | `romeu-cli` | romeu commands, under `internal/cmd/romeu/`, the preflight of 01 1.5 (`internal/preflight`), the commit and push of the durable copy of memory of 08 8.1 (`internal/memgit`), the host paths and the root check that init, approve, sync and doctor share (`internal/hostpaths`) and the julieta binary romeu embeds (`internal/embedded`, 02 2.1) | all of the above |
 | `memstore` | the memory store in two packages (08 8.1): the shared readers on `os.Root` with the layout allowlist, and julieta's `memstore/write` with the `Store` and the `fs` backend's writes | spec, canon |
@@ -1101,7 +1101,10 @@ row.
 | `REQ-0195` | 2026-10-22 | `id`, `repo` (a project `dir`), `cwd` (relative to the repo), `env` (keys `^[A-Z_][A-Z0-9_]*$`, not `PATH`, `HOME`, `LD_*`, `BASH_ENV`, `ENV`), `steps` (list of argv lists; no shell), `focus` (at most one per tab) | `docs/reference/project.md`, the field and rule tables of the run layout generated from `internal/spec` |
 | `REQ-0213` | 2026-10-12 | The entries above are examples; the v1 catalog was built from the reference config repo's locks (S4) and measured in probe B4 | none: explanation |
 | `REQ-0245` | 2026-10-28 | Kinds `clear` and `final` require the headings (six for `final`); `facts` has no body. julieta stamps everything in the front matter | REQ-1297 (03 3.9): the headings of a `handoff` entry and of a `tombstone` one; a stamp file has no body by its schema (03 3.10) |
+| `REQ-1371` | 2026-11-07 | When the digests differ in swap-class fields only (the kits) and the A15 extension has recorded the swap argv: `julieta snapshot --all` through `sbx env exec`, then that argv, so sbx swaps the container; the open generation stays, its `createdWith` set to the new recreate digest once a read-back shows the kit set and the provisioned rules equal the approved ones | REQ-0353 and REQ-1376 (04 4.2, `run` step 3): while the recreate digests differ, `run` makes no `sbx env run` with the changed env file: it warns `recreate-needed` on a running sandbox, hint `romeu recreate <name>`, and exits 5 with it (`RJ-305`) on a stopped one, which it does not start, with the stopped hint of REQ-1377; `salvage`, `rm`, `recreate`, `retire`, `pull` and the fingerprint read refuse the same (REQ-1387); the in-place apply is a row of the index's [Deferred decisions](../spec.md#in-the-product), reopened when T210's measurement passes (decided on 2026-11-07) |
 | `REQ-0415` | 2026-10-28 | list handoffs | REQ-1293 (04 4.3): `julieta memory list --tag handoff` |
+| `REQ-0152` | 2026-11-06 | `$HOME/.local/bin/julieta`, a symlink to the running binary, created by `julieta setup` at runtime | REQ-1353 (06 6.4): the root-owned link `/usr/local/bin/julieta` the `julieta-claude` kit installs; the two entry points are 06 6.3 item 5 |
+| `REQ-0586` | 2026-11-06 | `julieta setup` points `$HOME/.local/bin/julieta` at its own absolute path, so hooks, panes and the agent find `julieta` on `PATH`. No per-project path reaches a kit: the mount's target is one constant | REQ-1353 (06 6.4) and 06 6.3 item 5: the two entry points, the mount's target and the kit's link |
 | `REQ-0560` | 2026-10-12 | the row of Deferred decisions on `tools/ci ask-first`, with its trigger; the forbidden-name check over pull request text runs in the agents' own pre-PR gate and the maintainer's read until then | none: a pointer to a deferred row, which carries no id |
 | `REQ-0561` | 2026-10-12 | the row of Deferred decisions on `tools/ci sequences`, with its trigger | none: a pointer to a deferred row, which carries no id |
 | `REQ-0562` | 2026-10-12 | the row of Deferred decisions on `tools/ci invariants` and `mutate`, with its trigger | none: a pointer to a deferred row, which carries no id |

@@ -28,12 +28,21 @@ REQ-1058 (12 12.1) names `romeu upgrade` beside J1 as what needs the
 refs/heads/main` (REQ-0909); the README shows the entry of
 `commands.yaml` (T088).
 
-- Implements: REQ-0520 (05 5.2), REQ-0547 (05 5.4), REQ-0549 (05 5.4), REQ-0602 (06 6.4), REQ-1058 (12 12.1),
-  REQ-1087 (12 12.2), REQ-1183 (12 12.8).
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): reaching `romeu run` from the page now needs
+sbx at or above the floor 0.51.0 (REQ-1056) and no user-level
+`~/.sbxenv.yaml`, which `romeu` refuses (REQ-1361, `RJ-367`); the page
+names both. The registry line of `kit.allowedSources` stays as the Goal
+gives it, since the pin move is conditional (T205).
+
+- Implements: REQ-0520 (05 5.2), REQ-0547 (05 5.4), REQ-0549 (05 5.4), REQ-0602 (06 6.4), REQ-1056 (12 12.1), REQ-1058 (12 12.1),
+  REQ-1087 (12 12.2), REQ-1183 (12 12.8), REQ-1361 (04 4.2).
 - Operator: no
 - Acceptance:
   - A reader with the two hosts' prerequisites reaches `romeu run` from
     the page alone.
+  - The prerequisites name sbx at or above 0.51.0, and the host setup
+    says to move a `~/.sbxenv.yaml` away, with `RJ-367`'s hint.
   - `tools/ci/headings.yaml` holds the README list (the nine headings of
     ADR 0001 rule 12 as ADR 0009 decision 6 amends it) and this page
     matches it.

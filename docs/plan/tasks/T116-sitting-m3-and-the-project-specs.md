@@ -35,6 +35,15 @@ request whose Evidence carries the sitting's output names this task in
 its body and writes `merged:` and `pr:` into this file, the one write
 rule 1 allows outside its own file.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): the `dockerd@1` row of Deferred decisions can
+fire at the first slot whose project cannot run its checks without a
+Docker engine in the sandbox (this repository is named), and is decided
+from that slot's hand record of what A19 asks, which A19 re-records in
+M6. From this sitting `romeu` renders `skills: off` (REQ-1358), so each
+slot also checks the skills the project's sessions use against T114's
+list.
+
 - Implements: REQ-1091 (12 12.2).
 - Operator: runs the slots; from a `--dry-run` build of `main` (T103).
   Each sitting builds from a commit whose diff since the last host build
@@ -42,6 +51,15 @@ rule 1 allows outside its own file.
 - Acceptance:
   - Every project definition is rendered by `romeu sync`.
   - Each runbook section holds the slot's undo.
+  - Each slot records whether the project's checks run in its sandbox
+    (for this repository, a Docker engine for the hybrid and container
+    e2e). A slot that cannot run them opens the `deferred` issue of the
+    `dockerd@1` row before the next slot and records by hand, in that
+    issue, what A19 asks for the workload in force: the engine's uid, its
+    socket's group and what the agent user reaches.
+  - Each slot records whether a skill its sessions use is missing from
+    the rendered sandbox; a missing one is added to T114's kit or
+    reported as the trigger of the `skills` row before the next slot.
   - Every issue opened here from an item of the retired capabilities
     passes `go run ./tools/ci hygiene --file <body>` before it is
     opened, and the runbook lists the item ids moved.

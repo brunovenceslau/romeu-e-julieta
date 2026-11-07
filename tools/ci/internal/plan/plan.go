@@ -41,7 +41,7 @@ const maxImplements = 40
 // ratchet, not an exemption to grow. A test fails when one of them comes
 // down to the cap, so the list only shrinks; splitting the open ones is
 // a re-plan.
-var OverCap = []string{"T001", "T002", "T005", "T008", "T021", "T033", "T043", "T049", "T051", "T061", "T066", "T068", "T069"}
+var OverCap = []string{"T001", "T002", "T005", "T008", "T021", "T033", "T043", "T049", "T061", "T066", "T068", "T069"}
 
 // maxOwns is the longest owns entry, in bytes: rule 3 compares two
 // entries in time and memory that grow with the product of their

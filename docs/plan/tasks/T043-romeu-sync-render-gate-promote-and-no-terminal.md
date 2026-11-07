@@ -151,6 +151,11 @@ The step 3 line's "(J2 step 3)" names the journey step where `sync`
 runs, not a level: its cases are unit (`TestReadSpecs`), as are its
 sibling clauses.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+sync error on a spec that sets `julietaBin` (an acceptance line below)
+went with the reserved arg, which T212 removes after T201 (the render
+branch, the sync rule and the constant); the line is history.
+
 - Implements: REQ-0012 (index), REQ-0042 (01 1.1), REQ-0044 (01 1.2),
   REQ-0048 (01 1.2), REQ-0054 (01 1.3), REQ-0055 (01 1.3), REQ-0056 (01
   1.3), REQ-0059 (01 1.4), REQ-0074 (01 1.5), REQ-0082 (01 1.6),

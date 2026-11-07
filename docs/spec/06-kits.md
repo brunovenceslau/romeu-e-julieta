@@ -12,8 +12,8 @@ and `oci`. Type: reference with the decision record for each choice.
 | Go/no-go | `REQ-0566` probe A11 builds a minimal local v3 kit (`kind: mixin`) on the host before any product kit is written; it fixes the descriptor file name and capability names. On a no-go, kit work stops and an ADR records the A11 result and the options, each with its trigger: wait for the next frontend milestone, or reconsider v2 kits or a published kit of our own (Q7 reopens) | no kit is written against an unmeasured format |
 | Build | `REQ-0567` **local directory sources**: on approval romeu promotes kit sources into content-addressed dirs `<name>-env/.romeu/kits/<kit>-<digest12>/`; sbx builds them at create and reuses its cache when unchanged. Where sbx runs a local kit's install steps and lifecycle hooks, and what they reach (network, host paths, uid), is measured by A11 and A14 ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts)) | no registry needed in v1; a kit change applies on recreate; immutable dirs make promotion crash-safe (01 1.6) |
 | Materialization | `REQ-0568` product kits from romeu's embedded copy; personal kits from the config commit's tree through `git fsck --strict` and `gitsafe.WalkTree` (I27), each read up to 64 MiB in all, written with `os.Root` into the candidate | agent-authored trees never reach a live path before the gate |
-| Capabilities | `REQ-0569` romeu parses every descriptor (local kits from their files, the workload from its image annotation via `internal/oci`, verified by digest at every hop) with a strict subset grammar into a normalized capability set that enters gate 2 (I28); `REQ-0570` one package, `internal/oci`, owns that grammar and the normalized set, and `render` calls it for local kits (01 1.4, 12 12.2; decided in [round 8](../reviews/round-8.md#decisions-for-the-operator)); kit-declared domains go through `egress.Split`; `REQ-0571` parsed descriptors are cached by digest in host state. `REQ-0572` The conformance fixtures of I28 record the sbx version and frontend digest they were made with, and a frontend pin change, or an sbx version entering the tested window, runs the A11 and A12 conformance subset again, named in the PR's Evidence. `REQ-0573` A capability type the grammar does not model fails `sync` closed, a row of [Deferred decisions](../spec.md#in-the-product) | a kit is a capability grant, so its capabilities are what the gate must show; romeu and sbx must read the same descriptor the same way. For the workload, a digest change alone does not show a reviewer that the new image added a mount, a credential or a network domain; the capability set does, and the gated egress of the workload's declared domains depends on it |
-| Personal kits | `REQ-0574` a personal kit is a `mixin`: a `set` or a `workload` is refused (sync error), since a set's listed kits carry capabilities its own descriptor does not and a workload is the base image; network, mount, volume, credential, ssh-agent, docker-auth and host-port capabilities are refused (sync error): docker-auth hands the sandbox the host's registry logins and host-port a host service past the egress policy, the reach of a credential and of network. The other capability types, install steps, privileges and lifecycle hooks, are not refused: a personal kit that declares one is shown in the gate 2 diff. Whether install steps and lifecycle hooks are refused too is decided once A14 reports where they run (Q32) | personal kits should not widen a sandbox silently, and a refusal we state is one the code makes |
+| Capabilities | `REQ-0569` romeu parses every descriptor (local kits from their files, the workload from its image annotation via `internal/oci`, verified by digest at every hop) with a strict subset grammar into a normalized capability set that enters gate 2 (I28); `REQ-0570` one package, `internal/oci`, owns that grammar and the normalized set, and `render` calls it for local kits (01 1.4, 12 12.2; decided in [round 8](../reviews/round-8.md#decisions-for-the-operator)); kit-declared domains go through `egress.Split`; `REQ-0571` parsed descriptors are cached by digest in host state. `REQ-0572` The conformance fixtures of I28 record the sbx version and frontend digest they were made with, and a frontend pin change, or an sbx version entering the tested window, runs the A11 and A12 conformance subset again, named in the PR's Evidence. `REQ-0573` A capability type the grammar does not model fails `sync` closed, a row of [Deferred decisions](../spec.md#in-the-product). `REQ-1385` `internal/oci` also reads the workload image's annotation `com.docker.sandboxes.start-docker`, which starts the engine of `docker.io/sbx/claude` (6.2): `true` enters the normalized set as the `dockerd@1` grant, privileged plus private storage at `/var/lib/docker`, so gate 2 shows the engine's elevation, and a value other than `true` or `false` fails `sync` closed as REQ-0573 does (decided on 2026-11-07; the code does not read it yet; the task that builds this ships first the interim refusal of a workload that carries the key, [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), REQ-1391) | a kit is a capability grant, so its capabilities are what the gate must show; romeu and sbx must read the same descriptor the same way. For the workload, a digest change alone does not show a reviewer that the new image added a mount, a credential or a network domain; the capability set does, and the gated egress of the workload's declared domains depends on it |
+| Personal kits | `REQ-0574` a personal kit is a `mixin`: a `set` or a `workload` is refused (sync error), since a set's listed kits carry capabilities its own descriptor does not and a workload is the base image; network, mount, volume, credential, ssh-agent, docker-auth, host-port and dockerd capabilities are refused (sync error): docker-auth hands the sandbox the host's registry logins and host-port a host service past the egress policy, the reach of a credential and of network, and dockerd a root-equivalent engine with private storage at `/var/lib/docker` (Q33), refused until A19 records the elevation and Q33 is amended or a 05 5.4 row accepts it by name (added on 2026-11-07). The other capability types, install steps, privileges and lifecycle hooks, are not refused: a personal kit that declares one is shown in the gate 2 diff. Whether install steps and lifecycle hooks are refused too is decided once A14 reports where they run (Q32); a `privileged@1` entry stays admitted and shown at gate 2 while `dockerd@1`, which adds `/var/lib/docker` to it, is refused, and is weighed again with Q32 and A19 (decided on 2026-11-07) | personal kits should not widen a sandbox silently, and a refusal we state is one the code makes |
 | Signing | `REQ-0575` **none in v1** (local v3 kits cannot be signed); trust = romeu release + approved config commits. Publishing and signing product kits is a row of [Deferred decisions](../spec.md#in-the-product); the one constraint it puts on today's design is that gate 2 can record a digest in place of a content hash | honest about the limit; the gate hashes kit content |
 | Kit sets | not used (they need published refs) | - |
 
@@ -21,7 +21,7 @@ and `oci`. Type: reference with the decision record for each choice.
 
 | Option | For | Against | Decision |
 |---|---|---|---|
-| **`docker.io/docker/sbx-kit-claude` pinned by digest** | `REQ-0576` maintained upstream with Claude Code releases; multi-arch; carries Go, gh, jq, docker CLI; agent state in volumes of its own (below) | unsigned today; Debian base; built outside our review | **default (Q2)**, with `workloadRepositories` allowlist in host settings and its capabilities in gate 2 |
+| **Docker's Claude kit pinned by digest** (`docker.io/docker/sbx-kit-claude`; `docker.io/sbx/claude`, the built-in Claude sbx 0.51 publishes as a v3 kit, once the pin moves under the condition of Q2, decided on 2026-11-06) | `REQ-0576` maintained upstream with Claude Code releases; multi-arch; carries gh, jq and the docker CLI (`sbx-kit-claude` also Go and Node; `sbx/claude` a Docker Hardened Image and docker-ce with its engine started, so no `dockerd@1` of the product's, the annotation that starts it entering gate 2 as that grant, REQ-1385); agent state in volumes of its own (below; `sbx/claude` declares none) | unsigned today; Debian base; built outside our review; `sbx/claude` declares plain-HTTP runtime egress (Q2) | **default (Q2)**, with `workloadRepositories` allowlist in host settings and its capabilities in gate 2 |
 | Own workload | full control; signable once published | we would track Claude Code releases ourselves | rejected for v1 |
 
 `REQ-0577` `julieta pin workload` moves a project spec's digest, verifying the
@@ -49,13 +49,23 @@ change any kit digest and does not force a recreate of every project.
 1. `REQ-0582` On promotion romeu writes `julieta-linux-<GOARCH>` (romeu's own
    `GOARCH`) and `SHA256SUMS` into `<name>-env/.romeu/bin/` (from its
    embedded, release-built copy) and records the binary's sha256 in
-   `render.json`.
+   `render.json`. `REQ-1365` It also writes `julieta`, a relative symbolic
+   link to that binary, so a kit names julieta as `/opt/julieta/bin/julieta`
+   with no architecture in the name and no per-project value; `render.json`
+   records the link's target (03 3.7), the drift check reads it with
+   `readlink`, a promotion replaces the link by rename as it replaces a
+   file, and the running julieta takes its own path as the resolved one
+   (`os.Executable`), the binary's and never the link's (decided on
+   2026-11-06).
 2. `REQ-0583` The env file mounts `./.romeu/bin` read-only (a fixed mount, so its
-   content can change without widening or recreate).
-3. `REQ-0584` romeu always invokes julieta by absolute path:
-   `<abs .romeu/bin>/julieta-linux-<GOARCH>`, where `GOARCH` is romeu's
-   own (a sandbox runs the host's architecture, Q21, which A4 may
-   reopen). The names use Go's architecture names, so no `uname -m`
+   content can change without widening or recreate), at the target
+   `/opt/julieta/bin` ([02 2.5](02-layouts.md#25-in-sandbox-paths)).
+3. `REQ-0584` romeu's own `sbx env exec` calls invoke julieta by
+   absolute path: `/opt/julieta/bin/julieta-linux-<GOARCH>`, where
+   `GOARCH` is romeu's own (a sandbox runs the host's architecture, Q21,
+   which A4 may reopen); the rendered `cmd` names the link
+   `/opt/julieta/bin/julieta` of item 1 (REQ-1365; 03 REQ-1370;
+   amended on 2026-11-07). The names use Go's architecture names, so no `uname -m`
    mapping exists anywhere.
 4. `REQ-0585` Before every command that execs julieta (`run`, `stop`, `salvage`, on
    its own and inside `rm`, `recreate` and `retire`, `pull`, and
@@ -66,13 +76,25 @@ change any kit digest and does not force a recreate of every project.
    sha256 must equal `render.json`, and julieta must report its own
    directory as not writable. Any failure exits 2 before `layout up`
    (I30), with `julieta-protocol`, `julieta-digest` or
-   `julieta-bin-writable`. The check proves compatibility, not
-   integrity: it runs the binary it checks. Integrity comes from the
-   read-only mount and the host-side drift check of `.romeu/bin`.
-5. `REQ-0586` `julieta setup` points `$HOME/.local/bin/julieta` at its own absolute
-   path, so hooks, panes and the agent find `julieta` on `PATH`. No kit
-   build step references the per-project path, which a kit cannot know
-   at build time.
+   `julieta-bin-writable`. The check
+   proves compatibility, not integrity: it runs the binary it checks.
+   Integrity comes from the read-only mount and the host-side drift
+   check of `.romeu/bin`. `REQ-1366` An exit status of 125 from `sbx env
+   exec`, the status the sbx 0.50 notes document for `sbx exec` when
+   sbx could not run the command at all (A4 records whether `env exec`
+   returns it too), is `sbx-unknown` (`RJ-308`) and no julieta failure
+   (added on 2026-11-06). Only the status A4 records for an `env exec`
+   that sbx cannot run, as on a sandbox it cannot reach, is so mapped: a
+   path missing inside the sandbox may end 126 or 127, as a container
+   does, and A4 records it apart (amended on 2026-11-07).
+5. `REQ-1373` julieta has two entry points inside a sandbox and no more:
+   the mount's target and the link of 6.4 item 8, which the kit
+   installs, so hooks, panes and the agent find `julieta` on `PATH`
+   before any `julieta setup`; `setup` makes no link of its own (its
+   `$HOME/.local/bin/julieta` link is retired on 2026-11-06,
+   [12 12.11](12-engineering.md#1211-requirement-ids)). No per-project
+   path reaches a kit: the mount's target is one constant
+   ([02 2.5](02-layouts.md#25-in-sandbox-paths)).
 6. `REQ-0587` julieta embeds the digest of the skills and hook lines the matching
    `julieta-claude` kit installs; `julieta setup` compares it with the
    installed ones and reports `skills-stale`, which SessionStart prints
@@ -80,9 +102,17 @@ change any kit digest and does not force a recreate of every project.
    The skills are kit content and change only at recreate, while julieta
    changes at every release.
 
-`REQ-0588` Probe A3 confirms the read-only mount is enforced, visible at the same
-path, and that root inside the sandbox cannot make it writable with
-`mount -o remount,rw`.
+`REQ-0588` Probe A3 confirms the read-only mount is enforced, visible at its
+target, and that root inside the sandbox cannot make it writable with
+`mount -o remount,rw`. Measured on 2026-11-06 from inside a sandbox on
+sbx 0.51.0, ahead of A3: every host directory is a bind of one virtiofs
+superblock with its own flags; root's remount, of the bind and of the
+superblock, flips the flags to `rw` and the write still fails with
+`EROFS`, and so does a write through the share's root mounted anew, so
+the read-only is enforced on the host side, per exported path; what root
+can do is turn every host mount read-only, the memory dir included, a
+denial and no widening, and drop `nosuid` and `nodev` from a bind by
+remount, which widens nothing of the host.
 
 ## 6.4 Product kits
 
@@ -90,24 +120,41 @@ path, and that root inside the sandbox cannot make it writable with
 |---|---|---|---|
 | `julieta` | `mixin` | `REQ-0589` `mise` and `herdr` downloaded at build, version + per-arch sha256 pinned (`tools/kitpin`); `REQ-0590` `~/.zshenv` and `BASH_ENV` add `$HOME/.local/bin` and the mise shims dir; `REQ-0591` herdr config: `[update] version_check=false, manifest_check=false`, and an explicit tmux-style prefix key binding (`ctrl+b`), chosen on purpose: inside a host tmux, press the prefix twice, or override it in a personal kit's herdr config; `REQ-0592` network capability (install phase): `github.com`, `objects.githubusercontent.com` | descriptor + sh install steps (<= 5 lines each: download, `sha256sum -c`, install) |
 | `julieta-claude` | `mixin` | the only agent-aware kit: the skills, the two session hooks and the PreToolUse guard it installs, the memory dir it makes non-writable, and the boot hook that runs `julieta setup`, are the numbered list **What the `julieta-claude` kit installs and refuses** after this table, one item per obligation | descriptor + files |
-| `os-base` | `mixin` | `REQ-0593` exists only if A12 reports packages the workload lacks, which it then carries; otherwise the `julieta` kit sets `TZ` (arg `tz`, default `Etc/UTC`) and `os-base` does not exist. Its apt delta is not pinned: a residual risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), with pinning a row of [Deferred decisions](../spec.md#in-the-product) | descriptor + sh |
+| `os-base` | `mixin` | `REQ-0593` exists only if A12 reports packages the workload lacks, which it then carries; otherwise the `julieta` kit sets `TZ` (arg `tz`, default `Etc/UTC`) and `os-base` does not exist. Its apt delta is not pinned: a residual risk of [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), with pinning a row of [Deferred decisions](../spec.md#in-the-product). `REQ-1367` Where the workload's descriptor carries the derived `provides` of kit spec m.5, one `deb/<package>@<version>` per installed package, `julieta pin workload` reads whether `deb/tzdata` and `deb/zsh` are among them, so a workload that gained the packages is seen at the pin and A12 confirms the read (added on 2026-11-06) | descriptor + sh |
 | `git-ssh-sign` | `mixin` | `REQ-0594` ssh-agent capability used for git signing only, from the dedicated host signing socket (`signing.agentSocket`); git config `gpg.format=ssh`, `commit.gpgsign=true`, `user.signingkey` from arg `signingKey` (a public key); `gpg.ssh.allowedSignersFile` generated from the same arg; opt-in per project, needed now because the maintainer signs every commit and will not run an agent that cannot ([00 0.5](00-scope.md#05-scope-justification)), so other adopters skip it | descriptor + files; **ask-first surface** |
 
 **What the `julieta-claude` kit installs and refuses.** One item per
 obligation of the row above:
 
-1. `REQ-0595` The skills `skills/julieta` and `skills/handoff`, into
-   `~/.claude/skills/`, each skill's whole directory, so the files its
-   `SKILL.md` links (REQ-1255) arrive with it.
+1. `REQ-0595` The skills `skills/julieta` and `skills/handoff`, each
+   skill's whole directory, so the files its `SKILL.md` links (REQ-1255)
+   arrive with it, as bundled skills: the kit's recipe
+   (`julieta-claude.dockerfile`, `FROM scratch`, one `COPY` per skill)
+   lays them under `/usr/share/julieta-claude/skills/<skill>` in the
+   composed image, and one `com.docker.sandbox/agent-skill@1` per skill
+   (kit spec m.7; sbx 0.48) names that directory, so sbx exposes each at
+   the agent's discovery directory; the host's shared skills store is
+   off ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1)).
+   Decided on 2026-11-06: until then the files rode in an install step as
+   a base64 payload and were copied into `~/.claude/skills/`, a copy that
+   failed on 2026-10-27 under the `agent-skills@1` mount of the workload
+   on sbx 0.50.0, when sbx put no layer of a mixin's recipe into a
+   sandbox of a v2 agent; sbx 0.51 runs its built-in agents as v3 kits,
+   so the first recreate on it is this route's go/no-go, B2 measures it
+   again, and the payload step stays the fallback until the files are
+   seen at the discovery directory with `skills: off`.
 2. `REQ-0596` The Claude Code hooks `SessionStart`, for every source the pinned
    version fires (startup, resume, clear, compact), -> `julieta memory
    index --hook`, and `SessionEnd` -> `julieta stamp`,
-   each invoking julieta by the absolute path of the read-only
-   `.romeu/bin` mount, which romeu renders as a reserved kit arg,
-   `julietaBin` (a spec that sets it is a sync error), written into the
-   hook command through `internal/shquote`, so a hook works before
-   `julieta setup` has made the link of
-   [02 2.5](02-layouts.md#25-in-sandbox-paths)
+   each invoking julieta as `/opt/julieta/bin/julieta`, the fixed target
+   of the read-only `.romeu/bin` mount and the link of 6.3
+   ([02 2.5](02-layouts.md#25-in-sandbox-paths)), a constant of the kit,
+   so the kit's content is the same for every project and a hook needs
+   no `julieta setup` first; each hook command is the wrapper of
+   08 8.2 (REQ-0673), which also checks that `/opt/julieta/bin` is a
+   mount point before it runs julieta (decided on 2026-11-06; until then
+   the path came through a reserved kit arg, `julietaBin`, that no spec
+   could set)
    ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)).
 3. The agent's own memory dir made non-writable (and the disabling
    setting set if the pinned version has one, Q8).
@@ -129,13 +176,13 @@ obligation of the row above:
 6. `REQ-0599` The case "PreToolUse with the `.romeu/bin` mount absent refuses `gh
    pr merge`": the guard fails closed
    ([08 8.2](08-memory-handoff-salvage.md#82-session-hooks-user-side-middleware)).
-7. `REQ-1308` A `lifecycle.startup` hook that runs `<julietaBin> setup` as the
+7. `REQ-1308` A `lifecycle.startup` hook that runs `/opt/julieta/bin/julieta setup` as the
    agent user at every boot, in the foreground, so a session after a
-   restart starts with the `PATH` link, the hook dispatcher, the trusted
+   restart starts with the hook dispatcher, the trusted
    mise configuration, the locked tools and each repo's `setup` task
    done ([04 4.3](04-cli.md#43-julieta-sandbox)). This item is
-   agent-neutral and sits here because this kit already carries
-   `julietaBin`. It declares only `HOME` and `JULIETA_MANIFEST`: the
+   agent-neutral and sits here because this kit already carries the
+   hooks. It declares only `HOME` and `JULIETA_MANIFEST`: the
    manifest is the env file's value where a definition sets it (the
    sandbox definitions' bridge until romeu renders the sandboxes), else
    the cache of REQ-0425, written by the first `setup` that `romeu run`
@@ -155,7 +202,8 @@ obligation of the row above:
    synced or pushed (08 8.1); a run that leaves the sandbox unusable
    records the hook failure `Setup` (08 8.2, REQ-0675) and a clean run
    clears it. When julieta cannot run at all (the `.romeu/bin` mount
-   absent), the wrapper rule of REQ-0673 prints its alert block and nothing is
+   absent, or `/opt/julieta/bin` no mount point, the check of REQ-1372
+   that this hook's wrapper makes too), the wrapper rule of REQ-0673 prints its alert block and nothing is
    recorded. The hook is outside the digest of REQ-0587: it is no
    installed file `setup` can read. `romeu run` step 6 (REQ-0357) stays
    the authoritative run: it is where a sandbox left unusable stops the
@@ -163,18 +211,20 @@ obligation of the row above:
    romeu renders the sandboxes, this hook replaces step 7 of the sandbox
    definitions repository's julieta runbook, which the operator ran by
    hand after each recreate (decided on 2026-10-28).
-8. `REQ-1353` A launcher at `/usr/local/bin/julieta`, root-owned, mode
-   0755, a `sh` script that runs `exec <julietaBin> "$@"`, so `julieta`
-   resolves by name in every sandbox with the kit, before any `julieta
-   setup`, and the agent user cannot rewrite it; where the agent has
-   root, as through `sudo`, it can, so the launcher is a convenience and
-   not a boundary. The hooks and the guard keep the absolute path. `$HOME/.local/bin` comes first on the agent's
-   `PATH` and is the agent's, so a `julieta` there, the link of REQ-0397
-   or any other file, shadows the launcher for the agent's own calls
-   only; SessionStart says when the `julieta` the shell finds is neither
-   the launcher nor the running julieta (08 8.2, REQ-1351). Added on
-   2026-11-03, after a sandbox where `setup` had not run lost its
-   handoff to a file because the skills call `julieta` by name.
+8. `REQ-1353` A symbolic link at `/usr/local/bin/julieta` to
+   `/opt/julieta/bin/julieta`, root-owned, so `julieta` resolves by name
+   in every sandbox with the kit, before any `julieta setup`, and the
+   agent user cannot rewrite it; where the agent has root, as through
+   `sudo`, it can, so the link is a convenience and not a boundary
+   (amended on 2026-11-06: a `sh` launcher until then, and the link of
+   `julieta setup` beside it, retired). The hooks and the guard keep
+   the absolute path. `$HOME/.local/bin` comes first on the agent's
+   `PATH` and is the agent's, so a `julieta` there shadows the link for
+   the agent's own calls only; SessionStart says when the `julieta` the
+   shell finds is neither the link nor the running julieta (08 8.2,
+   REQ-1351). Added on 2026-11-03, after a sandbox where `setup` had
+   not run lost its handoff to a file because the skills call `julieta`
+   by name.
 
 `julieta-claude` replaces the agent's built-in memory with
 `julieta memory` on purpose
