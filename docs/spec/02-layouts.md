@@ -151,7 +151,7 @@ Rules of this tree, one item per obligation:
   files and edits none. The package of the `generated` check is
   `tools/ci/internal/drift/`, since no package is named `generated`.
   A generator of
-  [12 12.3](12-engineering.md#123-generators-and-single-sources-of-truth)
+  [12 12.3](12-engineering.md#123-generators)
   lives in the package that owns its data and is registered by its own
   `tools/ci/generator_<name>.go`; the `generated` check holds no
   generator, and runs every registered one and fails a drift from it.
@@ -179,7 +179,7 @@ Which binary may import each package is
 [10 10.7](10-testing-style.md#107-module-boundaries-enforced-by-toolsci-imports);
 module ids are [12 12.2](12-engineering.md#122-development-commands-and-capability-map);
 which files are generated is the inventory of
-[12 12.3](12-engineering.md#123-generators-and-single-sources-of-truth).
+[12 12.3](12-engineering.md#123-generators).
 
 `REQ-0128` Embedding: a `go:embed` pattern cannot leave its package directory, so
 each embedded input sits beside the package that embeds it. `REQ-0129` `romeu`
