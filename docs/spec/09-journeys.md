@@ -172,7 +172,8 @@ open generation with no sandbox, romeu preserves it first (J10). If a
 sandbox of the project's name exists that romeu has no generation for
 (for example after the host state was lost), `run` exits 2 with the
 error `unknown-sandbox` (`RJ-203`); the operator checks it and runs
-`romeu adopt <name>` on a TTY, after which `run`, `salvage` and `rm`
+`romeu adopt <name>` on a TTY (on a stopped sandbox, `adopt` first
+warns that romeu has no route for it until T210), after which `run`, `salvage` and `rm`
 work as usual on a running sandbox, `run` makes no `sbx env run` with
 romeu's env file on the adopted sandbox, and `status` and `sync` warn that it was
 adopted until `romeu recreate <name>` brings it under the spec; a
