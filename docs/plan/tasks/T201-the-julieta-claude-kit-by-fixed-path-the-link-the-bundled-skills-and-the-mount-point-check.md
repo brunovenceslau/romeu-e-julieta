@@ -101,12 +101,12 @@ V2.45, V2.47, V2.48, V3.0):
   `agent-hooks-missing` compare what the kit ships.
 - The kit e2e that removes the link asserts the hint of REQ-1351, `fix:
   on the host, romeu recreate <name>`.
+- Item 1 also removes the comments of `internal/agent/claude/hooks.go`
+  that still name `julietaBin` (RP-10).
 
 Deferred: the removal of the base64 payload step on a go; its trigger
 is the first recreate on sbx >= 0.51 that shows both skills at the
 discovery directory with `skills: off` (RP-19, amended on 2026-11-07).
-The comments of `internal/agent/claude/hooks.go` that still name
-`julietaBin` go with item 1 (RP-10).
 
 - Implements: REQ-1373 (06 6.3), REQ-0587 (06 6.3), REQ-0397 (04 4.3),
   REQ-0595 (06 6.4), REQ-0596 (06 6.4),
@@ -121,6 +121,7 @@ The comments of `internal/agent/claude/hooks.go` that still name
   - The kit e2e asserts each hook, the guard and the startup hook name
     `/opt/julieta/bin/julieta` and that the descriptor declares no
     `args`; a kit built from the tree carries no `julietaBin` string.
+  - `git grep -n julietaBin -- internal/agent/claude` finds nothing.
   - The kit e2e installs `/usr/local/bin/julieta` as a root-owned link
     to `/opt/julieta/bin/julieta`, the agent cannot rewrite it, and
     `julieta version` runs by name through it.

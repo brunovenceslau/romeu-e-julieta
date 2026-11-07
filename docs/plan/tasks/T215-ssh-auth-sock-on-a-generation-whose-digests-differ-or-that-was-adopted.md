@@ -35,15 +35,18 @@ and `sbxVersion` for a generation, and the `generations[].kits` record
 of the in-place apply is in the scope T210 decides. So the member this
 task needs, the kit ids recorded at create, lands with its spec text
 (03 3.8, ask-first `formats`, and its write in `internal/state`, ask-first
-`gates`) when the task reopens. Reopened by: A4's record of whether sbx
-forwards `SSH_AUTH_SOCK` on exec (T026); or the first report of a
+`gates`) when the task reopens. Reopened by: the first report of a
 signing prompt from a sandbox that was not created with `git-ssh-sign`;
-or T210 opening the in-place apply. `owns` is written when the task
+or T210 opening the in-place apply (REQ-1394 no longer cites A4;
+amended on 2026-11-07). `owns` is written when the task
 reopens: T080's `internal/sbxdrv/env_signing.go`, the state member and
 the files of `run` that pass the environment.
 
 - Implements: REQ-1394 (05 5.4).
-- Operator: no.
+- Operator: yes, the approval lines for `internal/sbxdrv/**` (ask-first
+  `sbxdrv`, `env_signing.go`), `internal/state/**` (ask-first `gates`,
+  the creating kit set) and `schemas/**` (ask-first `formats`, the
+  regenerated `state-project.v1.json`) when the task reopens.
 - Acceptance:
   - On a generation whose recreate digests differ, an exec and the
     attach carry `SSH_AUTH_SOCK` only when the recorded creating kit set
@@ -51,6 +54,6 @@ the files of `run` that pass the environment.
     the four combinations.
   - On an adopted generation no exec and no attach carries it, whatever
     the live render holds.
-- Verify: `go test -tags e2e ./e2e/... -run '^TestSigningForward' -v`.
+- Verify: `go test ./internal/sbxdrv/... -run '^TestSigningForward' -v`.
   The pattern names the functions this task adds, and the reviewer reads
   them in the `-v` output (10 10.8).

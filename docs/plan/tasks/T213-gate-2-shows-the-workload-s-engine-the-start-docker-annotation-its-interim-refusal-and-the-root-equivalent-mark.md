@@ -47,7 +47,8 @@ after T066 for `internal/state/records.go`, which both edit.
    `/var/lib/docker`; `false` adds nothing; any other value fails
    `sync` closed as REQ-0573 does. The refusal of item 1 then goes.
 3. The cache (REQ-1391): each descriptor cache entry carries the
-   normalization version of `internal/oci`; an entry of another version
+   normalization version of `internal/oci`, one constant in
+   `internal/oci/normalization.go`; an entry of another version
    is a cache miss, which `sync` parses again (03 3.8, the regenerated
    `state-descriptor.v1.json`).
 4. The gate 2 summary (REQ-1396, 01 1.4 REQ-0071): a `privileged@1`
