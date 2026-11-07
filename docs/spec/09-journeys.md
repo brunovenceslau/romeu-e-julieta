@@ -212,7 +212,7 @@ stopped adopted sandbox is not started, by `run` or by a salvage
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
 3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight;
    a stopped sandbox whose recreate digests differ, or whose generation
-   was adopted, is not started, and the command exits 1 with
+   was adopted, is not started, and the command exits 5 with
    `recreate-needed` as J3a says (REQ-1387); the memory reader checks for an open `handoff` tagged `tombstone`
    of the generation before anything is stopped: on a TTY romeu asks whether to continue
    without one, and without a TTY it warns and continues; generation
