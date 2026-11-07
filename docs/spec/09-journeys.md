@@ -156,7 +156,7 @@ hands sbx no env file, since the in-place apply is a row of
 [Deferred decisions](../spec.md#in-the-product) (REQ-1376): on a
 running sandbox it warns `recreate-needed`, hint `romeu recreate
 <name>` (REQ-1377, J6), and attaches through `sbx env exec`; a stopped
-one it does not start and exits 1 with `recreate-needed` (`RJ-305`),
+one it does not start and exits 5 with `recreate-needed` (`RJ-305`),
 whose hint is to revert the spec change and run `romeu sync <name>`
 so the digests match again, then rerun, since `rm` and `recreate` would
 have to start it for their salvage and refuse too (REQ-1387).
