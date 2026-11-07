@@ -29,6 +29,12 @@ is `e2e/sync_live_test.go`; it extends `sync/steps.go`, the ordered step
 list of T043, by one line (rule 14 of `docs/plan.md`), which the `after`
 edge admits.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+step 9 of `sync` applies no env file; when the recreate digest differs
+from the running generation's it warns `recreate-needed` with the hint
+`romeu run <name>`, since `run` step 3 hands the changed env file to sbx
+(REQ-0344, REQ-0353; T066).
+
 - Implements: REQ-0192 (03 3.2), REQ-0344 (04 4.2), REQ-0355 (04 4.2),
   REQ-0488 (05 5.2), REQ-0511 (05 5.2), REQ-0634 (07 7.5), REQ-0635 (07
   7.5).
@@ -46,8 +52,9 @@ edge admits.
   - The `secrets` field follows its `apply` tag: recreate-class, or `sbx
     secret set --command` if the A10 result overturned the default
     (Q18).
-  - It reports "recreate needed" when the recreate digest differs from
-    the running generation.
+  - It reports "recreate needed" with the hint `romeu run <name>` when
+    the recreate digest differs from the running generation, and makes
+    no other sbx call for it.
   - The J11 scenario function runs in CI.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestSyncLive' -v`. The
   pattern names the `TestSyncLive*` functions this task adds, and the

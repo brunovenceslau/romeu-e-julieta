@@ -24,7 +24,8 @@ the hand-written project definition, without the read-only mount of the
 store that T111's fourth edit left. The fifth edit of rule 9 lands
 here: the other kit entries with their args, `signingKey` set to the
 public key, each with its undo in the runbook (the `julieta-claude`
-entry and its `julietaBin` arg land at sitting M1, T111); `romeu sync`
+entry and its `julietaBin` arg land at sitting M1, T111, the arg gone
+and the targets of 02 2.5 set with T201); `romeu sync`
 writes both at sitting M3 (T116). `julieta
 install` and `lock` (T053) are in the wave, so each recreated repository
 gets its `mise.toml` and `mise.lock` (the M2 row of `docs/plan.md`). J6

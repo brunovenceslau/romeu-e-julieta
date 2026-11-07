@@ -37,6 +37,12 @@ risks). Its e2e files are `e2e/salvage_test.go`, `e2e/rm_test.go` and
 T041 is `e2e/internal/romeu/salvage_helpers.go` (rule 1 of
 `docs/plan.md`). The I26 case after `adopt` is T050's.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+REQ-0102 (01 1.6) now reads a sandbox listed in an unreadable state as
+present with `upstream-shape` and the daemon-restart hint (T202), and
+`rm`, `retire` and `recreate` pass every preflight step but the mounts
+check of step 6 before their removal half (T203).
+
 - Implements: REQ-0012 (index), REQ-0052 (01 1.2), REQ-0064 (01 1.4),
   REQ-0074 (01 1.5), REQ-0076 (01 1.5), REQ-0079 (01 1.6), REQ-0080 (01
   1.6), REQ-0083 (01 1.6), REQ-0090 (01 1.6), REQ-0091 (01 1.6),

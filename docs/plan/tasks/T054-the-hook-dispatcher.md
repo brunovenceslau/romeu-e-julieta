@@ -99,6 +99,11 @@ it:
   The recorded failures are not yet shown by `julieta status` or
   SessionStart: `hooks.Failures` is what they read.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+dispatcher scripts exec `/opt/julieta/bin/julieta`, the fixed target of
+02 2.5 (REQ-0397), in place of `<home>/.local/bin/julieta`, whose link
+`setup` no longer makes (T201).
+
 - Implements: REQ-0154 (02 2.5), REQ-0297 (04 4.1), REQ-0301 (04 4.1),
   REQ-0306 (04 4.1), REQ-0397 (04 4.3), REQ-0408 (04 4.3), REQ-0409 (04
   4.3), REQ-0505 (05 5.2), REQ-0619 (07 7.3), REQ-0675 (08 8.2),

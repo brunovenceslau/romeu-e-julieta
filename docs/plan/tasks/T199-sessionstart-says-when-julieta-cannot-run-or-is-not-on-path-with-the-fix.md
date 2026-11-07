@@ -56,6 +56,14 @@ had not run wrote a handoff to a file instead.
 Deferred: when T068 merges, the fix line of item 3 drops the "not built
 yet" line; that merge is the trigger.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+launcher of item 1 and its acceptance line are history: the
+specification now names a root-owned symbolic link
+`/usr/local/bin/julieta` to `/opt/julieta/bin/julieta` (REQ-1353), which
+T201 installs in place of the `sh` launcher once the mount has its fixed
+target (T200); the alert block, the wrappers and `handoff show --hook`
+are unchanged, and the launcher the block names is now the link.
+
 - Implements: REQ-1353 (06 6.4), REQ-1351 (08 8.2), REQ-1352 (08 8.2), REQ-0673 (08 8.2).
 - Operator: yes, the approval line for `kits/**` (ask-first `kits`),
   then the sandbox definitions repository's pin of the kit and a

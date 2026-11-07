@@ -67,6 +67,11 @@ definitions repository's julieta runbook. `needs: T177`, because only a
    recorded in docs/probes/; a result that contradicts the spec reopens
    REQ-1308 before this task merges.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+wrapper of item 1 runs `/opt/julieta/bin/julieta setup`, the fixed
+target of 02 2.5, in place of `<julietaBin> setup`; T201 makes the
+change in the kit, and the rest of this task stands.
+
 - Implements: REQ-1308 (06 6.4), REQ-1309 (04 4.3), REQ-0675 (08 8.2).
 - Operator: yes, the approval line for `kits/**` (ask-first `kits`),
   the sandbox definitions repository's pin of the kit at the merge

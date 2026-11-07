@@ -174,12 +174,21 @@ pull requests from authors it does not trust, or a fetch fills a
 runner; accepted: an `fsck.<msg>=ignore` of the machine's config can
 weaken `transfer.fsckObjects`, the same trust as its credentials.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+`julieta pin workload` also prints whether the workload descriptor's
+derived `provides` (kit spec m.5) names `deb/tzdata` and `deb/zsh`, and
+that the descriptor carries no `provides` when it does not (REQ-1362,
+REQ-1367), read through `internal/oci`; acceptance: a fixture descriptor
+with both packages, one with neither and one without `provides` each
+print their line, asserted in `e2e/julieta_pin_test.go`.
+
 - Implements: REQ-0009 (index), REQ-0038 (00 0.4), REQ-0117 (02 2.1),
   REQ-0119 (02 2.1), REQ-0134 (02 2.2), REQ-0135 (02 2.2), REQ-0174 (03
   3.1), REQ-0178 (03 3.1), REQ-0211 (03 3.5), REQ-0420 (04 4.3),
-  REQ-0421 (04 4.3), REQ-0422 (04 4.3), REQ-0423 (04 4.3), REQ-0433 (04
-  4.4), REQ-0435 (04 4.4), REQ-0519 (05 5.2), REQ-0577 (06 6.2),
-  REQ-0639 (07 7.6), REQ-0728 (09 (opening)).
+  REQ-0421 (04 4.3), REQ-0422 (04 4.3), REQ-0423 (04 4.3), REQ-1362 (04
+  4.3), REQ-0433 (04 4.4), REQ-0435 (04 4.4), REQ-0519 (05 5.2),
+  REQ-0577 (06 6.2), REQ-1367 (06 6.4), REQ-0639 (07 7.6), REQ-0728 (09
+  (opening)).
 - Operator: feeds block O4.
 - Acceptance:
   - `spec validate` exits 6 (`check-findings`) on any decode, schema or

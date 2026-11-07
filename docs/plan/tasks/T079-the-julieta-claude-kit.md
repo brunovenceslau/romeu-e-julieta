@@ -54,6 +54,11 @@ the seam it extends by one line (rule 14), after T054 and T053, the
 seam's earlier editors, and the `guard*.go` files sit in T054's
 `hooks/` package, so `after: T054`.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+`julietaBin` arg of the paragraph above is history: the kit names
+julieta as `/opt/julieta/bin/julieta`, the fixed target of 02 2.5, and
+takes no arg (06 6.4, REQ-0596); T201 makes the change.
+
 - Implements: REQ-0008 (index), REQ-0010 (index), REQ-0114 (02 2.1),
   REQ-0402 (04 4.3), REQ-0410 (04 4.3), REQ-0424 (04 4.3), REQ-0547 (05
   5.4), REQ-0587 (06 6.3), REQ-0595 (06 6.4), REQ-0596 (06 6.4),

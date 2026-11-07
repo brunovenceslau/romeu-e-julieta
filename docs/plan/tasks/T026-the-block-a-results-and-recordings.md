@@ -25,13 +25,27 @@ one written before the re-plan; `needs` names the tasks whose code it
 reads (the definitions of T019, the check of T020), and `owns` is
 written when the task reopens.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+the table of 11 11.1 gains A18 (the caches across sandboxes and
+recreates, REQ-1368) and A19 (the engine of the `sbx/claude` workload
+and `dockerd@1`, REQ-1369), and extends A3 (each mount at its target of
+02 2.5, the `julieta` link), A4 (`sbx inspect`, the mount fields and the
+unreadable state of `sbx ls --json`, exit 125 of `env exec`, `--no-input`
+per argv shape and the two offers of sbx 0.51), A5 (the goldens with
+`target`, `skills: off` and `cmd`, a planted `~/.sbxenv.yaml`), A9 (the
+`--created-via` value and the host and port deny of Q2) and A15 (the
+size options, `sbx env run -d` with a changed kit set, running and stopped, `cmd` on an attached, a
+detached and a cloned `env run`); the argv list of REQ-0997 grows with
+`sbx inspect`, the attached `sbx env run <dir>` and `--no-input`.
+
 - Implements: REQ-0142 (02 2.3), REQ-0158 (02 2.6), REQ-0566 (06 6.1),
   REQ-0588 (06 6.3), REQ-0750 (10 10.1), REQ-0924 (10 10.3), REQ-0943
   (10 10.4), REQ-0979 (11 (opening)), REQ-0981 (11 11.1), REQ-0982 (11
   11.1), REQ-0983 (11 11.1), REQ-0984 (11 11.1), REQ-0985 (11 11.1),
   REQ-0986 (11 11.1), REQ-0987 (11 11.1), REQ-0988 (11 11.1), REQ-0989
   (11 11.1), REQ-0990 (11 11.1), REQ-0991 (11 11.1), REQ-0992 (11 11.1),
-  REQ-0993 (11 11.1), REQ-0994 (11 11.1), REQ-0995 (11 11.1), REQ-1028
+  REQ-0993 (11 11.1), REQ-0994 (11 11.1), REQ-0995 (11 11.1), REQ-1368
+  (11 11.1), REQ-1369 (11 11.1), REQ-1028
   (11 11.4).
 - Operator: block O3 produces it; the maintainer opens it. A16's result
   file is committed from the maintainer's shell, and its **[review]**

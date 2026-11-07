@@ -27,6 +27,11 @@ REQ-0061 and REQ-0062 (01 1.4) now name the confirmed prompt of `romeu
 upgrade` as gate 1 too, and REQ-0499 (05 5.2) admits the swap of the
 running binary in `upgrade`; the sweeps cover `upgrade` once T196 lands.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+REQ-0078 (01 1.5) now lets the protective commands print the mounts
+check of step 6 (`mounts-mismatch`, T203) and go on; the sweeps cover it
+once T203 lands.
+
 - Implements: REQ-0001 (index), REQ-0026 (index), REQ-0027 (index),
   REQ-0029 (index), REQ-0047 (01 1.2), REQ-0061 (01 1.4), REQ-0062 (01
   1.4), REQ-0063 (01 1.4), REQ-0065 (01 1.4), REQ-0076 (01 1.5),

@@ -9,11 +9,15 @@ owns:
   - internal/cmd/romeu/status/orphans*.go
   - internal/cmd/romeu/status/lost_generation*.go
   - e2e/status_b2_test.go
+  - internal/cmd/romeu/status/mounts*.go
+  - internal/cmd/romeu/status/sbx_version*.go
 needs:
   - T048
+  - T202
 after:
   - T185
   - T174
+  - T203
 ask_first:
   - formats
   - gates
@@ -39,7 +43,21 @@ sections add carry the `formats` approval line; the orphan scan and
 `envDirs` of `sync` sit in files T055 and T169 own, so this slice copies
 the small part it needs and names who unifies it, as T048 says.
 
-- Implements: REQ-0327 (04 4.2), REQ-0334 (04 4.2), REQ-0712 (08 8.5).
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+per project, `status` also prints the mounts sbx lists for the sandbox
+against the render's and the ones it lists that romeu did not render
+(01 1.5 step 6, T203), and the sbx version that created the open
+generation beside the live `sbx version` (REQ-1359, 03 3.8), "unknown"
+for a generation without the member, the kits removed from the set
+since the generation's create (05 5.4, REQ-1375), and, where the recorded `sbx ls
+--json` shape lists no mounts, that the mounts were not compared;
+acceptance: a fixture with one extra mount, one whose shape lists no
+mounts, and one generation with `sbxVersion` and one without, each line
+asserted in `e2e/status_b2_test.go`.
+
+- Implements: REQ-0327 (04 4.2), REQ-0334 (04 4.2), REQ-1359 (03 3.8),
+  REQ-1375 (05 5.4),
+  REQ-0712 (08 8.5).
 - Operator: no.
 - Acceptance:
   - Per project, the spec commit against the synced one: equal, ahead,

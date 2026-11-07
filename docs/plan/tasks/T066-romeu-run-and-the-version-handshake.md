@@ -26,8 +26,12 @@ needs:
   - T013
   - T135
   - T186
+  - T200
+  - T202
 after:
   - T048
+  - T201
+  - T203
 ask_first:
   - sbxdrv
   - formats
@@ -63,12 +67,32 @@ harness of T041 is `e2e/internal/romeu/run_helpers.go`. No per-step
 stderr lines: the progress-lines row of the index's Deferred decisions
 holds them.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
+steps 5 and 6 invoke `/opt/julieta/bin/julieta-linux-<GOARCH>`, the
+target of the `.romeu/bin` mount (02 2.5, T200), and step 7 execs into
+the attached `sbx env run <dir>`, whose `cmd` is `julieta layout up`
+over the manifest step 6 cached (03 3.3, REQ-0358; the builder is
+T202's), so the argv of I1 is that call, the `sbx env exec -it` of
+`layout up` until A15 records it; step 3 hands a changed env file to
+sbx with `sbx env run -d <dir>`, stopped or running, after `julieta
+snapshot --all` on a running sandbox, keeps the generation and moves
+its `createdWith` on exit 0, and exits 1 with `recreate-needed`
+otherwise (REQ-0352, REQ-0353, amended on 2026-11-07); the generation record gains
+`sbxVersion` from `sbx inspect` after the create (REQ-1359); the
+minimal `layout up` of this task, run as `cmd` before any manifest is
+cached, prints that none is cached and that `romeu run --no-attach
+<name>` writes one, and execs the login shell (REQ-0418, 04 4.3); the
+hybrid test mounts `.romeu/bin` at `/opt/julieta/bin` (REQ-0738). The
+sentence on the `sbx env exec -it` of `layout up` in the re-plan
+paragraph above is history.
+
 - Implements: REQ-0001 (index), REQ-0012 (index), REQ-0013 (index),
   REQ-0041 (01 1.1), REQ-0051 (01 1.2), REQ-0055 (01 1.3), REQ-0088 (01
   1.6), REQ-0089 (01 1.6), REQ-0101 (01 1.6), REQ-0104 (01 1.6),
   REQ-0130 (02 2.1), REQ-0144 (02 2.3), REQ-0151 (02 2.5), REQ-0171 (03
   (opening)), REQ-0202 (03 3.3), REQ-0215 (03 3.6), REQ-0216 (03 3.6),
-  REQ-0225 (03 3.6), REQ-0227 (03 3.7), REQ-0233 (03 3.8), REQ-0270 (04
+  REQ-0225 (03 3.6), REQ-0227 (03 3.7), REQ-0233 (03 3.8), REQ-1359 (03
+  3.8), REQ-0418 (04 4.3), REQ-1366 (06 6.3), REQ-0270 (04
   4.1), REQ-0271 (04 4.1), REQ-0283 (04 4.1), REQ-0302 (04 4.1),
   REQ-0308 (04 4.2), REQ-0311 (04 4.2), REQ-0327 (04 4.2), REQ-0328 (04
   4.2), REQ-0340 (04 4.2), REQ-0346 (04 4.2), REQ-0348 (04 4.2),
@@ -106,11 +130,16 @@ holds them.
   - The J3a variant: with a sandbox that exists, `run` starts or
     reattaches with `sbx env run -d` without re-provisioning, and
     `julieta setup` is a no-op when the locks are unchanged (09, J3;
-    S8). The create and start calls are interactive, raw, their stdio
-    the terminal's.
-  - A stopped sandbox whose recreate digest differs, or whose rendered
-    env file changed since its create, makes `run` exit 5 with
-    `recreate-needed` (`RJ-305`) and start nothing (04 4.2 step 3, J3a);
+    S8). The create, the start, the apply of a changed env file and the
+    attached `sbx env run <dir>` of step 7 are interactive, raw, their
+    stdio the terminal's.
+  - A stopped or running sandbox whose recreate digest differs gets
+    `sbx env run -d <dir>`, interactive and raw, after the snapshot
+    exec when running; on the fake's exit 0 the generation's
+    `createdWith` takes the new digest, and on a non-zero exit `run`
+    exits 1 with `recreate-needed` (`RJ-305`) and the record is
+    unchanged (04 4.2 step 3, J3a; amended on 2026-11-07, exit 5 on a
+    stopped sandbox until then);
     a failing `julieta setup` exits 1 without attaching and prints the
     escaped report; `--no-attach` ends after setup; `run` attaches when
     `julieta setup` reports a failed fetch.
@@ -130,9 +159,13 @@ holds them.
     mount each stop `run` with exit 2 and `julieta-protocol`,
     `julieta-digest` or `julieta-bin-writable` (I30, 06 6.3).
   - `run` warns `spec-moved: romeu sync <name>` when the last-fetched
-    config ref is ahead, with no network call; a running sandbox whose
-    recreate digest differs warns `recreate-needed` naming the changed
-    fields.
+    config ref is ahead, with no network call.
+  - A running sandbox whose digests are equal gets no sbx call; a
+    stopped one gets `sbx env run -d <dir>`; the snapshot exec runs
+    before the apply on a running sandbox and not on a stopped one; a
+    snapshot that fails, and an apply that runs past its limit
+    (`subprocess-timeout`), exit 1 with the generation's `createdWith`
+    unchanged, so the next `run` applies again.
   - A romeu built with plain `go build` exits 2 with
     `julieta-not-embedded` on `sync` and `run`, and `status`, `doctor`
     and `version` work. `run` reads julieta from the package of T186.
@@ -146,6 +179,17 @@ holds them.
   - romeu's share of S8 is measured by B5 on real hosts (11 11.2), and
     no CI test asserts a bound on it (S8).
   - The lock is released before the final `exec` (04 4.1).
+  - After a create, the generation record carries `sbxVersion` as `sbx
+    inspect` reported it (03 3.8), read through T202's parser; a shape
+    without the field leaves the member absent and warns.
+  - The minimal `layout up`, run with no manifest cached and none in
+    its environment, prints the no-manifest line naming `romeu run
+    --no-attach <name>` and execs the login shell; with a cached
+    manifest it opens the shell in the primary repo's dir as before.
+  - The hybrid test mounts `.romeu/bin` at `/opt/julieta/bin` and the
+    julieta calls of steps 5 and 6 name that path; a fake `env exec`
+    that exits 125 makes the compatibility check report `sbx-unknown`
+    and no julieta failure (06 6.3, REQ-1366).
   - `romeu status` gains julieta's warnings and recorded hook failures
     for a running sandbox, and says so when it skips that exec (04 4.2),
     in this task's own file under `internal/cmd/romeu/status/`, after
