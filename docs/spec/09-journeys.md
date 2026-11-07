@@ -118,7 +118,8 @@ which names each step's command and output path.
    their capabilities, workload, gated egress) -> approve.
 7. [O] `romeu run <cfg>` -> sandbox created -> tools installed -> herdr
    layout with the agent pane focused; the operator logs the agent in
-   inside the sandbox, once, on this first run.
+   inside the sandbox on this first run; what a recreate keeps of the
+   login is A12's record ([06 6.2](06-kits.md#62-workload-choice)).
 
 ## J2 New project
 
@@ -147,17 +148,33 @@ which names each step's command and output path.
 On the host the operator opens one terminal window and runs `romeu run
 <p>` in it; that process becomes the sandbox's herdr client. Nothing
 else runs on the host. See `romeu run` in
-[04](04-cli.md#how-romeu-run-reaches-the-run-layout). J3a: run step 3
-starts a stopped sandbox or reattaches to a running one without
-re-provisioning, and hands a changed env file to sbx, which applies it
-to the sandbox, stopped or running; `julieta setup` is a no-op when locks are unchanged
-(S8). J3b: create, record generation, egress, `julieta setup` installs
-everything, then attach. If the tree has an open generation with no
-sandbox, romeu preserves it first (J10). If a sandbox of the project's
-name exists that romeu has no generation for (for example after the host
-state was lost), `run` exits 2 with the error `unknown-sandbox`
-(`RJ-203`); the operator checks it and runs `romeu adopt <name>` on a
-TTY, after which `run`, `salvage` and `rm` work as usual.
+[04](04-cli.md#how-romeu-run-reaches-the-run-layout). J3a: with the
+env file unchanged since the sandbox took it, run step 3 starts a
+stopped sandbox without re-provisioning and makes no sbx call for a
+running one, and step 7 attaches. With a changed env file `run`
+hands sbx no env file, since the in-place apply is a row of
+[Deferred decisions](../spec.md#in-the-product) (REQ-1376): on a
+running sandbox it warns `recreate-needed`, hint `romeu recreate
+<name>` (REQ-1377, J6), and attaches through `sbx env exec`; a stopped
+one it does not start and exits 1 with `recreate-needed` (`RJ-305`),
+whose hint is to revert the spec change so the digests match again,
+or `romeu salvage --from-host <name>`, since `rm` and `recreate` would
+have to start it for their salvage and refuse too (REQ-1387).
+`julieta setup` is a no-op when locks are unchanged (S8). J3b: record
+a new generation, create (`sbx env run -d --clone`), egress,
+compatibility check, `julieta setup` installs everything, then attach.
+In both, `run` commits and pushes memory before the attach
+(REQ-1380). If the tree has an
+open generation with no sandbox, romeu preserves it first (J10). If a
+sandbox of the project's name exists that romeu has no generation for
+(for example after the host state was lost), `run` exits 2 with the
+error `unknown-sandbox` (`RJ-203`); the operator checks it and runs
+`romeu adopt <name>` on a TTY, after which `run`, `salvage` and `rm`
+work as usual on a running sandbox, `run` never hands the adopted
+sandbox romeu's env file, and `status` and `sync` warn that it was
+adopted until `romeu recreate <name>` brings it under the spec; a
+stopped adopted sandbox is not started, by `run` or by a salvage
+(REQ-1378, REQ-1387).
 
 ## J4 Pull and review agent work on the host
 
@@ -194,7 +211,9 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
    stopped agent for one.
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
 3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight;
-   the memory reader checks for an open `handoff` tagged `tombstone`
+   a stopped sandbox whose recreate digests differ, or whose generation
+   was adopted, is not started, and the command exits 1 with
+   `recreate-needed` as J3a says (REQ-1387); the memory reader checks for an open `handoff` tagged `tombstone`
    of the generation before anything is stopped: on a TTY romeu asks whether to continue
    without one, and without a TTY it warns and continues; generation
    `open -> salvaging`, new salvage id and host base SHAs for the
@@ -273,9 +292,13 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
   everything as it was -> [H] on `yes`, swaps the binary, records gate
   1 (once per machine) and runs `romeu sync --all`; julieta binaries update
   through the read-only mount without recreate; only projects whose kit
-  content or capabilities changed see gate 2, and the next `romeu run`
-  hands the new env file to sbx, which applies it to the existing
-  sandbox (01 1.7, recreate needed). Installing by hand with the `e2e/scenarios/j1/commands.yaml`
+  content or capabilities changed see gate 2 and need `romeu recreate
+  <name>`: their next `romeu run` warns `recreate-needed` on a running
+  sandbox and refuses to start a stopped one, since the in-place apply
+  of a changed env file is a row of
+  [Deferred decisions](../spec.md#in-the-product) (01 1.7, recreate
+  needed); `romeu recreate` refuses a stopped one too, as J3a says
+  (REQ-1387). Installing by hand with the `e2e/scenarios/j1/commands.yaml`
   entry of J1 step 2, then `romeu approve --toolchain` and `romeu sync
   --all`, stays the path for a host without `tools.gh`.
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config
@@ -337,22 +360,26 @@ TTY, after which `run`, `salvage` and `rm` work as usual.
 
 ## J12 Second machine
 
-1. J1 steps 1-5 on the new machine (approvals, secret bindings and
-   memory are machine-local by design). Agent memory and handoffs stay
-   on the machine that wrote them (Q14).
-2. `romeu sync --all` -> one gate per project -> `romeu run <name>`.
+1. J1 steps 1-5 on the new machine (approvals and secret bindings are
+   machine-local by design).
+2. `romeu sync --all` clones each project's `memory.remote` into
+   `<name>-env/memory/` ([08 8.1](08-memory-handoff-salvage.md#81-memory-store),
+   REQ-1305, Q14), then one gate per project, then `romeu run <name>`.
 3. Unpushed work from the other machine is not available (push first).
-   A memory entry file is self-contained: copying
-   `memory/<dir>/entries/` whole is a complete move, and the store lock
-   is recreated on first use
-   ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)).
+   Memory a session wrote there reaches `memory.remote` at that
+   machine's next romeu command that pushes memory (08 8.1, REQ-1304).
+   For a project with `memory: {remote: none}`, a memory entry file is
+   self-contained: copying `memory/<dir>/entries/` whole is a complete
+   move, and the store lock is recreated on first use (the Moving a
+   store row of [08 8.1](08-memory-handoff-salvage.md#81-memory-store),
+   REQ-0647).
 
 ## J13 Remove, rename or split a repo inside a project (v1 manual path)
 
 1. [A] edit the spec (remove the repo, change its URL, or add the new
    repos); PR; merge.
 2. [O] `romeu sync foo` -> gate 2 (repos changed) -> `romeu recreate foo`
-   (salvage runs first, over the generation's recorded repo set, so the
+   on a running sandbox (J3a for a stopped one; salvage runs first, over the generation's recorded repo set, so the
    removed repo is still salvaged).
 3. [H] new repos get new clone dirs; a removed repo's clone and memory
    dir stay in place and are reported by `status` as `orphaned repo dir`

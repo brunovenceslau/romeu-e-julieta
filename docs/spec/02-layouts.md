@@ -179,7 +179,7 @@ Which binary may import each package is
 [10 10.7](10-testing-style.md#107-module-boundaries-enforced-by-toolsci-imports);
 module ids are [12 12.2](12-engineering.md#122-development-commands-and-capability-map);
 which files are generated is the inventory of
-[12 12.3](12-engineering.md#123-generators).
+[12 12.3](12-engineering.md#123-generators-and-single-sources-of-truth).
 
 `REQ-0128` Embedding: a `go:embed` pattern cannot leave its package directory, so
 each embedded input sits beside the package that embeds it. `REQ-0129` `romeu`
@@ -304,13 +304,24 @@ world-accessible.
 host clone is read-only from the sandbox), `./memory/_shared` and `./memory/<dir>` for every
 repo (direct, rw) and `./.romeu/bin` (direct, read-only). `.romeu/bin`
 is a fixed mount: no spec field names it and each project has it.
+romeu renders no mount of `sbxenv.yaml` or of the rest of `.romeu/`.
+sbx itself binds the env file (since 0.42), each kit source of the
+render and each skill dir of an `agent-skill@1` entry of a rendered kit
+(0.51); those binds are the closed exemption list of the mounts check
+([01 1.5](01-system-model.md#15-preflight-before-every-mutating-sbx-call),
+step 6, REQ-1354), A4 records their shapes and A3 whether each is
+read-only (amended on 2026-11-07). Paths in the file are `./x`, relative to the file; no
+`..`, no absolute path. Confirmed by probes A3 and A5. The runtime
+ledger's two mounts of [13 13.1](13-runtime-ledger.md#131-stores) are
+not in v1.
+
 `REQ-1355` Each of those mounts but the primary clone's, which clone
 mode keeps at its host path, names its in-sandbox `target` (sbx 0.51,
 `additionalWorkspaces[].target`), a path named after its consumer, as
 the FHS places a package: `/opt/julieta/bin` for `./.romeu/bin`,
 `/var/lib/julieta/memory/_shared` and `/var/lib/julieta/memory/<dir>`
-for the memory dirs (2.5), so no other host path reaches the sandbox,
-and a kit names julieta by one constant path
+for the memory dirs (2.5), so no other host path that romeu renders
+reaches the sandbox, and a kit names julieta by one constant path
 ([06 6.3](06-kits.md#63-julieta-delivery)). `/opt/julieta` and
 `/var/lib/julieta` are romeu's: no product kit lays a file under either
 **[review]**, and the hook wrappers check the mount point before they
@@ -319,12 +330,8 @@ Decided on 2026-11-06; no sandbox romeu created exists before `run` is
 built, and the sandboxes of the by-hand bridge
 ([docs/notes/julieta-by-hand.md](../notes/julieta-by-hand.md)) get the
 targets in their hand-written definitions before the kit that names the
-path is pinned, so nothing migrates.
-`sbxenv.yaml` and the rest of `.romeu/` sit outside every mount; paths
-in the file are `./x`, relative to the file; no `..`, no absolute path.
-Confirmed by probes A3 and A5; A3 also checks that each mount is at its
-target. The runtime ledger's two mounts of
-[13 13.1](13-runtime-ledger.md#131-stores) are not in v1.
+path is pinned, so nothing migrates. A3 checks that each mount is at
+its target.
 
 `REQ-0143` Host git refs written by romeu in each host clone, all in romeu-owned
 namespaces: `refs/romeu/origin/<dir>/*` (origin fetches used for
@@ -392,7 +399,7 @@ store is the table of [01 1.2](01-system-model.md#where-data-lives).
 | What | Path | Owner |
 |---|---|---|
 | primary repo | same absolute path as the host clone (sbx clone mode) | sbx |
-| julieta binaries | `/opt/julieta/bin`, the fixed target of the read-only mount of `<name>-env/.romeu/bin/` (2.3, REQ-0142; decided on 2026-11-06); `REQ-0151` romeu always invokes them by that absolute path, `/opt/julieta/bin/julieta-linux-<GOARCH>` ([06 6.3](06-kits.md#63-julieta-delivery), step 3) | romeu |
+| julieta binaries | `/opt/julieta/bin`, the fixed target of the read-only mount of `<name>-env/.romeu/bin/` (2.3, REQ-0142; decided on 2026-11-06); `REQ-0151` romeu's own `sbx env exec` calls invoke julieta by its absolute path, `/opt/julieta/bin/julieta-linux-<GOARCH>` ([06 6.3](06-kits.md#63-julieta-delivery), step 3), and the rendered `cmd` names the link `/opt/julieta/bin/julieta` (REQ-1370, [03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1); amended on 2026-11-07) | romeu |
 | `julieta` on `PATH` | `/usr/local/bin/julieta`, the link the `julieta-claude` kit installs ([06 6.4](06-kits.md#64-product-kits), item 8, REQ-1353); the two entry points are 06 6.3 item 5; the `$HOME/.local/bin/julieta` link of `julieta setup` is retired (REQ-0152, 2026-11-06, [12 12.11](12-engineering.md#1211-requirement-ids)) | `julieta-claude` kit |
 | secondary repos | `REQ-0153` `$HOME/src/<name>/<dir>` | julieta (`julieta setup`) |
 | memory dirs | `/var/lib/julieta/memory/<dir>` and `/var/lib/julieta/memory/_shared`, the fixed targets of the direct mounts (REQ-0142; decided on 2026-11-06) | host tree |

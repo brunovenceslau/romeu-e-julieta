@@ -228,8 +228,9 @@ What the tags decide:
 - `ref` decides which commit egress derives from, so it is widening
   with the rest of `repos`.
 - `workload` and `kits` are widening with their capabilities, and
-  apply at recreate: `run` hands the changed env file to sbx, which
-  applies it to the existing sandbox where it can
+  apply at recreate: while the in-place apply waits behind the gate of
+  `run` step 3 ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
+  REQ-1376), a change reaches the sandbox at `romeu recreate`
   ([01 1.7](01-system-model.md#17-vocabulary), recreate needed).
 - `secrets` applies at recreate; it becomes `live` if probe A10
   confirms it (Q18).
@@ -306,7 +307,7 @@ additionalWorkspaces:
   - path: ./.romeu/bin
     target: /opt/julieta/bin
     readOnly: true
-skills: off
+skills: "off"
 cmd: [/opt/julieta/bin/julieta, layout, up]
 kits:
   - source: docker.io/docker/sbx-kit-claude@sha256:<64 hex>
@@ -317,7 +318,7 @@ kits:
   - source: ./.romeu/kits/git-ssh-sign-<digest12>
     args: {signingKey: "ssh-ed25519 AAAA... "}
   - source: ./.romeu/kits/my-home-<digest12>
-sandboxOptions: {cpus: 4, memory: 8g}
+sandboxOptions: {cpus: 4, memory: 8g, rootSize: 20g}
 secrets:
   github:
     command: "/usr/bin/env -i HOME=<abs home> PATH=/usr/bin:/bin <abs argv0> <args...>"
@@ -333,7 +334,9 @@ never a literal value; `REQ-0202` clone mode comes from romeu's `sbx env run
 from no spec field. `REQ-1357` Every additional workspace carries a
 `target`, the fixed in-sandbox path of
 [02 2.5](02-layouts.md#25-in-sandbox-paths) (sbx 0.51), and
-`./.romeu/bin` its `readOnly`. `REQ-1358` `skills` is written as `off`:
+`./.romeu/bin` its `readOnly`. `REQ-1358` `skills` is written as `off`, a string, which the
+marshaller quotes, since `off` is a YAML 1.1 boolean (A5 records that
+sbx 0.51 reads it as the mode `off`; amended on 2026-11-07):
 sbx's default shares the host's skills store read-only into every
 sandbox (sbx 0.43, `skills.defaultMode`), content no gate reads, and the
 skills a sandbox of romeu gets are its kits'
@@ -341,8 +344,8 @@ skills a sandbox of romeu gets are its kits'
 [Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-06).
 `REQ-1370` `cmd` is `[/opt/julieta/bin/julieta, layout, up]` (sbx 0.51),
 the command of an attached `sbx env run <dir>`, so `romeu run` attaches
-through that call ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
-step 7) and an operator who starts the sandbox with `sbx env run <dir>`
+through that call once A15 records it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
+step 7; until then the `sbx env exec -it` of REQ-0358; the switch re-runs the drift check of this file right before the attach) and an operator who starts the sandbox with `sbx env run <dir>`
 by hand gets the run layout from the manifest julieta cached (REQ-0425;
 without one, `layout up` says so and opens a shell, 04 4.3); no
 `entrypoint` is written (decided on 2026-11-06). `REQ-0203` romeu names this file by path; probe A5 records
@@ -651,8 +654,8 @@ both forms.
 | `retiring` | `REQ-0230` `null`, or `{"attic": "<UTC-ts>"}` while the retire steps of 01 1.6 run |
 | `generations[]` | `REQ-0231` every generation of the project; v1 keeps them all, so the record grows by one generation per recreate and has no bound. `doctor` warns past 256 KiB, and compaction is a row of [Deferred decisions](../spec.md#in-the-product) |
 | `generations[].state` | `REQ-0232` `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
-| `generations[].createdWith` | `REQ-0233` the recreate digest at create, or at the last env file sbx applied to the sandbox in place ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3; amended on 2026-11-07); `null` for an adopted generation (status reports "recreate digest unknown") |
-| `generations[].sbxVersion` | `REQ-1359` the sbx version that created the sandbox, read after the create from the field sbx 0.51 records for it (`sbx inspect`; A4 records the field and its shape); absent for a generation created before this member, by an older sbx or by `adopt`; `status` prints it beside the live `sbx version` (added on 2026-11-06) |
+| `generations[].createdWith` | `REQ-0233` the recreate digest at create; `run` never moves it while the in-place apply waits behind the gate of run step 3 ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), REQ-1376; amended on 2026-11-07); `null` for an adopted generation, which `status` and `sync` report with the warning `recreate-needed`, naming the generation adopted, with the hint of REQ-1377 for the sandbox's state (`romeu recreate <name>` for a running sandbox) |
+| `generations[].sbxVersion` | `REQ-1359` the sbx version that created the sandbox, read after the create from the field sbx 0.51 records for it (`sbx inspect`; A4 records the field and its shape; [01 1.6](01-system-model.md#generation), REQ-1379); absent for a generation created before this member, by an older sbx or by `adopt`, and when that read fails, which `run` warns as `sbx-version-unread` and goes on; `status` prints it beside the live `sbx version` (added on 2026-11-06) |
 | `salvage[].manifestSha256` | `REQ-0234` plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
 | `salvage[].id` | `REQ-0235` a ULID, as the generation's id is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
 | `salvage[].fingerprint` | `REQ-0236` `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the `fingerprint` digest (3.12) of the values the list **Fingerprint** after this table names, not read again at that write. That list is the one home of what a fingerprint is; the pages that compare one cite it. A field of the state format, under the version rule of the opening of this page |
@@ -790,7 +793,10 @@ closes the open one of the shared dir (status `done`), after the
 duplicate rule of 04 4.1 (a duplicate prints the existing id and closes
 nothing); an open `handoff` is edited as any entry, and a done one
 refuses every `edit`, so a closed narrative is the record of its moment. `REQ-0243` An entry file is self-contained: copying `memory/<dir>/entries/`
-whole is a complete move, and the store lock is recreated on first use.
+whole is a complete move, and the store lock is recreated on first use
+(the Moving a store row of
+[08 8.1](08-memory-handoff-salvage.md#81-memory-store), REQ-0647, is
+this rule's home).
 
 ## 3.10 Stamp (schema `stamp.v1`)
 
