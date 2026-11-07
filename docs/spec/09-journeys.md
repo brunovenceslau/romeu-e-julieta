@@ -157,8 +157,11 @@ hands sbx no env file, since the in-place apply is a row of
 running sandbox it warns `recreate-needed`, hint `romeu recreate
 <name>` (REQ-1377, J6), and attaches through `sbx env exec`; a stopped
 one it does not start and exits 5 with `recreate-needed` (`RJ-305`),
-whose hint is to revert the spec change and run `romeu sync <name>`
-so the digests match again, then rerun, since `rm` and `recreate` would
+whose hint is to undo the change that moved the digest (the spec, a
+secret's argv in the host settings, or the romeu release) and run
+`romeu sync <name>` so the digests match again, then rerun, and warns
+that undoing re-approves what the change removed (REQ-1377), since
+`rm` and `recreate` would
 have to start it for their salvage and refuse too (REQ-1387).
 `julieta setup` is a no-op when locks are unchanged (S8). J3b: record
 a new generation, create (`sbx env run -d --clone`), egress,
