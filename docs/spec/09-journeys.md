@@ -152,7 +152,7 @@ else runs on the host. See `romeu run` in
 env file unchanged since the sandbox took it, run step 3 starts a
 stopped sandbox without re-provisioning and makes no sbx call for a
 running one, and step 7 attaches. With a changed env file `run`
-hands sbx no env file, since the in-place apply is a row of
+makes no `sbx env run` with it, since the in-place apply is a row of
 [Deferred decisions](../spec.md#in-the-product) (REQ-1376): on a
 running sandbox it warns `recreate-needed`, hint `romeu recreate
 <name>` (REQ-1377, J6), and attaches through `sbx env exec`; a stopped
@@ -173,8 +173,8 @@ sandbox of the project's name exists that romeu has no generation for
 (for example after the host state was lost), `run` exits 2 with the
 error `unknown-sandbox` (`RJ-203`); the operator checks it and runs
 `romeu adopt <name>` on a TTY, after which `run`, `salvage` and `rm`
-work as usual on a running sandbox, `run` never hands the adopted
-sandbox romeu's env file, and `status` and `sync` warn that it was
+work as usual on a running sandbox, `run` makes no `sbx env run` with
+romeu's env file on the adopted sandbox, and `status` and `sync` warn that it was
 adopted until `romeu recreate <name>` brings it under the spec; a
 stopped adopted sandbox is not started, by `run` or by a salvage
 (REQ-1378, REQ-1387).
@@ -301,15 +301,19 @@ stopped adopted sandbox is not started, by `run` or by a salvage
   of a changed env file is a row of
   [Deferred decisions](../spec.md#in-the-product) (01 1.7, recreate
   needed); `romeu recreate` refuses a stopped one too, as J3a says
-  (REQ-1387). Installing by hand with the `e2e/scenarios/j1/commands.yaml`
+  (REQ-1387), so start each sandbox that will need the recreate
+  (`romeu run --no-attach <name>`) before `romeu upgrade`, and recreate
+  it while it runs. Installing by hand with the `e2e/scenarios/j1/commands.yaml`
   entry of J1 step 2, then `romeu approve --toolchain` and `romeu sync
   --all`, stays the path for a host without `tools.gh`.
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config
   sandbox, whose `egress.extra` holds the registry hosts
   ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)) -> PR -> merge -> [O] `romeu sync foo` (gate: new digest) ->
-  `romeu recreate foo`.
+  `romeu recreate foo`, with the sandbox running (`romeu run --no-attach
+  foo` before the sync if it is stopped; once the change is promoted a
+  stopped sandbox is refused, J3a).
 - Personal kit: [A] edit `kits/<id>/` in the config repo -> PR -> sync ->
-  gate -> recreate.
+  gate -> recreate, with the sandbox running, as for the workload.
 - sbx update on the host: the next `romeu sync` or `run` exits 3 (gate
   1, [04 4.2](04-cli.md#42-romeu-host)); [O] `romeu doctor` shows the
   new sbx version against the floor and the recording set
@@ -382,7 +386,9 @@ stopped adopted sandbox is not started, by `run` or by a salvage
 1. [A] edit the spec (remove the repo, change its URL, or add the new
    repos); PR; merge.
 2. [O] `romeu sync foo` -> gate 2 (repos changed) -> `romeu recreate foo`
-   on a running sandbox (J3a for a stopped one; salvage runs first, over the generation's recorded repo set, so the
+   with the sandbox running (`romeu run --no-attach foo` before the
+   sync if it is stopped; once the change is promoted a stopped sandbox
+   is refused, J3a; salvage runs first, over the generation's recorded repo set, so the
    removed repo is still salvaged).
 3. [H] new repos get new clone dirs; a removed repo's clone and memory
    dir stay in place and are reported by `status` as `orphaned repo dir`

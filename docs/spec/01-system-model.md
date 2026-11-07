@@ -185,7 +185,7 @@ derivation, and sbx, not romeu, applies those of the runtime phase
 declares a network, mount, volume, credential, ssh-agent, docker-auth,
 host-port or `dockerd@1` capability is refused (sync error): `dockerd@1`
 hands the sandbox a root-equivalent engine and private storage, refused
-until A19 and Q33 settle (amended on 2026-11-07). Its other capabilities (install steps,
+until A19 records the elevation and Q33 is amended or a 05 5.4 row accepts it by name (amended on 2026-11-07). Its other capabilities (install steps,
 privileges, lifecycle hooks) are not refused: they are shown in the
 gate 2 diff.
 
@@ -239,8 +239,8 @@ at step 2, 3 or the identity check of step 6. `rm`, `retire` and
 `recreate` run their salvage half the same way and pass every step but
 the mounts check before their removal half, since a removal replaces
 the mounts. A stopped sandbox whose recreate digests differ, or whose
-generation was adopted, is the one case where `salvage` and the salvage
-half stop: they do not start it, since the start would hand sbx the
+generation was adopted, is the one case where `salvage`, the salvage
+half and `pull` stop: they do not start it, since the start would hand sbx the
 changed env file, and its disk persists ([04 4.2](04-cli.md#42-romeu-host),
 REQ-1387; decided on 2026-11-07). *Why for us:* a check that cannot widen a
 sandbox must not keep the operator from saving work; drift and identity
@@ -342,7 +342,7 @@ A generation is one sandbox lifetime, identified by a ULID.
 | open | `REQ-1212` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows no sandbox | (none) | the record just written is removed; exit 1 |
 | open | `REQ-1213` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
 | open | `REQ-0089` the `sbx env run` of that same command times out (`subprocess-timeout`, [04 4.1](04-cli.md#starting-values)), whatever `sbx ls --json` shows | open | the record is kept, because sbx's daemon may finish the create after romeu stopped waiting; exit 1; the next `run` finds the sandbox present and goes on, or absent and closes the generation as lost (the `closed-lost` row), which costs one extra `run` and never a sandbox without a generation |
-| (none) | `REQ-0090` `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated`; `run` never hands its sandbox romeu's env file ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1378) |
+| (none) | `REQ-0090` `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated`; `run` makes no `sbx env run` with romeu's env file on its sandbox ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1378) |
 | open | `REQ-0091` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
 | salvaging | `REQ-1214` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half again (the earlier command ended, killed or failed, while it salvaged, and wrote no later state) | salvaging | new salvage id; the refs the earlier salvage created stay |
 | salvaging | `REQ-0092` the sandbox half fails (julieta exits 1, a full disk) or its exec is interrupted | open | salvage record `result: incomplete`, `reasons: [sandbox-half-failed]`; `REQ-0093` exit 1, or 128 plus the signal number when a signal to romeu interrupted the exec ([04 4.1](04-cli.md#signals)) |
@@ -373,8 +373,8 @@ it prints the lost record and exits 1, and the next `run` creates.
 
 `run` step 3 changes no generation record when the recreate digests
 differ: under the gate of [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout)
-(REQ-1376) it warns about a running sandbox and attaches without handing
-sbx the env file, and refuses a stopped one before any sbx call starts
+(REQ-1376) it warns about a running sandbox and attaches through
+`sbx env exec`, with no `sbx env run`, and refuses a stopped one before any sbx call starts
 it; the row an in-place apply would add waits with that apply in its row
 of [Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-07).
 
@@ -481,7 +481,7 @@ generated glossary page is a row of
 | lesson | a file under `docs/lessons/` of this repository ([12 12.7](12-engineering.md#127-text-standard-and-lessons)), read by contributors and review; the session's own feedback in a user's project is a memory entry of type `feedback` ([03 3.9](03-formats.md#39-memory-entry-schema-memory-entryv1)) and is not called a lesson | - |
 | widening set | gate 2's digested content | - |
 | recreate-class | fields tagged `apply:"recreate"`: name (the sandbox's name derives from the project's, so a renamed project is a new sandbox; decided on 2026-10-22), repos, kits, workload, ports, sandbox options, agent, and (until probe A10 says otherwise) secrets: the fields of the env file and of the sandbox's identity, which the recreate digest covers ([03 3.12](03-formats.md#312-digests-internalcanon)) | - |
-| recreate needed | the live render's recreate digest differs from the open generation's `createdWith`, or that digest is unknown because the generation was adopted: the env file changed since the sandbox took it, or romeu never rendered it. `run` never hands sbx such an env file: on a running sandbox it warns `recreate-needed` and attaches through `sbx env exec`, and a stopped one it does not start: `run`, and `salvage`, `rm`, `recreate` and `retire`, which would start it for the sandbox half, exit 5 with `recreate-needed`; `status` and `sync` warn with the same slug. The hint is `romeu recreate <name>` for a running sandbox, and for a stopped one to undo the change that moved the digest (in the spec, in a secret's argv in the host settings, or in the romeu release) and run `romeu sync <name>`, so the promoted render's recreate digest matches the generation's again, then rerun the command, with a warning that undoing re-approves what the change removed; a stopped adopted generation has no romeu route until T210 ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1376 and REQ-1378, and the `salvage` row, REQ-1387; [04 4.1](04-cli.md#41-conventions-both-binaries), Warnings, REQ-1377). Nothing yet shows that sbx applies a changed env file to an existing sandbox and keeps the instance, so the in-place apply waits for its row of [Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-07) | stale (for the recreate digest) |
+| recreate needed | the live render's recreate digest differs from the open generation's `createdWith`, or that digest is unknown because the generation was adopted: the env file changed since the sandbox took it, or romeu never rendered it. `run` makes no `sbx env run` with such an env file (whether its `sbx env exec <dir>` reads it on a running sandbox is unmeasured, [04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3): on a running sandbox it warns `recreate-needed` and attaches through `sbx env exec`, and a stopped one it does not start: `run`, and `salvage`, `rm`, `recreate` and `retire`, which would start it for the sandbox half, exit 5 with `recreate-needed`; `status` and `sync` warn with the same slug. The hint is `romeu recreate <name>` for a running sandbox, and for a stopped one to undo the change that moved the digest (in the spec, in a secret's argv in the host settings, or in the romeu release) and run `romeu sync <name>`, so the promoted render's recreate digest matches the generation's again, then rerun the command, with a warning that undoing re-approves what the change removed; a stopped adopted generation has no romeu route until T210 ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1376 and REQ-1378, and the `salvage` row, REQ-1387; [04 4.1](04-cli.md#41-conventions-both-binaries), Warnings, REQ-1377). Nothing yet shows that sbx applies a changed env file to an existing sandbox and keeps the instance, so the in-place apply waits for its row of [Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-07) | stale (for the recreate digest) |
 | review checkout | a hardened checkout of sandbox work under `<name>-env/review/<dir>/` | - |
 | sandbox probe | a block B check that the probe harness runs inside a sandbox, ids C2..C6 (C1 is retired, 11 11.2) | - |
 | runtime ledger | the per-machine, add-only store of runtime events under host state ([13](13-runtime-ledger.md), designed, not built in v1); "the ledger" on its own means this | - |

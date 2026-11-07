@@ -85,10 +85,14 @@ romeu's temporary files for the view live inside `view/`. Because they
 are in the rendered file they are inside `renderDigest`
 ([01 1.4](01-system-model.md#gate-2-project-widening-per-project)): a
 project rendered without them meets gate 2 once and needs one
-recreate, since `run` hands sbx no changed env file while the in-place
-apply of one is a row of
-[Deferred decisions](../spec.md#in-the-product)
-([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3). L1
+recreate, which no warning reports: the mounts the renderer adds are
+outside the recreate digest, so `recreate-needed` does not fire, and a
+stopped sandbox is still started with `sbx env run -d <dir>` and the
+current env file ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
+step 3, REQ-0352); a trigger on the env file's own digest is part of
+the in-place apply's row of
+[Deferred decisions](../spec.md#in-the-product) (amended on
+2026-11-07). L1
 renders them from the first `sync`; a project created by an earlier
 release pays that recreate once, the cost of waiting its Deferred row
 states. Amended on 2026-11-07: the two mounts take fixed in-sandbox
