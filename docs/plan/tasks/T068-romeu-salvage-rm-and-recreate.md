@@ -62,7 +62,15 @@ goes on; `rm` and `recreate` pass every step but it before their
 removal half (REQ-0078). T069 runs the same cases for `retire`. The
 J13 scenario starts the sandbox (`romeu run --no-attach`) before the
 `sync` that promotes the repo change, as J13 step 2 says, since a
-stopped sandbox is refused once the change is promoted.
+stopped sandbox is refused once the change is promoted. When the
+listing shows no mounts for a stopped sandbox, the start of the salvage
+half calls T203's comparison right after the start and before any other
+call (REQ-1382, 01 1.5); a failure is printed and the salvage goes on,
+as the protective commands do (REQ-0078), since the stop before exiting
+of REQ-1393 is `run`'s. REQ-1382 and the fingerprint read's case of
+REQ-1390 are built here without a new id on this task's Implements
+line, which is over the cap of 40 and does not grow (OverCap, decided
+on 2026-10-17; recorded for the maintainer on 2026-11-07).
 
 - Implements: REQ-0012 (index), REQ-0052 (01 1.2), REQ-0064 (01 1.4),
   REQ-0074 (01 1.5), REQ-0076 (01 1.5), REQ-0079 (01 1.6), REQ-0080 (01
@@ -141,7 +149,14 @@ stopped sandbox is refused once the change is promoted.
   - On a stopped sandbox with equal digests and `~/.sbxenv.yaml` present
     under the test's home, `salvage` exits non-zero with `sbx-env-base`
     and its hint before any sbx call that starts the sandbox (REQ-1390);
-    the same holds for a failed `sbx-global-secret` check.
+    the same holds for a failed `sbx-global-secret` check, and for the
+    fingerprint read of a rerun on a `removing` generation, which starts
+    nothing and changes no record.
+  - On a stopped sandbox with equal digests whose listing shows no
+    mounts, `salvage` starts it and the fake records the mounts
+    comparison as the first call after the start; with a mount missing
+    in the listing after the start, `salvage` prints `mounts-mismatch`
+    and goes on, with no `sbx stop` before the sandbox half (REQ-1382).
   - With the preflight's mounts check failing, `salvage` prints
     `mounts-mismatch` and goes on; `rm` and `recreate` pass every step
     but it before their removal half, and a missing memory mount ends

@@ -82,16 +82,21 @@ items 4 and 5 are added.
    file, and each kit source and each `agent-skill@1` skill dir of a
    kit of the render, and each passes only when its source, after
    resolving links, is the env file or lies under a
-   `.romeu/kits/<id>-<digest12>/` dir of the live render, its target is
-   the one A4 records (the synthetic session's until then), and it is
-   read-only; a writable bind fails for every command (RX-15). A
+   `.romeu/kits/<id>-<digest12>/` dir, and its target is the one A4
+   records (the synthetic session's until then); which render's kit
+   dirs count on a running sandbox whose kits changed since the create
+   is part of the open question on mount-affecting changes on a running sandbox (docs/spec.md). A bind off the list fails the step for `run` and
+   `sync`, and the protective commands print it and go on (REQ-1381,
+   REQ-0078); the plan adds no read-only condition the spec does not
+   hold (RC-1, amended on 2026-11-07). A
    listing with no mounts for a running sandbox fails the step; one
    with none for a stopped sandbox defers the comparison to right after
    the command starts it (REQ-1382), through a function this task
-   exports, which on a failure stops the sandbox with `sbx stop` before
-   the command exits with `mounts-mismatch` and says the bind was live
-   until the stop (REQ-1393); `run` (T066) and the salvage start (T068)
-   call it. The comparison is skipped whole for an adopted generation
+   exports, which returns the result with the same results as step 6:
+   `run` (T066) then stops the sandbox with `sbx stop` and exits 2 with
+   `mounts-mismatch`, saying the bind was live until the stop
+   (REQ-1393, which names `run` only), and the salvage start (T068)
+   prints it and goes on (REQ-1382, REQ-0078; amended on 2026-11-07). The comparison is skipped whole for an adopted generation
    (REQ-1383). RJ-368's hint is the one of 04 4.4 for the sandbox's
    state: restore the source and rerun, or salvage then recreate; for a
    removed repo or a changed target on a running sandbox `romeu
@@ -102,9 +107,13 @@ items 4 and 5 are added.
    sandbox's state (running or stopped) and by whether the generation
    was adopted, returns the hint of every `recreate-needed` warning and
    error: `romeu recreate <name>` for a running sandbox; for a stopped
-   one, the undo of the change that moved the recreate digest (the
-   spec, or a secret's argv in the host settings), then `romeu sync
-   <name>` and a rerun, with the warnings REQ-1377 lists; the adopted
+   one, the undo of the change that moved the recreate digest, then
+   `romeu sync <name>` and a rerun, naming the three sources that
+   digest covers: the project spec, a secret's argv in the host
+   settings, and the product-kit content of the romeu release, which
+   has no romeu route until T210, so a sandbox a release will need
+   recreated is started before the upgrade (REQ-1377, J9), with the
+   warnings REQ-1377 lists; the adopted
    messages for an adopted generation. Beside it, the refusal that
    `run` (T066), `pull` (T067), `salvage`, `rm`, `recreate`, `retire`
    and the fingerprint read (T068, T069) make on a stopped sandbox whose
@@ -127,7 +136,11 @@ items 4 and 5 are added.
   REQ-1383 (01 1.5), REQ-1387 (04 4.2), REQ-1393 (05 5.4).
 - Operator: yes, the approval lines for the `errors.go` declarations of
   `RJ-305`, `RJ-367` and `RJ-368` (ask-first `contracts`) and for
-  `internal/sbxdrv/policy_ls.go` (ask-first `sbxdrv`).
+  `internal/sbxdrv/policy_ls.go` (ask-first `sbxdrv`). Item 1's build
+  waits for the maintainer's answer to the open question on mount-affecting changes on a running sandbox (docs/spec.md), which decides how step 6
+  treats a repo added or removed, a mount target changed and a kit
+  changed on a running sandbox, and which kit dirs the closed list
+  exempts (amended on 2026-11-07).
 - Acceptance:
   - With a fake session listing every compared mount at its target,
     step 6 passes; with one missing, one at another target, one marked
@@ -137,17 +150,18 @@ items 4 and 5 are added.
     exits 2 with `mounts-mismatch` naming the mount; a render with one
     repo more than the generation records passes step 6 (amended on
     2026-11-07).
-  - An exempt bind (the env file, a kit source, a skill dir) passes
-    only read-only, at the target the session records, with a source
-    under a `.romeu/kits/<id>-<digest12>/` dir of the live render or
-    equal to the env file; the same bind writable, at another target,
-    or with a source elsewhere fails with `mounts-mismatch` (RX-15).
+  - An exempt bind (the env file, a kit source, a skill dir) passes at
+    the target the session records, with a source under a
+    `.romeu/kits/<id>-<digest12>/` dir or equal to the env file; the
+    same bind at another target, or with a source elsewhere, fails with
+    `mounts-mismatch` for `run` and `sync` and is printed by the
+    protective commands, which go on (amended on 2026-11-07).
   - A listing that shows no mounts fails the step for a running
     sandbox; for a stopped one the step passes and the exported
     after-start comparison, called with a listing that holds a bind off
-    the list, calls `sbx stop` on the fake and returns
-    `mounts-mismatch` saying the bind was live until the stop
-    (REQ-1382, REQ-1393).
+    the list, returns `mounts-mismatch` and calls no sbx command itself;
+    the stop and its message are `run`'s (T066), and the salvage start
+    prints the result and goes on (REQ-1382, REQ-1393).
   - For an adopted generation the step compares nothing and passes
     (REQ-1383).
   - The hint function returns `romeu recreate <name>` for a running

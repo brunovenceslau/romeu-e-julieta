@@ -47,7 +47,10 @@ beside A9's deny, and this probe re-records it), and extends:
   quoted `"off"` as the mode off) and `cmd`, and a `~/.sbxenv.yaml`
   planted under a home the harness creates, never the operator's: the
   harness refuses to start while the operator's own file exists and
-  removes its plant on every exit path;
+  removes its plant on every exit path; where sbx cannot be pointed at
+  another home, A5 plants nothing in the operator's home and records
+  the user-level file case as `not-provoked` (block A plants nothing but
+  A2's one global setting, Q29);
 - A9: the `--created-via` value, and the host and port deny of Q2, read
   again beside a portless allow of the same host and after a same-name
   `sbx env rm` and `sbx env run -d --clone`;

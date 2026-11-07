@@ -111,11 +111,16 @@ stopped one is not started, and `run` exits 5 with `recreate-needed`
 (`RJ-305`) and the stopped hint. The hint and the refusal are the
 shared function of T203 in `internal/preflight`, which `status`, `sync`
 step 9, `pull` and the salvage commands use too; `run` imports it.
-Steps 4 to 6 run as for equal digests, over the manifest of the live
-render (RS-11). Before each `sbx env exec` of steps 5 to 7 on such a
-generation `run` reads `sbx ls --json` again and exits 5 with
-`recreate-needed` if the sandbox stopped, and it compares the live
-recreate digest again right before it releases the lock (REQ-1389).
+Which manifest steps 5 and 6 pass on such a generation, and what a
+repo added, a repo removed, a mount target changed or a kit changed
+does on a running sandbox, wait for the open question on mount-affecting changes on a running sandbox (docs/spec.md): `julieta setup` checks every
+memory dir of the manifest (REQ-0412), so a repo added since the create
+cannot attach over the live render's manifest as it stands (RP-2).
+Before each `sbx env exec` of steps 5 to 7 on such a generation `run`
+reads `sbx ls --json` again and exits 5 with `recreate-needed` if the
+sandbox stopped, and right before it releases the lock it computes the
+live recreate digest again and compares it with the one step 3 read,
+not with `createdWith` (REQ-1389, amended on 2026-11-07).
 Before the attach, and as the last step under `--no-attach`, `run`
 makes the memory commit and push of 08 8.1 itself, through the step
 that `internal/cmd/romeu/all/memory_push.go` exposes, then releases the
@@ -156,14 +161,17 @@ carries the kit of T201, and T200 no longer removes `julietaBin`
   REQ-0634 (07 7.5), REQ-0635 (07 7.5), REQ-0651 (08 8.1), REQ-0675 (08
   8.2), REQ-0722 (08 8.5), REQ-0728 (09 (opening)), REQ-0736 (10 10.1),
   REQ-0738 (10 10.1), REQ-0747 (10 10.1), REQ-1212 (01 1.6), REQ-1213
-  (01 1.6), REQ-1376 (04 4.2), REQ-1377 (04 4.1), REQ-1378 (04 4.2),
-  REQ-1379 (01 1.6), REQ-1380 (04 4.2), REQ-1384 (04 4.1), REQ-1387 (04
-  4.2), REQ-1389 (05 5.4).
+  (01 1.6), REQ-1376 (04 4.2), REQ-1378 (04 4.2),
+  REQ-1379 (01 1.6), REQ-1380 (04 4.2), REQ-1384 (04 4.1), REQ-1389 (05
+  5.4), REQ-1321 (04 4.1), REQ-1336 (05 5.2).
 - Operator: yes, the approval lines for `internal/state/**` (ask-first
   `gates`), `schemas/**` (ask-first `formats`, the regenerated
   `state-project.v1.json`), `internal/sbxdrv/**` (ask-first `sbxdrv`)
   and `tools/ci/internal/callsites/**` (ask-first `procgroup` and
-  `checks`).
+  `checks`). Its build waits for the maintainer's answer to the open question on mount-affecting changes on a running sandbox (docs/spec.md),
+  which decides step 3's running branch for a repo added or removed, a
+  mount target changed or a kit changed, and the manifest of steps 5
+  and 6 (amended on 2026-11-07).
 - Acceptance:
   - Hybrid, on the Linux runners, the J3b scenario function passes: a
     generation is recorded before `sbx env run`, egress is reconciled,
@@ -208,22 +216,23 @@ carries the kit of T201, and T200 no longer removes `julietaBin`
   - On a running sandbox whose render removed a repo, or changed a
     mount target, since the create, `run` stops at preflight step 6
     with `mounts-mismatch` (`RJ-368`, exit 2) before any mutating call
-    and does not attach (REQ-1354, decided on 2026-11-07); a render
-    that added a repo passes step 6 and reaches step 3's warning. On a
+    and does not attach (REQ-1354, decided on 2026-11-07). On a
     stopped sandbox with equal digests whose listing showed no mounts,
     `run` calls T203's comparison right after its `sbx env run -d`
     start and, on a failure, stops the sandbox and exits 2 (REQ-1382,
     REQ-1393).
-  - A repo the spec added since the create, on a running sandbox, still
-    attaches: steps 4 to 6 use the live render's manifest, as for equal
-    digests (RS-11).
+  - The cases of a repo added and of a kit changed on a running
+    sandbox are written when the open question on mount-affecting changes on a running sandbox (docs/spec.md) is answered (amended on 2026-11-07).
   - Before each `sbx env exec` of steps 5 to 7 on a generation whose
     digests differ or that was adopted, `run` reads `sbx ls --json`
     again; a fake that reports the sandbox stopped at that read makes
     `run` exit 5 with `recreate-needed` and make no further sbx call. A
-    `sync` that promotes a new recreate digest between step 3 and the
-    release of the lock (a fake promotion in the test) makes `run` exit
-    5 with `recreate-needed` before the exec (REQ-1389).
+    secret's argv in the host settings changed after step 3 (by the
+    test, between step 3 and the release of the lock) moves the live
+    recreate digest away from the one step 3 read, and `run` exits 5
+    with `recreate-needed` before the exec; with nothing changed, a
+    running sandbox whose digests differ from `createdWith` still
+    attaches (REQ-1389).
   - A failing `julieta setup` exits 1 without attaching and prints the
     escaped report; `--no-attach` ends after setup; `run` attaches when
     `julieta setup` reports a failed fetch.
@@ -268,7 +277,10 @@ carries the kit of T201, and T200 no longer removes `julietaBin`
     environment variable; argv[0] is the absolute sbx path of the host
     settings; the gate 1 comparison of REQ-0062 and the floor check run
     against that same path right before `syscall.Exec`, and a changed
-    sbx between preflight and exec exits 3 without exec'ing; the
+    sbx between preflight and exec exits 3 without exec'ing; the argv
+    it builds passes `sbxdrv`'s I4 and I25 guards (05 5.2) before the
+    exec, and a request whose built argv would carry a refused flag or
+    a secret value form is rejected with no exec (RC-7); the
     scrubbed environment of 04 4.1 is the one passed; signal
     dispositions are reset to default and the mask cleared before the
     exec, and no descriptor but 0 to 2 survives it.

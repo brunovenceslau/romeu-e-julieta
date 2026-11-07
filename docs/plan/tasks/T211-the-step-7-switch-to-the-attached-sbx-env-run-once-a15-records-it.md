@@ -25,7 +25,7 @@ Added on 2026-11-07 (scope this repository), as decided on 2026-11-07
 A15's record (T026) that the attached call on a running sandbox whose
 env file equals the running one attaches, runs `cmd` and provisions
 nothing, with and without `--no-input` (04 4.2, REQ-0358; 03 3.3,
-REQ-1370). `owns` is written when the task reopens; the files it will
+REQ-1370), together with a recorded env-file digest (item 1). `owns` is written when the task reopens; the files it will
 name are `run`'s step 7 file under `internal/cmd/romeu/run/`, the
 request form of `internal/sbxdrv/attach*.go` (T066), `e2e/run_test.go`
 and the I1 check of `e2e/hybrid_test.go`. T202's builder of the
@@ -33,7 +33,12 @@ attached call lands dark until then.
 
 1. The switch: the typed attach request of REQ-1384 takes the `run`
    form for a generation whose digests are equal and that romeu
-   created; the drift check of `sbxenv.yaml` (01 1.5, step 3) runs
+   created, and only when the live env file equals the one the
+   generation was created or last started with, which needs the
+   env-file digest of the in-place apply's scope (T210, REQ-1395);
+   until that digest is recorded the task stays deferred, since equal
+   recreate digests do not mean an equal env file (RC-9, amended on
+   2026-11-07); the drift check of `sbxenv.yaml` (01 1.5, step 3) runs
    again right before the attach, since sbx reads the env file after
    steps 5 and 6 ran code in the sandbox (REQ-0358).
 2. The exception (N2): a generation whose digests differ, or that was
@@ -45,10 +50,14 @@ attached call lands dark until then.
    REQ-0738; 10 10.3, REQ-0927).
 
 - Implements: REQ-0358 (04 4.2), REQ-0927 (10 10.3).
-- Operator: no.
+- Operator: yes, the approval line for `internal/sbxdrv/**` (ask-first
+  `sbxdrv`) when the task reopens and edits `attach*.go` (RP-16).
 - Acceptance:
-  - For a generation with equal digests that romeu created, the final
-    argv is the attached `sbx env run <dir>`, with `--no-input` exactly
+  - For a generation with equal digests that romeu created whose env
+    file digest differs from the recorded one, the final argv stays the
+    `sbx env exec -it` of `layout up`.
+  - For a generation with equal digests that romeu created, and an
+    equal env file, the final argv is the attached `sbx env run <dir>`, with `--no-input` exactly
     when A15 recorded that it attaches under it; the drift check runs
     again right before the exec and a drifted `sbxenv.yaml` exits 4
     without exec'ing.

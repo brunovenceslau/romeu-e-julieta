@@ -38,7 +38,11 @@ refusal, and that `romeu recreate <name>` works while it runs (REQ-0313).
 `pull` makes the refusal of REQ-1387 right after the preflight and
 before any exec, for any repo, before the running check of REQ-0360, and
 re-reads `sbx ls --json` before each of its execs on such a generation
-(REQ-1389). Both use the hint function of REQ-1377 that T203 builds in
+(REQ-1389). A failed `sbx-env-base` or `sbx-global-secret` check of the
+preflight stops a `pull` whose execs would start a stopped sandbox, the
+secondary's case with equal digests, with the hint to remove the file or
+the secret (REQ-1390), though `pull` otherwise goes on past a failed
+step 5. `stop` and `pull` use the hint function of REQ-1377 that T203 builds in
 `internal/preflight`. The
 preflight's mounts check (step 6, T203) is printed by `stop` and `pull`,
 which go on (REQ-0078). Deferred, not in the specification: a TTY
@@ -54,7 +58,7 @@ spec pull request first.
   REQ-0468 (05 5.1), REQ-0483 (05 5.2), REQ-0486 (05 5.2), REQ-0503 (05
   5.2), REQ-0519 (05 5.2), REQ-0546 (05 5.4), REQ-0585 (06 6.3),
   REQ-0687 (08 8.4), REQ-0781 (10 10.1), REQ-1387 (04 4.2), REQ-1389
-  (05 5.4).
+  (05 5.4), REQ-1390 (05 5.4).
 - Operator: no.
 - Acceptance:
   - `stop` runs `julieta snapshot --all`, then the recorded `sbx stop`
@@ -82,6 +86,11 @@ spec pull request first.
     next exec (REQ-1389).
   - With the preflight's mounts check failing, `stop` and `pull` print
     `mounts-mismatch` and go on (REQ-0078).
+  - `pull` of a secondary on a stopped sandbox with equal digests and
+    `~/.sbxenv.yaml` present under the test's home exits non-zero with
+    `sbx-env-base` and its hint before any exec, and the fake records no
+    call that starts the sandbox; the same holds for a failed
+    `sbx-global-secret` check (REQ-1390).
   - A unit table of stale state covers I19: a daemon URL read before a
     port change is not used. In the e2e the fake `sbx` changes the port
     between calls and reports stopped; the fetch uses the new URL or is

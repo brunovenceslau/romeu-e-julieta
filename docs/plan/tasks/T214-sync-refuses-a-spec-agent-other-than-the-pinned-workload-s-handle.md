@@ -8,12 +8,11 @@ owns:
   - internal/oci/handle*.go
   - internal/oci/capabilities*.go
   - internal/cmd/romeu/sync/rule_agent*.go
-  - internal/cmd/romeu/sync/errors.go
 needs:
   - T213
-after: []
-ask_first:
-  - contracts
+after:
+  - T208
+ask_first: []
 sitting: none
 ---
 
@@ -34,20 +33,28 @@ enters the normalized set beside the engine grant.
    A, the sitting fact of T208, marked with its source).
 2. A sync rule, registered from its own file (rule 4 of
    `docs/plan.md`), compares the spec's `agent` with that handle and
-   fails `sync` naming `agent`, the spec's value and the handle. The
-   id is the one 04 4.4 gives a spec value the render refuses; if 04
-   4.4 has none that fits, a docs pull request adds the row first
-   (12 12.11).
+   fails `sync` naming `agent`, the spec's value and the handle.
 
-- Implements: REQ-1392 (05 5.4).
-- Operator: yes, the approval line for `internal/cmd/romeu/sync/errors.go`
-  (ask-first `contracts`) if the rule declares an id there.
+Amended on 2026-11-07 (RC-8, RP-11): the error reuses the id-less
+usage pattern of `kit-refused` (T188), exit 2, so no `errors.go`
+changes and no id is added. Since the handle enters the normalized
+set, the task raises the normalization version of REQ-0240 that T213
+introduces, so every cached record is derived again with the handle.
+It comes after T208, whose pin is the workload that declares the
+handle, so no sync runs the rule against a pin without one; where
+T205's decision defers T208, it gives this task the same fate and
+milestone.
+
+- Implements: REQ-1392 (05 5.4), REQ-0240 (03 3.8).
+- Operator: no.
 - Acceptance:
   - A spec whose `agent` equals the pinned workload's handle syncs; one
     that names another agent makes `sync` exit 2 naming both values,
     before gate 2.
   - The handle is read from the descriptor fixture of the pinned
     workload, and a descriptor without the field is `upstream-shape`.
+  - The normalization version is one above T213's, and a record cached
+    with T213's version is derived again and then carries the handle.
 - Verify: `go test ./internal/oci/... ./internal/cmd/romeu/sync/... -run
   '^(TestWorkloadHandle|TestRuleAgent)' -v`. The pattern names the
   functions this task adds, and the reviewer reads them in the `-v`

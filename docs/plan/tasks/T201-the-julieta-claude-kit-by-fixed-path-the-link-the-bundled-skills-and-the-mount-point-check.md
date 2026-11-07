@@ -33,8 +33,7 @@ sitting: none
 
 Goal: the `julieta-claude` kit names julieta by one constant path,
 `/opt/julieta/bin/julieta`, takes no `julietaBin` arg, installs a
-root-owned link at `/usr/local/bin/julieta` in place of the `sh`
-launcher, ships its two skills as bundled `agent-skill@1` entries, and
+root-owned link at `/usr/local/bin/julieta`, ships its two skills as bundled `agent-skill@1` entries, and
 its hook wrappers refuse to run a file that is not on the mount.
 
 Added on 2026-11-06 (scope this repository), with the specification
@@ -95,14 +94,19 @@ V2.45, V2.47, V2.48, V3.0):
   collide. On a go (both skills seen at the discovery directory with
   `skills: off`), the payload step is removed in a pull request of its
   own; on a no-go, the payload stays and the `agent-skill@1` entries
-  go. That removal has no task yet: its home is an open item of the
-  re-plan of 2026-11-07.
+  go.
 - Item 5: the expected hook lines are built from the kit's constant
   `/opt/julieta/bin/julieta`, not from `os.Executable`, which resolves
   to `/opt/julieta/bin/julieta-linux-<GOARCH>`, so `skills-stale` and
   `agent-hooks-missing` compare what the kit ships.
 - The kit e2e that removes the link asserts the hint of REQ-1351, `fix:
   on the host, romeu recreate <name>`.
+
+Deferred: the removal of the base64 payload step on a go; its trigger
+is the first recreate on sbx >= 0.51 that shows both skills at the
+discovery directory with `skills: off` (RP-19, amended on 2026-11-07).
+The comments of `internal/agent/claude/hooks.go` that still name
+`julietaBin` go with item 1 (RP-10).
 
 - Implements: REQ-1373 (06 6.3), REQ-0587 (06 6.3), REQ-0397 (04 4.3),
   REQ-0595 (06 6.4), REQ-0596 (06 6.4),

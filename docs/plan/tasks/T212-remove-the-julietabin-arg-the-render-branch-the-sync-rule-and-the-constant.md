@@ -50,8 +50,10 @@ golden, which T204 also edits.
 - Implements: REQ-0596 (06 6.4).
 - Operator: no.
 - Acceptance:
-  - `git grep -n julietaBin -- internal e2e` finds nothing, and no
-    rendered kit carries args for `julieta-claude`.
+  - `git grep -n julietaBin` over the paths this task owns finds
+    nothing, and no rendered kit carries args for `julieta-claude`; the
+    comments of `internal/agent/claude/hooks.go` are T201's to change
+    (RP-10, amended on 2026-11-07).
   - The render tests of a project with the product kits pass with no
     `Rendered` args, and the sync test of the removed rule is gone.
 - Verify: `go test ./internal/render/... ./internal/cmd/romeu/sync/... -run

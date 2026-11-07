@@ -20,7 +20,6 @@ owns:
 needs:
   - T205
   - T066
-  - T190
 after:
   - T047
   - T203
@@ -52,8 +51,9 @@ reason in its file, and T208 moves the pin without it.
    each pair the workload descriptor declares in its runtime egress
    over plain HTTP (the set of 07 7.5 that only a descriptor declared,
    REQ-1316, filtered to port 80), verifies each with `sbx policy check
-   network`, and records each in `egressApplied` as a deny, before and
-   after the calls as the allow rules are (REQ-0355).
+   network`, and records each, before and after the calls as the
+   allow rules are (REQ-0355); "in `egressApplied` as a deny" and "every
+   pair over plain HTTP" are history: see the amendment below.
 2. `doctor` (REQ-0392): the `egress-applied` row compares the deny
    rules too, so a deny that went missing, after a recreate or by hand, is
    a finding.
@@ -67,15 +67,17 @@ with `sbx policy check network`, and recorded before and after the
 call; a typed member of 03 3.8 for the denies, apart from
 `egressApplied`, so the allow reconcile of `run` (T066) and of `sync`
 (T047) never removes a deny; and the `doctor` row of REQ-0392 comparing
-the denies too. The set is the two pairs REQ-1374 names, applied only
-where the pinned workload descriptor declares them in its runtime
-egress, read with the port T190's derivation keeps; item 1's "every
-pair over plain HTTP" is history. The code owns its `sbx policy deny`
+the denies too. The set is the two pairs REQ-1374 names, taken as
+fixed data from T205's note, which read them from the descriptor, and
+applied only while the pin is the digest T205 measured; T190's
+derivation keeps no port, so this task does not read it (RP-7,
+amended on 2026-11-07). The denies live in the typed member alone,
+never in `egressApplied` (RP-8). The code owns its `sbx policy deny`
 builder, its guard and placeholder rows, its fake session and the
 generation record's new member, after T202 (the fake), T203 (the
 `egress-applied` row's file and the policy session) and T213 (the
-record file), and after T210, which edits the same spec pages; it needs
-T190 for the derived set. This task is never an edge target: T205's
+record file), and after T210, which edits the same spec pages; it no
+longer needs T190, since T066 already orders it after T190. This task is never an edge target: T205's
 other branches remove it.
 
 - Implements: REQ-1374 (05 5.4), REQ-0354 (04 4.2), REQ-0355 (04 4.2),

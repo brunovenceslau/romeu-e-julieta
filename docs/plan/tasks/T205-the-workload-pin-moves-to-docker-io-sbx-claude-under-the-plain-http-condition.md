@@ -10,6 +10,7 @@ owns:
   - docs/spec/05-security.md
   - docs/plan/tasks/T208-the-workload-pin-move-to-docker-io-sbx-claude.md
   - docs/plan/tasks/T209-the-per-sandbox-deny-of-the-workload-s-plain-http-egress-pair.md
+  - docs/plan/tasks/T214-sync-refuses-a-spec-agent-other-than-the-pinned-workload-s-handle.md
 needs: []
 after:
   - T055
@@ -91,8 +92,15 @@ fates it writes, all in this task's pull request (V2.12):
   reach the engine's socket: the pin may move; (b) it can: this task's
   pull request rewrites the engine row of 05 5.4 to accept that
   elevation by name with its trigger and amends Q33, or (c) the pin
-  waits: T208 takes `fate: deferred` with the trigger the maintainer
-  names.
+  waits: T208 takes `fate: deferred`, `milestone: M6`, with the trigger
+  the maintainer names, and T209 takes the same fate, milestone and
+  trigger, so no deny is built for a pin that waits (RP-9, amended on
+  2026-11-07).
+- Wherever T208 takes `fate: deferred`, T214, which comes after it,
+  takes the same fate, milestone and trigger. This task's pull request,
+  not T208's, rewrites the engine row and amends Q33 on branch (b):
+  the plan's reading of REQ-1386's "the pull request that moves it"
+  (RP-20).
 
 T208 moves the pin only where both conditions allow it. `needs: T055`
 becomes `after: T055`: the link is the file overlap on
