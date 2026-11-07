@@ -107,7 +107,7 @@ V2.45, V2.47, V2.48, V3.0):
 - Implements: REQ-1373 (06 6.3), REQ-0587 (06 6.3), REQ-0397 (04 4.3),
   REQ-0595 (06 6.4), REQ-0596 (06 6.4),
   REQ-1308 (06 6.4), REQ-1353 (06 6.4), REQ-1372 (08 8.2), REQ-0673 (08
-  8.2), REQ-0741 (10 10.1), REQ-0744 (10 10.1).
+  8.2), REQ-0744 (10 10.1).
 - Operator: yes, the approval lines for `kits/**` and `skills/**`
   (ask-first `kits`) and `schemas/**` (ask-first `formats`), then the
   sandbox definitions repository's pin of the kit, the `target` in its
