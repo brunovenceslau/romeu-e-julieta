@@ -243,8 +243,11 @@ obligation of the row above:
 sync` refuses to render `git-ssh-sign` (exit 2, the error
 `signing-socket`, `RJ-204`) unless `signing.agentSocket` is set,
 reachable, and holds exactly one key, and that key equals the kit's
-`signingKey` arg. The full host agent is never forwarded; the rule
-governs the sandboxes romeu renders. `REQ-0601` `internal/signing` checks this with
+`signingKey` arg. romeu never forwards the full host agent; the rule
+governs the sandboxes romeu renders. sbx forwards per sandbox and the
+last client wins (Q19), so an sbx call the operator makes into the
+sandbox with their own agent in `SSH_AUTH_SOCK` replaces the signing
+socket there until romeu's next call ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), REQ-1394). `REQ-0601` `internal/signing` checks this with
 the ssh-agent protocol's identity listing, read through
 `golang.org/x/crypto/ssh/agent` (no subprocess, T147); the same check runs
 in `doctor` and in the preflight of
