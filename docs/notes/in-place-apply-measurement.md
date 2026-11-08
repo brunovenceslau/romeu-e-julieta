@@ -230,9 +230,15 @@ current pin `docker.io/docker/sbx-kit-claude` dockerd and containerd
 also run as root, with the agent in the `sudo` and `docker` groups.
 `sudo -n` works on both workloads.
 
-A per-sandbox `sbx policy deny network` on `deb.debian.org:80` beat the
-provisioned allow and held beside a portless allow of the same host; it
-did not survive a recreate under the same name.
+A per-sandbox `sbx policy deny network` on `deb.debian.org:80` and on
+`dhi.io:80` beat the allow sbx provisions from the workload's
+descriptor: both hosts answered `403 Blocked by local rule for
+<host>:80` and `sbx policy check` said `Denied`, exit 1, while HTTPS to
+them stayed 200. The deny held beside a portless allow of the same host.
+`sbx env rm` removed it with the sandbox, and it was gone after a
+recreate under the same name. sbx's global rule
+`default-code-and-containers` also allows `dhi.io:80` for every
+sandbox.
 
 ## Outcome for T210 item 2
 
