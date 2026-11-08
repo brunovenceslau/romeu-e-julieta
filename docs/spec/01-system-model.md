@@ -89,7 +89,7 @@ The table is written by hand; generating it is a row of
 
 `REQ-0059` There are two romeu-level approvals, both TTY-only, plus sbx's own
 native approval of host commands, which romeu never bypasses (never
-the flag that applies a plan without asking (`--auto-approve` or `-y`; `-f`/`--force` on `env run`, `env create`, `run` or `create`; the `--force` of a removal romeu decided approves no plan, I4); `romeu doctor` recommends
+the flag that applies a plan without asking (`--auto-approve` or `-y`; `-f`/`--force` on `env run`, `env create`, `run` or `create`; the `--force` of `sbx env rm` and of the egress `sbx policy rm network`, the two removals romeu decides, approves no plan, I4); `romeu doctor` recommends
 `sbx settings set env.rememberHostCommands true`). `sbx env plan` output
 is not part of romeu's gates: sbx shows its own plan and prompts during
 `sbx env run`. *Why for us:* sbx already re-asks when a host command
@@ -185,7 +185,7 @@ derivation, and sbx, not romeu, applies those of the runtime phase
 declares a network, mount, volume, credential, ssh-agent, docker-auth,
 host-port or `dockerd@1` capability is refused (sync error): `dockerd@1`
 hands the sandbox a root-equivalent engine and private storage, refused
-until A19 records the elevation and Q33 is amended or a 05 5.4 row accepts it by name (amended on 2026-11-07). Its other capabilities (install steps,
+until a 05 5.4 row accepts a personal kit's engine by name (Q33's acceptance names the workload's engine only, amended on 2026-11-08) (amended on 2026-11-07). Its other capabilities (install steps,
 privileges, lifecycle hooks) are not refused: they are shown in the
 gate 2 diff.
 

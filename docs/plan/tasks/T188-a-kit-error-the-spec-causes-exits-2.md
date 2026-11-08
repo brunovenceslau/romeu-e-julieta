@@ -64,8 +64,9 @@ operator to confirm at review; scope this repository.
 
 Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
 as decided on 2026-11-07): a personal kit that declares `dockerd@1` is
-refused, beside docker-auth and host-port, until A19 records the
-elevation and Q33 is amended or a 05 5.4 row accepts it by name
+refused, beside docker-auth and host-port, until a 05 5.4 row accepts
+a personal kit's engine by name (Q33's acceptance names the workload's
+engine only, amended on 2026-11-08)
 (REQ-0070, REQ-0514, REQ-0574): `refusedCapability` of
 `internal/render/kits.go` gains a `dockerd` case after `host-port`, so
 the refusal is `ErrPersonalCapability` and exits 2 with `kit-refused`

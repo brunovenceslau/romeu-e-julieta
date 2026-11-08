@@ -111,6 +111,16 @@ fates it writes, all in this task's pull request (V2.12):
   not T208's, rewrites the engine row and amends Q33 on branch (b):
   the plan's reading of REQ-1386's "the pull request that moves it"
   (RP-20).
+- Amended on 2026-11-08: the hand measurement of 2026-11-07 settled
+  both conditions before this task ran. The plain-HTTP condition took a
+  branch the list above lacked, decided on 2026-11-07: the deny holds
+  but does not survive the recreate, so T209 re-applies it after each
+  create and recreate and T208 gains `needs: T209` (both written by the
+  pull request of the sbx 0.51 measurement). The engine condition took
+  branch (b), and that same pull request, not this task's, rewrote the
+  engine row and amended Q33. What stays this task's: A9's deny re-run on
+  the pin it moves to, the workload facts of item 5 in its note, and
+  T208's and T214's fates.
 
 T208 moves the pin only where both conditions allow it. `needs: T055`
 becomes `after: T055`: the link is the file overlap on

@@ -13,6 +13,9 @@ owns:
   - internal/sbxdrv/envexec*.go
   - internal/sbxdrv/call*.go
   - internal/sbxdrv/builders_test.go
+  - internal/sbxdrv/policy_rm*.go
+  - internal/sbxdrv/guard.go
+  - internal/sbxdrv/guard_test.go
   - e2e/fakesbx/**
   - e2e/testdata/sbx/**
 needs:
@@ -91,6 +94,17 @@ julieta's (REQ-1366, amended on 2026-11-07). The shapes A4 cannot
 provoke are named in its result, not here (REQ-0924, T026). The title
 keeps "the floor" so the file name stays the one other tasks cite.
 
+Amended on 2026-11-08 (as decided on 2026-11-07, I4 amended on
+2026-11-08; scope this repository): `PolicyRmNetwork` builds `sbx policy
+rm network --sandbox <name> --resource <domain> --force --no-input`
+(REQ-0354), since sbx fails the call under `--no-input` without
+`--force` (measured on 2026-11-07); the I4 guard admits `--force` on
+exactly that shape and on `sbx env rm <dir>`, and refuses it on every
+other verb and on a `policy rm network` without both `--sandbox` and
+`--resource`; `e2e/testdata/sbx/guard-cases.jsonl` gains those rows;
+the comment of `policy_rm.go` that says the call carries no `--force`
+goes.
+
 - Implements: REQ-0102 (01 1.6), REQ-1360 (04 4.1), REQ-1366 (06 6.3),
   REQ-0997 (11 11.1).
 - Operator: yes, the approval line for `internal/sbxdrv/**` and
@@ -99,6 +113,9 @@ keeps "the floor" so the file name stays the one other tasks cite.
   sandbox with additional workspaces, redacted, pasted under Evidence as
   the source of the synthetic sessions' shapes and field names.
 - Acceptance:
+  - The guard cases admit `--force` on `env rm <dir>` and on `policy rm
+    network --sandbox <s> --resource <d>`, and refuse it on `policy rm
+    network` without `--sandbox`, with `--id`, and on `secret rm`.
   - Each builder has a no-input bit in the per-shape table; the
     builder table asserts the flag absent on every shape today, present
     for a shape whose session marks it accepted, and never on a shape

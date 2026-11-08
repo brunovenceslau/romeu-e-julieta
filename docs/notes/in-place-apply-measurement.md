@@ -1,22 +1,28 @@
+---
+type: reference
+reader: whoever decides T210 item 2 or re-records A15 with the harness
+---
+
 # The in-place apply measurement on sbx 0.51
 
 Reader: whoever decides T210 item 2 or re-records A15 with the harness.
 Type: reference.
 
 This note records two hand measurements, both run by the maintainer on
-a macOS 27.2 Apple-silicon host with sbx v0.51.0 (7d55286d). Dates and
-times are UTC.
+an Apple-silicon Mac with sbx v0.51.0 (7d55286d); sitting 1 records
+macOS 27.2. Dates and times are UTC.
 
-- Sitting 1, 2026-11-07, 21:31 to 23:03: part C of the host measurement
-  protocol, on the throwaway sandbox `rj-probe-a`, created with
-  `sbx env run -d --clone <dir>`.
+- Sitting 1, 2026-11-07, 21:31 to 23:03: parts A to D of the host
+  measurement protocol, on the throwaway sandboxes `rj-probe-a` (the
+  current workload pin, created with `sbx env run -d --clone <dir>`, the
+  sandbox of part C) and `rj-probe-b` (`docker.io/sbx/claude`).
 - Sitting 2, 2026-11-08, 01:06 to 01:13: protocol 2, on the throwaway
   sandboxes `rj2-a`, `rj2-b`, `rj2-k` and the never-created `rj2-ghost`.
 
 Quotes replace the host's home directory with `~`, an env directory
-with `<dir>`, and the em dash sbx prints
-before a status word with a plain dash. Nothing in this note is a product rule; the spec pages
-cite it as the source of what they record.
+with `<dir>`, and the em dash sbx prints before a status word with a
+plain dash. Nothing in this note is a product rule; the spec pages cite
+it as the source of what they record.
 
 ## What was measured
 
@@ -38,9 +44,11 @@ directories, the `cmd` log and the processes.
 
 ## The result in one line
 
-On sbx 0.51 no change kind applied on either state. Every accepted
-`sbx env run -d <dir>` exited 0, kept the instance and left the change
-unapplied, and sbx's own plan said so: `applies on the next create`.
+On sbx 0.51 no change kind applied on either state. Every
+`sbx env run -d <dir>` that sbx did not refuse exited 0, kept the
+instance and left the change unapplied, and sbx's own plan said so:
+`applies on the next create`, `waits for the next create` or `mounted
+by the next create`.
 Sitting 2 found the same with `-f` for a removed secrets binding: the
 binding is `left in place`.
 
@@ -158,11 +166,11 @@ binding entry is written to sbx's credentials file that
   host, the source is mounted read-only at `/run/sandbox/source`, and
   the next plan shows `0 to change`. In sitting 1 every plan listed
   `clone: true -> null` against a sandbox created with `--clone` and no
-  `clone` key in the file, which explains that drift. sbx's removal
+  `clone` key in the file, which likely explains that drift (inferred). sbx's removal
   warning still says `(--clone)` for a clone set in the file.
 - **The attached `sbx env run <dir>`.** In sitting 1 it exited 1 with
-  `error: unknown option '-lc'` before attaching, because `cmd` alone
-  kept the workload's entrypoint. In sitting 2, with both `entrypoint`
+  `error: unknown option '-lc'` before attaching, likely because `cmd`
+  alone kept the workload's entrypoint (inferred). In sitting 2, with both `entrypoint`
   and `cmd` in the file, it attached and ran them with a TTY, and
   changed nothing in `sbx policy ls` or `sbx inspect`. The first
   attached run after a create with `-f` prompted
@@ -218,17 +226,20 @@ call into a sandbox wins over the one that created it. Withholding
 `SSH_AUTH_SOCK` does not stop forwarding on exec; on a start of a
 sandbox whose kit has `ssh-agent@1`, `sbx env run -d` refuses:
 `ssh-agent@1 is not available ... needs a host SSH agent`, exit 1. This
-holds with sbx's `ssh.agentSocketPath` setting empty, which was not
-read in either sitting.
+assumes sbx's `ssh.agentSocketPath` setting is empty; it was not read
+in either sitting. Every forwarding sample ran in a sandbox whose kit
+declared `ssh-agent@1`.
 
 ## The workload's Docker engine (sitting 1, part D)
 
-On `docker.io/sbx/claude`: the agent user is in group 999 `docker`, the
-socket is `srw-rw---- root docker`, dockerd runs as uid 0 with the full
-capability set, and `docker run hello-world` ran as the agent. On the
-current pin `docker.io/docker/sbx-kit-claude` dockerd and containerd
-also run as root, with the agent in the `sudo` and `docker` groups.
-`sudo -n` works on both workloads.
+On `docker.io/sbx/claude` (`rj-probe-b`): the agent user is in group
+999 `docker`, the socket is `srw-rw---- root docker`, dockerd runs as
+uid 0 with the full capability set, and `docker run hello-world` ran as
+the agent. On the current pin `docker.io/docker/sbx-kit-claude`
+(`rj-probe-a`) dockerd and containerd also run as root, with the agent
+in the `sudo` and `docker` groups; its socket and a `docker run` were
+not read. `sudo -n` works on both workloads. Whether root inside the
+sandbox can bypass sbx's egress rules was not tried.
 
 A per-sandbox `sbx policy deny network` on `deb.debian.org:80` and on
 `dhi.io:80` beat the allow sbx provisions from the workload's
@@ -272,5 +283,11 @@ sandbox.
   than the launch, which is romeu's path.
 - The Docker restart of A15 and `ssh-add -L` after it (left out, since
   it reaches every sandbox on the host).
-- sbx's `ssh.agentSocketPath` setting.
+- sbx's `ssh.agentSocketPath` setting, forwarding into a sandbox whose
+  kit lacks `ssh-agent@1`, and whether the `sign: [git]` restriction
+  measured on sbx v0.48.0 still holds.
+- Whether root inside the sandbox bypasses sbx's egress rules (a raw IP,
+  the proxy variables unset, the VM's netfilter rules flushed).
+- Whether a same-name recreate after `sbx env rm` without
+  `--prune-bindings` inherits a sandbox-scoped secret.
 - Intel hosts: one host only, which part C allows; REQ-0979 stays open.
