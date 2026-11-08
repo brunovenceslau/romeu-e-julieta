@@ -63,9 +63,9 @@ change any kit digest and does not force a recreate of every project.
 3. `REQ-0584` romeu's own `sbx env exec` calls invoke julieta by
    absolute path: `/opt/julieta/bin/julieta-linux-<GOARCH>`, where
    `GOARCH` is romeu's own (a sandbox runs the host's architecture, Q21,
-   which A4 may reopen); the rendered `cmd` names the link
-   `/opt/julieta/bin/julieta` of item 1 (REQ-1365; 03 REQ-1370;
-   amended on 2026-11-07). The names use Go's architecture names, so no `uname -m`
+   which A4 may reopen); the rendered `entrypoint` names the link
+   `/opt/julieta/bin/julieta` of item 1, and `cmd` its arguments
+   (REQ-1365; 03 REQ-1370; amended on 2026-11-07). The names use Go's architecture names, so no `uname -m`
    mapping exists anywhere.
 4. `REQ-0585` Before every command that execs julieta (`run`, `stop`, `salvage`, on
    its own and inside `rm`, `recreate` and `retire`, `pull`, and
@@ -133,8 +133,13 @@ obligation of the row above:
    lays them under `/usr/share/julieta-claude/skills/<skill>` in the
    composed image, and one `com.docker.sandbox/agent-skill@1` per skill
    (kit spec m.7; sbx 0.48) names that directory, so sbx exposes each at
-   the agent's discovery directory; the host's shared skills store is
-   off ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1)).
+   the agent's discovery directory; the host's shared skills store,
+   which the env file cannot turn off, is shared read-only beside them
+   while sbx's `skills.defaultMode` is `readonly`
+   ([03 3.3](03-formats.md#33-rendered-sbxenvyaml-sbx-env-file-schemaversion-1),
+   REQ-0200; a residual risk of
+   [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1);
+   amended on 2026-11-07).
    Decided on 2026-11-06: until then the files rode in an install step as
    a base64 payload and were copied into `~/.claude/skills/`, a copy that
    failed on 2026-10-27 under the `agent-skills@1` mount of the workload
@@ -142,7 +147,10 @@ obligation of the row above:
    sandbox of a v2 agent; sbx 0.51 runs its built-in agents as v3 kits,
    so the first recreate on it is this route's go/no-go, B2 measures it
    again, and the payload step stays the fallback until the files are
-   seen at the discovery directory with `skills: off`.
+   seen at the discovery directory, with the `skills.defaultMode` in
+   force recorded and, where the host's store is shared, whether it
+   holds a skill of the same name, so a host copy is not taken for a
+   bundled one (amended on 2026-11-07).
 2. `REQ-0596` The Claude Code hooks `SessionStart`, for every source the pinned
    version fires (startup, resume, clear, compact), -> `julieta memory
    index --hook`, and `SessionEnd` -> `julieta stamp`,

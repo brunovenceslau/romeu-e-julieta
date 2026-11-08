@@ -281,7 +281,7 @@ later version could delegate readiness to mise daemons.
 
 `REQ-0198` Produced only by `internal/render` through the YAML marshaller. The key
 names below follow the documented env-file schema and the documented v3
-workload pattern, with `skills` (sbx 0.43), `additionalWorkspaces[].target`
+workload pattern, with `additionalWorkspaces[].target`, `entrypoint`
 and `cmd` (sbx 0.51) from the release notes that introduced them; `REQ-0199` the golden files are **probe-confirmed**: probe A5
 runs `sbx env plan` on them and records the hash of each golden's
 normalized form (decoded and re-encoded with sorted keys by one
@@ -307,8 +307,8 @@ additionalWorkspaces:
   - path: ./.romeu/bin
     target: /opt/julieta/bin
     readOnly: true
-skills: "off"
-cmd: [/opt/julieta/bin/julieta, layout, up]
+entrypoint: [/opt/julieta/bin/julieta]
+cmd: [layout, up]
 kits:
   - source: docker.io/docker/sbx-kit-claude@sha256:<64 hex>
   - source: ./.romeu/kits/julieta-<digest12>
@@ -327,6 +327,19 @@ ports: []
 
 `REQ-0200` Rules: no `x-*` keys (metadata lives in `render.json`); no `lifecycle`
 hooks (they re-prompt on every invocation and `preRemove` only warns);
+no `skills` key, since the env file refuses it: `sbx env plan` and
+`sbx env run -d --clone` on an env file with `skills: "off"` exit 1
+with `unknown field "skills"` (measured on 2026-11-07, sbx v0.51.0),
+and sbx's per-sandbox control of the host's shared skills store exists
+only at creation, through `sbx create --skills` or `sbx run --skills`
+or an `sbx.yaml` `skills:` key, none of them a route romeu uses; the
+global setting `skills.defaultMode` (default `readonly`) applies to
+sandboxes created after it changes. The store's read-only share is
+therefore a residual risk of
+[05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), which
+`doctor` warns about (`skills-shared`, 04 4.2) and the mounts check of
+REQ-1381 does not refuse, and a romeu route to turn it off is a row of
+[Deferred decisions](../spec.md#in-the-product) (amended on 2026-11-07);
 `REQ-0201` the secret command is built with `internal/shquote` from host-settings
 argv with a scrubbed environment; romeu only ever renders `command`,
 never a literal value; `REQ-0202` clone mode comes from romeu's `sbx env run
@@ -334,21 +347,20 @@ never a literal value; `REQ-0202` clone mode comes from romeu's `sbx env run
 from no spec field. `REQ-1357` Every additional workspace carries a
 `target`, the fixed in-sandbox path of
 [02 2.5](02-layouts.md#25-in-sandbox-paths) (sbx 0.51), and
-`./.romeu/bin` its `readOnly`. `REQ-1358` `skills` is written as `off`, a string, which the
-marshaller quotes, since `off` is a YAML 1.1 boolean (A5 records that
-sbx 0.51 reads it as the mode `off`; amended on 2026-11-07):
-sbx's default shares the host's skills store read-only into every
-sandbox (sbx 0.43, `skills.defaultMode`), content no gate reads, and the
-skills a sandbox of romeu gets are its kits'
-([06 6.4](06-kits.md#64-product-kits)); sharing the store is a row of
-[Deferred decisions](../spec.md#in-the-product) (decided on 2026-11-06).
-`REQ-1370` `cmd` is `[/opt/julieta/bin/julieta, layout, up]` (sbx 0.51),
-the command of an attached `sbx env run <dir>`, so `romeu run` attaches
+`./.romeu/bin` its `readOnly`. `REQ-1370` `entrypoint` is `[/opt/julieta/bin/julieta]` and `cmd` is
+`[layout, up]` (sbx 0.51), the command of an attached `sbx env run <dir>`, so `romeu run` attaches
 through that call once A15 records it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
 step 7; until then the `sbx env exec -it` of REQ-0358, and after it for a sandbox whose recreate digests differ or whose generation was adopted; the switch re-runs the drift check of this file right before the attach) and an operator who starts the sandbox with `sbx env run <dir>`
 by hand (not while the recreate digests differ: `run` step 3) gets the run layout from the manifest julieta cached (REQ-0425;
-without one, `layout up` says so and opens a shell, 04 4.3); no
-`entrypoint` is written (decided on 2026-11-06). `REQ-0203` romeu names this file by path; probe A5 records
+without one, `layout up` says so and opens a shell, 04 4.3). Both keys
+are written because `cmd` alone keeps the workload's entrypoint: the
+pinned `sbx-kit-claude` declares `sandbox.entrypoint: [claude]`, and an
+attached `sbx env run <dir>` with a `cmd` and no `entrypoint` failed
+with `unknown option '-lc'`, the `cmd` elements reaching `claude` as
+arguments; `sbx env plan` accepts an env file carrying both and lists
+them under AGENT LAUNCH, while the attached run with this shape is A15's
+to record (measured on 2026-11-07, sbx v0.51.0; decided on 2026-11-07,
+in place of the `cmd`-only shape decided on 2026-11-06). `REQ-0203` romeu names this file by path; probe A5 records
 whether sbx also reads a sandbox configuration from the workspace tree,
 and if it does, that file joins the plant list of I3 and the drift
 check refuses it ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout),
