@@ -36,7 +36,8 @@ beside A9's deny, and this probe re-records it), and extends:
   write, as the agent and as root, also after a remount and through the
   share's root mounted anew, to each bind sbx makes itself (the env
   file, each kit source, each skill dir of an `agent-skill@1` entry,
-  the host's skills store), whose read-only flag is recorded;
+  the host's skills store), whose read-only flag is recorded, and no
+  write reaches the host's skills store;
 - A4: `sbx inspect`, the mount fields of `sbx ls --json` for a running
   and for a stopped sandbox (an empty list included) and the source,
   target and read-only flag of each bind sbx adds itself (the host's
