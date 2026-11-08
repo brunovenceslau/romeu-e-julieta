@@ -426,12 +426,21 @@ dir`, see J13).
    closed and sbx fails a confirmation without a terminal (exit 1);
    romeu's own confirmation and salvage come before the call, and this
    `--force` approves no plan (I4 is about the plan of `env run` and
-   `env create`).
+   `env create`). On a sandbox that does not exist it prints
+   `error: sandbox '<name>' not found` and exits 0, with and without
+   the flags (measured on 2026-11-08, sbx v0.51.0), so its exit 0 may
+   mean "already absent" (01 1.6, REQ-0097).
 4. `REQ-0354` Reconcile egress: `sbx policy allow network --sandbox <name> <d>` for
    missing domains; `sbx policy rm network --sandbox <name> --resource
-   <d>` for domains romeu applied that left the set; verify with `sbx
-   policy check network --sandbox <name> <d>`. (Exact argv comes from
-   the block A recordings.) `REQ-0355` romeu writes each domain into
+   <d> --force --no-input` for domains romeu applied that left the set;
+   verify with `sbx policy check network --sandbox <name> <d>`. (Exact
+   argv comes from the block A recordings.) The `rm` carries `--force`
+   because without it sbx fails the call under `--no-input` with a hint
+   to pass `--force`, and with it sbx removes exactly the named rule of
+   the named sandbox and asks nothing (measured on 2026-11-08, sbx
+   v0.51.0, [the in-place apply measurement](../notes/in-place-apply-measurement.md));
+   like `env rm --force`, this `--force` skips a confirmation and
+   approves no plan (I4, amended on 2026-11-08). `REQ-0355` romeu writes each domain into
    `egressApplied` before its `allow` call and removes it from the
    record after its `rm` call succeeds, so the record always names every
    rule romeu may have applied; a reconcile cut short is finished by the
