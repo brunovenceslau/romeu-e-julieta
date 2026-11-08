@@ -224,8 +224,8 @@ call into a sandbox wins over the one that created it. Withholding
 sandbox whose kit has `ssh-agent@1`, `sbx env run -d` refuses:
 `ssh-agent@1 is not available ... needs a host SSH agent`, exit 1. This
 assumes sbx's `ssh.agentSocketPath` setting is empty; it was not read
-in either sitting. Every forwarding sample of sitting 1 ran in a sandbox
-whose kit declared `ssh-agent@1`; the kit of sitting 2 was not read.
+in either sitting. Every forwarding sample of both sittings ran in a sandbox
+whose kit declared `ssh-agent@1` (sitting 2's probe kit `rj2-mix`).
 
 ## The workload's Docker engine (sitting 1, part D)
 
