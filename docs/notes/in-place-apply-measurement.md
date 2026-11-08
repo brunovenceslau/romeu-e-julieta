@@ -5,9 +5,6 @@ reader: whoever decides T210 item 2 or re-records A15 with the harness
 
 # The in-place apply measurement on sbx 0.51
 
-Reader: whoever decides T210 item 2 or re-records A15 with the harness.
-Type: reference.
-
 This note records two hand measurements, both run by the maintainer on
 an Apple-silicon Mac with sbx v0.51.0 (7d55286d); sitting 1 records
 macOS 27.2. Dates and times are UTC.
@@ -227,8 +224,8 @@ call into a sandbox wins over the one that created it. Withholding
 sandbox whose kit has `ssh-agent@1`, `sbx env run -d` refuses:
 `ssh-agent@1 is not available ... needs a host SSH agent`, exit 1. This
 assumes sbx's `ssh.agentSocketPath` setting is empty; it was not read
-in either sitting. Every forwarding sample ran in a sandbox whose kit
-declared `ssh-agent@1`.
+in either sitting. Every forwarding sample of sitting 1 ran in a sandbox
+whose kit declared `ssh-agent@1`; the kit of sitting 2 was not read.
 
 ## The workload's Docker engine (sitting 1, part D)
 

@@ -7,6 +7,10 @@ fate: new
 owns:
   - internal/cmd/julieta/hooks/guard*.go
   - skills/julieta/SKILL.md
+  - kits/julieta-claude/skills/julieta/SKILL.md
+  - kits/julieta-claude/julieta-claude.yaml
+  - internal/agent/claude/digest.go
+  - internal/agent/claude/payload_test.go
   - e2e/kit_julieta_claude_test.go
 needs: []
 after:
@@ -42,10 +46,20 @@ Q33, I35 and this task close it. Its `after` edge is the overlap on
    `sh -c` and `eval`; and any command whose name is not a literal word.
 2. The refusal text says that root needs the maintainer, who runs the
    command from the host with `sbx exec`.
-3. The `julieta` skill gains one line with the same rule.
+3. The `julieta` skill gains one line with the same rule, authored with
+   skill-creator (ADR 0040), in `skills/julieta/` and its kit copy, with
+   the kit digest (`KitDigest`) recomputed; the launcher comment of
+   `julieta-claude.yaml` that says the agent has root "as through sudo"
+   names the engine too.
+4. The effect on the sandboxes that already use the `julieta-claude`
+   kit, the maintainer's interim ones included, is said in the pull
+   request: an agent there that installs packages with `sudo apt-get` is
+   refused, and the route is a package in `os-base` or mise, or the
+   maintainer running the install from the host.
 
 - Implements: REQ-1399 (06 6.4), REQ-1400 (05 5.4), REQ-1401 (05 5.2).
-- Operator: no.
+- Operator: yes, the `kits` approval line (`skills/julieta/SKILL.md`,
+  its kit copy and `julieta-claude.yaml`).
 - Acceptance:
   - The U test of I35: the parse table, one row per refused form,
     `bash -c "s""udo true"` and `x=sudo; $x true` among them, and the
