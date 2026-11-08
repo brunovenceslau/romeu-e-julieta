@@ -222,8 +222,10 @@ obligation of the row above:
 8. `REQ-1353` A symbolic link at `/usr/local/bin/julieta` to
    `/opt/julieta/bin/julieta`, root-owned, so `julieta` resolves by name
    in every sandbox with the kit, before any `julieta setup`, and the
-   agent user cannot rewrite it; where the agent has root, as through
-   `sudo`, it can, so the link is a convenience and not a boundary
+   agent user cannot rewrite it; where the agent has root, through the
+   workload's Docker engine (05 5.4, REQ-1386) or, until T216 lands,
+   `sudo` (REQ-1400), it can, so the link is a convenience and not a
+   boundary
    (amended on 2026-11-06: a `sh` launcher until then, and the link of
    `julieta setup` beside it, retired). The hooks and the guard keep
    the absolute path. `$HOME/.local/bin` comes first on the agent's
@@ -233,6 +235,15 @@ obligation of the row above:
    REQ-1351). Added on 2026-11-03, after a sandbox where `setup` had
    not run lost its handoff to a file because the skills call `julieta`
    by name.
+9. `REQ-1399` The agent user holds no `sudo`: an install step that runs
+   as root (`user: "0"`, as `os-base`'s does) removes every sudoers rule
+   that grants the agent user and takes the agent out of the `sudo`
+   group, and leaves the `docker` group, the one root-equivalent access
+   Q33 accepts (05 5.4, REQ-1386). `julieta setup` runs `sudo -n true`
+   as the agent and fails when it succeeds, so a workload that grants
+   `sudo` some other way is seen at every boot (I35; added on 2026-11-08, as
+   decided on 2026-11-08: A19 found `sudo -n` working on both
+   workloads; 05 5.4, REQ-1400).
 
 `julieta-claude` replaces the agent's built-in memory with
 `julieta memory` on purpose
