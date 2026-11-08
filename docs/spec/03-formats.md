@@ -281,8 +281,10 @@ later version could delegate readiness to mise daemons.
 
 `REQ-0198` Produced only by `internal/render` through the YAML marshaller. The key
 names below follow the documented env-file schema and the documented v3
-workload pattern, with `additionalWorkspaces[].target`, `entrypoint`
-and `cmd` (sbx 0.51) from the release notes that introduced them; `REQ-0199` the golden files are **probe-confirmed**: probe A5
+workload pattern, with `additionalWorkspaces[].target` and `cmd`
+(sbx 0.51) from the release notes that introduced them, and
+`entrypoint`, which `sbx env plan` of sbx v0.51.0 accepts (measured on
+2026-11-07); `REQ-0199` the golden files are **probe-confirmed**: probe A5
 runs `sbx env plan` on them and records the hash of each golden's
 normalized form (decoded and re-encoded with sorted keys by one
 function in `internal/canon`), and `tools/ci probes` compares that
@@ -356,8 +358,9 @@ without one, `layout up` says so and opens a shell, 04 4.3). Both keys
 are written because `cmd` alone keeps the workload's entrypoint: the
 pinned `sbx-kit-claude` declares `sandbox.entrypoint: [claude]`, and an
 attached `sbx env run <dir>` with a `cmd` and no `entrypoint` failed
-with `unknown option '-lc'`, the `cmd` elements reaching `claude` as
-arguments; `sbx env plan` accepts an env file carrying both and lists
+with `unknown option '-lc'` (observed), which sbx's help explains:
+`cmd` replaces the arguments of the inherited entrypoint, so its
+elements reach `claude` as arguments (inferred); `sbx env plan` accepts an env file carrying both and lists
 them under AGENT LAUNCH, while the attached run with this shape is A15's
 to record (measured on 2026-11-07, sbx v0.51.0; decided on 2026-11-07,
 in place of the `cmd`-only shape decided on 2026-11-06). `REQ-0203` romeu names this file by path; probe A5 records
