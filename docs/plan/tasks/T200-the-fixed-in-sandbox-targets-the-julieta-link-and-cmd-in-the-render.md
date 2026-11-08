@@ -31,8 +31,8 @@ sitting: none
 # T200 - The fixed in-sandbox targets, the julieta link and cmd in the render
 
 Goal: the rendered env file names a fixed in-sandbox `target` for every
-additional workspace but the primary clone, writes `skills: off` and
-`cmd`, and `.romeu/bin` carries a `julieta` link beside the arch binary,
+additional workspace but the primary clone, writes `entrypoint` and
+`cmd` and no `skills` key, and `.romeu/bin` carries a `julieta` link beside the arch binary,
 so no per-project path reaches a kit, and no host path reaches a
 sandbox but the primary clone's.
 
@@ -50,8 +50,9 @@ migrates.
    `additionalWorkspaces[].target`; the primary clone keeps its host
    path (clone mode). The manifest's `repos[].memory` and
    `sharedMemory` carry the targets (03 3.6, REQ-0221).
-2. `skills: off` (REQ-1358) and `cmd: [/opt/julieta/bin/julieta,
-   layout, up]` (REQ-1370) in every rendered env file; no `entrypoint`.
+2. `entrypoint: [/opt/julieta/bin/julieta]` and `cmd: [layout, up]`
+   (REQ-1370) in every rendered env file, and no `skills` key
+   (REQ-0200); amended on 2026-11-07, below.
 3. The `julieta` link (REQ-1365): on promotion `.romeu/bin/julieta` is a
    relative symbolic link to `julieta-linux-<GOARCH>`; `render.json`
    records it as `".romeu/bin/julieta": "link:julieta-linux-<GOARCH>"`
@@ -78,11 +79,20 @@ moves from `after` to `needs`: the `_shared` mount and `sharedMemory`
 are T174's. The `link:` value of `render.v1`'s `files` map keeps the
 schema's string type, so the `formats` check does not ask: the pull
 request records the `formats` approval by name, and an older romeu
-reads a newer `render.json` as drift (03 3.7, 03 3.12; V2.37). The
-golden writes `skills: "off"`, quoted, as yaml.v3 marshals the string
-(03 3.3, REQ-1358; V2.44).
+reads a newer `render.json` as drift (03 3.7, 03 3.12; V2.37).
 
-- Implements: REQ-1355 (02 2.3), REQ-1357 (03 3.3), REQ-1358 (03 3.3),
+Amended on 2026-11-07 (as decided on 2026-11-07, after the hand
+measurement of sbx v0.51.0 that day; scope this repository): item 2's
+`skills: "off"` and its `cmd`-only shape go. The env file refuses the
+key (`unknown field "skills"`, exit 1), so REQ-1358 is retired and the
+render writes no `skills` key (REQ-0200; the share it would have turned
+off is a 05 5.4 row and `doctor`'s `skills-shared`, T191); and a `cmd`
+with no `entrypoint` reached the workload's entrypoint `claude` as
+arguments, so the render writes `entrypoint: [/opt/julieta/bin/julieta]`
+and `cmd: [layout, up]` (REQ-1370), which `sbx env plan` accepts; the
+attached run with that shape is A15's (T026), and T211 waits on it.
+
+- Implements: REQ-1355 (02 2.3), REQ-1357 (03 3.3), REQ-0200 (03 3.3),
   REQ-1370 (03 3.3), REQ-0227 (03 3.7), REQ-0221 (03 3.6), REQ-1365 (06
   6.3), REQ-0583 (06 6.3).
 - Operator: yes, the approval line for `schemas/**` (ask-first
@@ -90,7 +100,8 @@ golden writes `skills: "off"`, quoted, as yaml.v3 marshals the string
   new value form.
 - Acceptance:
   - The env file goldens of 03 3.3 carry a `target` on every additional
-    workspace but the primary, `skills: "off"` (quoted) and `cmd`, and
+    workspace but the primary, `entrypoint` and `cmd` and no `skills`
+    key, and
     `sandboxOptions` in the flow form of 03 3.3's example; probe A5
     confirms them later (T019), and until then they are marked as the
     facts of this task.
@@ -107,7 +118,7 @@ golden writes `skills: "off"`, quoted, as yaml.v3 marshals the string
     promotion test of T039 extended with the link.
   - Item 4 is T212's (amended on 2026-11-07).
 - Verify: `go test ./internal/render/... -run
-  '^(TestEnvTargets|TestEnvSkillsAndCmd|TestBinLink|TestDriftLink|TestRecoverFinishesAPromotionKilledAfterEachStep)'
+  '^(TestEnvTargets|TestEnvEntrypointAndCmd|TestBinLink|TestDriftLink|TestRecoverFinishesAPromotionKilledAfterEachStep)'
   -v && go test ./internal/cmd/romeu/sync/... ./internal/cmd/julieta/spec/...
   -run '^(TestManifestSizeTargets|TestSpecManifestTargets)' -v`.
   The patterns name the functions this task adds, and the recovery test

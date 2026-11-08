@@ -40,9 +40,12 @@ as decided on 2026-11-07): the `dockerd@1` row of Deferred decisions can
 fire at the first slot whose project cannot run its checks without a
 Docker engine in the sandbox (this repository is named), and is decided
 from that slot's hand record of what A19 asks, which A19 re-records in
-M6. From this sitting `romeu` renders `skills: off` (REQ-1358), so each
-slot also checks the skills the project's sessions use against T114's
-list.
+M6. The env file cannot turn off the host's skills store, so a romeu
+sandbox gets it read-only while sbx's `skills.defaultMode` is `readonly`
+(03 3.3, REQ-0200; `doctor`'s `skills-shared`; amended on 2026-11-07);
+each slot records the setting in force and checks the skills the
+project's sessions use against T114's list, so no slot depends on the
+share.
 
 - Implements: REQ-1091 (12 12.2).
 - Operator: runs the slots; from a `--dry-run` build of `main` (T103).
@@ -57,8 +60,8 @@ list.
     `dockerd@1` row before the next slot and records by hand, in that
     issue, what A19 asks for the workload in force: the engine's uid, its
     socket's group and what the agent user reaches.
-  - Each slot records whether a skill its sessions use is missing from
-    the rendered sandbox; a missing one is added to T114's kit or
+  - Each slot records the `skills.defaultMode` in force and whether a
+    skill its sessions use is missing from the rendered sandbox's kits; a missing one is added to T114's kit or
     reported as the trigger of the `skills` row before the next slot.
   - Every issue opened here from an item of the retired capabilities
     passes `go run ./tools/ci hygiene --file <body>` before it is

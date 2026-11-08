@@ -66,8 +66,10 @@ same target in its hand-written env file, so one kit serves both.
    directory; the base64 payload step is kept until the first recreate
    on sbx 0.51 shows the files at the discovery directory, then
    removed in a pull request of its own. That the files reach the
-   discovery directory with `skills: off` is B2's measurement (T082,
-   T092); until block B, the first recreate on sbx 0.51 is the route's
+   discovery directory, with the `skills.defaultMode` in force recorded
+   and, where the host's store is shared, whether it holds a skill of
+   the same name, is B2's measurement (T082, T092; amended on
+   2026-11-07, since the env file cannot turn the share off); until block B, the first recreate on sbx 0.51 is the route's
    go/no-go, recorded as a fact of this task (REQ-0595).
 5. `skills-stale` (REQ-0587): the digest julieta embeds covers the same
    skill files and hook lines; `julieta setup` reads the installed
@@ -91,8 +93,9 @@ V2.45, V2.47, V2.48, V3.0):
   first recreate on sbx 0.51 shows another, and `claude.SkillsDir`
   follows the recorded fact. The base64 payload step skips itself when
   a skill's `SKILL.md` is already there, so the two routes cannot
-  collide. On a go (both skills seen at the discovery directory with
-  `skills: off`), the payload step is removed in a pull request of its
+  collide. On a go (both skills seen at the discovery directory, read
+  as the bundled copies: the `skills.defaultMode` in force recorded and
+  no skill of the same name in a shared host store), the payload step is removed in a pull request of its
   own; on a no-go, the payload stays and the `agent-skill@1` entries
   go.
 - Item 5: the expected hook lines are built from the kit's constant
@@ -106,7 +109,9 @@ V2.45, V2.47, V2.48, V3.0):
 
 Deferred: the removal of the base64 payload step on a go; its trigger
 is the first recreate on sbx >= 0.51 that shows both skills at the
-discovery directory with `skills: off` (RP-19, amended on 2026-11-07).
+discovery directory as the bundled copies, with the `skills.defaultMode`
+in force recorded and no skill of the same name in a shared host store
+(RP-19, amended on 2026-11-07).
 
 - Implements: REQ-1373 (06 6.3), REQ-0587 (06 6.3), REQ-0397 (04 4.3),
   REQ-0595 (06 6.4), REQ-0596 (06 6.4),

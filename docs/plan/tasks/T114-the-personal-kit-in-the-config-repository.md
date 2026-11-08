@@ -28,10 +28,15 @@ task in its body and writes `merged:` and `pr:` into this file, the one
 write rule 1 allows outside its own file.
 
 Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
-as decided on 2026-11-07): from sitting M3 `romeu` renders `skills: off`
-(REQ-1358), and the mounts check refuses a host bind off its closed list,
-a mount of the host's skills store among them (REQ-1381), so a romeu
-sandbox gets only the skills its kits bundle. Which skills move into
+as decided on 2026-11-07, and again after the hand measurement of sbx
+v0.51.0 that day): the env file cannot turn off the host's skills
+store, so a romeu sandbox gets it read-only beside its kits' skills
+while sbx's `skills.defaultMode` is `readonly`, its default (03 3.3,
+REQ-0200; 05 5.4); the mounts check admits that read-only bind
+(REQ-1381), and `doctor` warns `skills-shared` (T191). A sandbox gets
+only the skills its kits bundle once the setting is `off`, which
+reaches sandboxes created after the change, so a daily sandbox must not
+depend on the share. Which skills move into
 this kit is read, not guessed: the operator lists the skills the
 maintainer's daily sessions read from the host store, and each one that
 neither `julieta-claude` nor a pinned plugin carries ships here as a

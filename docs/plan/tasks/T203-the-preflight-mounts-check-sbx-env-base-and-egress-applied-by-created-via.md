@@ -146,9 +146,13 @@ items 4 and 5 are added.
     step 6 passes; with one missing, one at another target, one marked
     missing, a memory bind of a repo the spec removed since the create,
     a mount whose target the spec changed, and a host bind off the
-    closed list (a mount of the host skills store among them), each
+    closed list (a bind of the host skills store that is not read-only
+    among them), each
     exits 2 with `mounts-mismatch` naming the mount; a render with one
     repo more than the generation records passes step 6 (amended on
+    2026-11-07).
+  - The read-only bind of the host's skills store passes at the source,
+    target and read-only flag the session records (REQ-1381; amended on
     2026-11-07).
   - An exempt bind (the env file, a kit source, a skill dir) passes at
     the target the session records, with a source under a

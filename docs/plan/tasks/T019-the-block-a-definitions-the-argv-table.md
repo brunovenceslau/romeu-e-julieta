@@ -38,14 +38,17 @@ beside A9's deny, and this probe re-records it), and extends:
   whose read-only flag is recorded;
 - A4: `sbx inspect`, the mount fields of `sbx ls --json` for a running
   and for a stopped sandbox (an empty list included) and the source,
-  target and read-only flag of each bind sbx adds itself, the unreadable
-  state, exit 125 of `env exec` and its status when the daemon is
+  target and read-only flag of each bind sbx adds itself (the host's
+  skills store among them, under the `skills.defaultMode` in force;
+  added on 2026-11-07), the unreadable state, exit 125 of `env exec` and its status when the daemon is
   stopped, `--no-input` per argv shape and the two offers of sbx 0.51,
   each provoked where the harness can; a shape provoked on neither host
   is recorded as `not-provoked`, keeps no `--no-input`, and is named in
   the result, whose synthetic session 10 10.3 admits (REQ-0924);
-- A5: the goldens with `target`, `skills: off` (whether sbx reads the
-  quoted `"off"` as the mode off) and `cmd`, and a `~/.sbxenv.yaml`
+- A5: the goldens with `target`, `entrypoint` and `cmd` and no
+  `skills` key, the golden with a `skills` key added (refused by hand
+  on 2026-11-07, sbx v0.51.0; an acceptance reopens the skills row of
+  Deferred decisions), and a `~/.sbxenv.yaml`
   planted under a home the harness creates, never the operator's: the
   harness refuses to start while the operator's own file exists and
   removes its plant on every exit path; where sbx cannot be pointed at
@@ -67,8 +70,9 @@ beside A9's deny, and this probe re-records it), and extends:
   `readOnly`; a secrets binding added, removed), whether the instance
   stays and the change took effect as read back through sbx, an apply
   repeated and one killed mid-apply, a declined plan, the attached `sbx
-  env run <dir>` on an equal env file with and without `--no-input`, and
-  `cmd` on an attached, a detached and a cloned `env run`; A15 is
+  env run <dir>` on an equal env file carrying the `entrypoint` and
+  `cmd` of 03 3.3 with and without `--no-input`, and that entrypoint
+  and `cmd` on an attached, a detached and a cloned `env run`; A15 is
   re-run at each floor bump.
 The argv list of REQ-0997 grows with `sbx inspect`, the attached `sbx
 env run <dir>`, `--no-input`, `sbx secret ls` and the settings listing.

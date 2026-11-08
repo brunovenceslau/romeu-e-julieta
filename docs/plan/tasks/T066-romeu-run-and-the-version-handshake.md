@@ -80,7 +80,7 @@ holds them.
 Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
 steps 5 and 6 invoke `/opt/julieta/bin/julieta-linux-<GOARCH>`, the
 target of the `.romeu/bin` mount (02 2.5, T200), and step 7 execs into
-the attached `sbx env run <dir>`, whose `cmd` is `julieta layout up`
+the attached `sbx env run <dir>`, whose `entrypoint` and `cmd` are `julieta layout up` (amended on 2026-11-07)
 over the manifest step 6 cached (03 3.3, REQ-0358; the builder is
 T202's), so the argv of I1 is that call, the `sbx env exec -it` of
 `layout up` until A15 records it; step 3 hands a changed env file to
@@ -89,7 +89,7 @@ snapshot --all` on a running sandbox, keeps the generation and moves
 its `createdWith` on exit 0, and exits 1 with `recreate-needed`
 otherwise (REQ-0352, REQ-0353, amended on 2026-11-07); the generation record gains
 `sbxVersion` from `sbx inspect` after the create (REQ-1359); the
-minimal `layout up` of this task, run as `cmd` before any manifest is
+minimal `layout up` of this task, run as `entrypoint` and `cmd` before any manifest is
 cached, prints that none is cached and that `romeu run --no-attach
 <name>` writes one, and execs the login shell (REQ-0418, 04 4.3); the
 hybrid test mounts `.romeu/bin` at `/opt/julieta/bin` (REQ-0738). The
