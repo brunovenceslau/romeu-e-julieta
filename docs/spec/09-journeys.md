@@ -158,15 +158,11 @@ running sandbox it warns `recreate-needed`, hint `romeu recreate
 <name>` (REQ-1377, J6), and attaches through `sbx env exec`, unless
 step 6 refuses with `mounts-mismatch` (a repo removed or a mount target
 changed, REQ-1354); a stopped
-one it does not start and exits 5 with `recreate-needed` (`RJ-305`),
-whose hint is to undo the change that moved the digest (the spec, or
-a secret's argv in the host settings; a change that came only from a
-romeu release has no romeu route until T210, so J9 starts the sandbox
-before the upgrade) and run
-`romeu sync <name>` so the digests match again, then rerun, and warns
-that undoing re-approves what the change removed (REQ-1377), since
-`rm` and `recreate` would
-have to start it for their salvage and refuse too (REQ-1387).
+one it starts with `sbx env exec`, which applies nothing, warns the
+same and attaches, except when the spec removed a kit or a secrets
+binding since the create: then it exits 5 with `recreate-needed`
+(`RJ-305`), hint `romeu recreate <name>`, whose salvage starts the
+sandbox (REQ-1387; decided on 2026-11-08).
 `julieta setup` is a no-op when locks are unchanged (S8). J3b: record
 a new generation, create (`sbx env run -d --clone`), egress,
 compatibility check, `julieta setup` installs everything, then attach.
@@ -177,7 +173,7 @@ sandbox of the project's name exists that romeu has no generation for
 (for example after the host state was lost), `run` exits 2 with the
 error `unknown-sandbox` (`RJ-203`); the operator checks it and runs
 `romeu adopt <name>` on a TTY (`adopt` first warns that once the
-sandbox stops romeu has no route for it until T210, and on a stopped
+sandbox stops romeu has no route for it, and on a stopped
 sandbox that this is already so), after which `run`, `salvage` and `rm`
 work as usual on a running sandbox, `run` makes no `sbx env run` with
 romeu's env file on the adopted sandbox, and `status` and `sync` warn that it was
@@ -220,9 +216,9 @@ stopped adopted sandbox is not started, by `run` or by a salvage
    stopped agent for one.
 2. [O] `romeu recreate foo` (or `romeu rm foo`).
 3. [H] `romeu salvage foo` (mandatory, deterministic): [H] preflight;
-   a stopped sandbox whose recreate digests differ, or whose generation
-   was adopted, is not started, and the command exits 5 with
-   `recreate-needed` as J3a says (REQ-1387); the memory reader checks for an open `handoff` tagged `tombstone`
+   a stopped sandbox whose recreate digests differ is started with
+   `sbx env exec`, and one whose generation was adopted is not started:
+   the command exits 5 with `recreate-needed` as J3a says (REQ-1387); the memory reader checks for an open `handoff` tagged `tombstone`
    of the generation before anything is stopped: on a TTY romeu asks whether to continue
    without one, and without a TTY it warns and continues; generation
    `open -> salvaging`, new salvage id and host base SHAs for the
@@ -302,14 +298,13 @@ stopped adopted sandbox is not started, by `run` or by a salvage
   1 (once per machine) and runs `romeu sync --all`; julieta binaries update
   through the read-only mount without recreate; only projects whose kit
   content or capabilities changed see gate 2 and need `romeu recreate
-  <name>`: their next `romeu run` warns `recreate-needed` on a running
-  sandbox and refuses to start a stopped one, since the in-place apply
-  of a changed env file is a row of
+  <name>`: their next `romeu run` warns `recreate-needed` and attaches,
+  a stopped sandbox started first with `sbx env exec`, since the
+  in-place apply of a changed env file is a row of
   [Deferred decisions](../spec.md#in-the-product) (01 1.7, recreate
-  needed); `romeu recreate` refuses a stopped one too, as J3a says
-  (REQ-1387), so start each sandbox that will need the recreate
-  (`romeu run --no-attach <name>`) before `romeu upgrade`, and recreate
-  it while it runs. Installing by hand with the `e2e/scenarios/j1/commands.yaml`
+  needed); a release that removed a product kit makes `run` refuse a
+  stopped sandbox, and `romeu recreate` starts it for the salvage, as
+  J3a says (REQ-1387; amended on 2026-11-08). Installing by hand with the `e2e/scenarios/j1/commands.yaml`
   entry of J1 step 2, then `romeu approve --toolchain` and `romeu sync
   --all`, stays the path for a host without `tools.gh`.
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config
