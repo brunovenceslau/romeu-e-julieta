@@ -55,7 +55,10 @@ signing socket, the exec or the attach forwards an agent with no keys,
 which replaces the signing key in the sandbox; its form (an agent romeu
 serves through `golang.org/x/crypto/ssh/agent`, or a socket where
 nothing listens) is measured first, since `sbx env run -d` refuses a
-start of an `ssh-agent@1` kit without a host agent.
+start of an `ssh-agent@1` kit without a host agent. Measured on
+2026-11-08 (sbx v0.51.0): both forms replace the forwarded agent on
+exec and on a start; the served agent lists `no identities`, the
+empty path makes the agent inside fail.
 
 - Acceptance:
   - Inside the sandbox, `ssh-add -L` lists no key after such an exec,

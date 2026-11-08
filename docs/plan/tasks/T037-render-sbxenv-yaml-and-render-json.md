@@ -40,7 +40,9 @@ Re-plan (2026-10-22): Changed. `ports` of `sbxenv.yaml` is a list of
 objects (`sandbox`, `host`, `protocol`, `hostIP`), so render parses the
 project spec's port string (03 3.1, `[[HOST_IP:]HOST_PORT:]SANDBOX_PORT[/PROTOCOL]`)
 into that shape; an omitted protocol is `tcp4` in sbx (`tcp6` only for an IPv6
-`HOST_IP`, which the spec does not accept yet).
+`HOST_IP`, which the spec does not accept yet). `sbx env plan` accepts
+the shape and shows an omitted protocol as `tcp4` (measured on
+2026-11-08, sbx v0.51.0, planned only, not applied).
 
 Re-plan (2026-10-12): Kept. `render` is one package in three file sets
 (T037, T038, T039), each owning its own files and testdata, ordered by
