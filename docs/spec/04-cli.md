@@ -443,8 +443,9 @@ dir`, see J13).
    approves no plan (I4, amended on 2026-11-08). With an allow on
    `<host>` and a deny on `<host>:80` both present, `--resource <host>`
    removes only the allow and the deny stays (REQ-1374; measured on
-   2026-11-08, sbx v0.51.0; A9 re-records it), so the removal keeps a
-   recorded deny and needs no second check of it. `REQ-0355` romeu writes each domain into
+   2026-11-08, sbx v0.51.0; A9 re-records it). `run` still re-checks
+   each recorded deny with `sbx policy check` after the removals, so a
+   later sbx that removes the deny too is seen at once. `REQ-0355` romeu writes each domain into
    `egressApplied` before its `allow` call and removes it from the
    record after its `rm` call succeeds, so the record always names every
    rule romeu may have applied; a reconcile cut short is finished by the

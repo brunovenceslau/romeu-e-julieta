@@ -61,10 +61,11 @@ goal above is history.
    over plain HTTP (the set of 07 7.5 that only a descriptor declared,
    REQ-1316, filtered to port 80), verifies each with `sbx policy check
    network`, and records each, before and after the calls as the
-   allow rules are (REQ-0355); the reconcile's `policy rm` calls leave
-   a recorded deny in place, since `--resource <host>` removes only the
-   allow beside a `<host>:80` deny (REQ-0354, measured on 2026-11-08,
-   sbx v0.51.0, which retired the re-check added that day); "in `egressApplied` as a deny" and "every
+   allow rules are (REQ-0355), and checks each recorded deny again after
+   the reconcile's `policy rm` calls (REQ-0354, added on 2026-11-08):
+   sbx v0.51.0 removes only the allow beside a `<host>:80` deny
+   (measured on 2026-11-08), and the re-check catches a later sbx that
+   does not; "in `egressApplied` as a deny" and "every
    pair over plain HTTP" are history: see the amendment below.
 2. `doctor` (REQ-0392): the `egress-applied` row compares the deny
    rules too, so a deny that went missing, after a recreate or by hand, is
