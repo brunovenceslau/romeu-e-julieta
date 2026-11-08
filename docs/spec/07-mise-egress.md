@@ -14,8 +14,11 @@ records.
 | CI (product repo) | same `mise.lock` as the sandbox | GitHub Actions |
 
 *Why for us (install after create, not in a kit):* a kit install step
-runs before the clone exists and a startup step races the agent; romeu
-owns ordering, so tools exist before the first pane. DevPod builds and
+runs before the clone exists, and whether a startup step holds the
+session until it ends is A14's measurement; romeu's step 6 stays the
+authoritative run either way
+([06 6.4](06-kits.md#64-product-kits) item 7), so tools exist before
+the first pane. DevPod builds and
 attaches in one step because its IDE attaches last; ours is a terminal
 the agent starts in, so we split create from attach.
 
@@ -211,7 +214,14 @@ verification with `sbx policy check network --sandbox <name> <domain>`
 only the descriptors declared (step 6) are not applied, removed or
 checked by romeu: sbx applies them from the descriptor, and a rule
 romeu added for one would widen it, since a rule with no port opens
-every port of the domain (measured on 2026-10-29, sbx v0.50.1).
+every port of the domain (measured on 2026-10-29, sbx v0.50.1). The
+one exception is the per-sandbox deny of REQ-1374
+([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1)) on
+the two plain-HTTP host and port pairs of the `docker.io/sbx/claude`
+workload, a rule that narrows: it holds only if the measurement before
+the pin takes the deny branch (T205), and then romeu applies and
+verifies that deny as the pull request of that branch (T209) writes it
+(added on 2026-11-07).
 `REQ-0635` Applied on create (before `julieta setup`), on every `run` (re-applies
 after an `sbx reset`), and on `sync` for a running sandbox. `REQ-0636` The
 manifest carries the applied set

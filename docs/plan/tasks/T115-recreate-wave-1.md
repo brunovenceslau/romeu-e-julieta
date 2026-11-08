@@ -24,7 +24,8 @@ the hand-written project definition, without the read-only mount of the
 store that T111's fourth edit left. The fifth edit of rule 9 lands
 here: the other kit entries with their args, `signingKey` set to the
 public key, each with its undo in the runbook (the `julieta-claude`
-entry and its `julietaBin` arg land at sitting M1, T111); `romeu sync`
+entry and its `julietaBin` arg land at sitting M1, T111, the arg gone
+and the targets of 02 2.5 set with T201); `romeu sync`
 writes both at sitting M3 (T116). `julieta
 install` and `lock` (T053) are in the wave, so each recreated repository
 gets its `mise.toml` and `mise.lock` (the M2 row of `docs/plan.md`). J6
@@ -41,6 +42,13 @@ their args enter every sandbox (rule 9 of `docs/plan.md`). The pull
 request whose Evidence carries sitting M2's output names this task in
 its body and writes `merged:` and `pr:` into this file, the one write
 rule 1 allows outside its own file.
+
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): the wave does not wait for T201, so it has no
+edge to it. A slot that runs before T201 merges pins the kit with its
+`julietaBin` arg; a slot after it pins a SHA with T201 and sets the
+mounts at their targets of 02 2.5, the manifest re-encoded with them
+(T111's amendment). The runbook records which form each slot used.
 
 - Implements: REQ-0548 (05 5.4), REQ-0549 (05 5.4), REQ-0602 (06 6.4),
   REQ-1002 (11 11.2).

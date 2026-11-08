@@ -39,6 +39,12 @@ hand-written session marked `synthetic: true` (T046, rule 10 of
 are the ones A9 records, not the ones inferred, so the task waits for the
 sitting that runs block A (O3).
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+`owns` keeps the path this task's pull request touched,
+`e2e/testdata/sbx/0.49.2/secrets-settings.jsonl`; the floor raise to sbx
+0.51.0 moved that session to `e2e/testdata/sbx/0.51.0/`, where T191
+owns it.
+
 - Implements: none: the requirement ids stay with the tasks that own the
   preflight (T046) and the sbx driver (T029).
 - Operator: no. The recording is the operator's, at O3.

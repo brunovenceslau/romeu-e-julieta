@@ -14,6 +14,8 @@ after:
   - T122
   - T108
   - T182
+  - T205
+  - T210
 ask_first:
   - decisions
   - spec
@@ -31,6 +33,12 @@ sandbox kit repository.
 
 Re-plan (2026-10-12, stage B): New. The acceptance of a Proposed record
 is a pull request of its own, so block O8 has a task to name.
+
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+T205 also edits `docs/spec.md` (Q2, and Q33 on its accept branch), and
+T210 edits it where its measurement opens the gate of the in-place
+apply, so this task comes after both; T126 is M6 and both are M4, so no
+milestone waits on a later one.
 
 - Implements: REQ-1167 (12 12.5).
 - Operator: each App check of the record's Consequences, under Evidence.

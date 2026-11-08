@@ -25,13 +25,71 @@ one written before the re-plan; `needs` names the tasks whose code it
 reads (the definitions of T019, the check of T020), and `owns` is
 written when the task reopens.
 
+Amended on 2026-11-06 and 2026-11-07 (the sbx 0.51 and kit schema m.12
+amendments, as decided on 2026-11-07): the table of 11 11.1 gains A18
+(the caches across sandboxes and recreates, REQ-1368) and A19 (the
+engine of the `sbx/claude` workload and `dockerd@1`, REQ-1369; its
+workload part is measured first by hand inside T205's measurement,
+beside A9's deny, and this probe re-records it), and extends:
+- A3: each mount at its target of 02 2.5, the `julieta` link, and a
+  write, as the agent and as root, also after a remount and through the
+  share's root mounted anew, to each bind sbx makes itself (the env
+  file, each kit source, each skill dir of an `agent-skill@1` entry,
+  the host's skills store), whose read-only flag is recorded, and no
+  write reaches the host's skills store;
+- A4: `sbx inspect`, the mount fields of `sbx ls --json` for a running
+  and for a stopped sandbox (an empty list included) and the source,
+  target and read-only flag of each bind sbx adds itself (the host's
+  skills store among them, under the `skills.defaultMode` in force,
+  and once under `off`, whether an env-file create honours it; added
+  on 2026-11-07), the unreadable state, exit 125 of `env exec` and its status when the daemon is
+  stopped, `--no-input` per argv shape and the two offers of sbx 0.51,
+  each provoked where the harness can; a shape provoked on neither host
+  is recorded as `not-provoked`, keeps no `--no-input`, and is named in
+  the result, whose synthetic session 10 10.3 admits (REQ-0924);
+- A5: the goldens with `target`, `entrypoint` and `cmd` and no
+  `skills` key, a variant of a golden with a `skills: "off"` key
+  added, no golden and no recorded hash (refused by hand
+  on 2026-11-07, sbx v0.51.0; an acceptance reopens the skills row of
+  Deferred decisions), and a `~/.sbxenv.yaml`
+  planted under a home the harness creates, never the operator's: the
+  harness refuses to start while the operator's own file exists and
+  removes its plant on every exit path; where sbx cannot be pointed at
+  another home, A5 plants nothing in the operator's home and records
+  the user-level file case as `not-provoked` (block A plants nothing but
+  A2's one global setting, Q29);
+- A9: the `--created-via` value, and the host and port deny of Q2, read
+  again beside a portless allow of the same host and after a same-name
+  `sbx env rm` and `sbx env run -d --clone`;
+- A15: `sbx env exec <dir> -- true` on a stopped sandbox whose env file
+  in `<dir>` changed, and `sbx env exec` on a running one with a changed
+  env file, each read back through `sbx ls --json`, `sbx inspect`, `sbx
+  policy ls`, a marker and the sandbox id (T210 records both first by
+  hand); and the in-place apply measurement T210 records first by hand
+  and this probe re-records: on a running and on a stopped sandbox, `sbx
+  env run -d <dir>` with the env file changed in one kind at a time (a
+  kit added, changed, removed; the workload; a `ports` entry; each size
+  option of 03 3.1; `agent`; a repo added, removed; a `target` or
+  `readOnly`; a secrets binding added, removed), whether the instance
+  stays and the change took effect as read back through sbx, an apply
+  repeated and one killed mid-apply, a declined plan, the attached `sbx
+  env run <dir>` on an equal env file carrying the `entrypoint` and
+  `cmd` of 03 3.3 with and without `--no-input`, and that entrypoint
+  and `cmd` on an attached, a detached and a cloned `env run`; A15 is
+  re-run at each floor bump.
+The argv list of REQ-0997 grows with `sbx inspect`, the attached `sbx
+env run <dir>`, `--no-input`, `sbx secret ls` and the settings listing.
+A18 and A19 record only, so each passes once its observations are
+recorded (10 10.3, REQ-0950).
+
 - Implements: REQ-0142 (02 2.3), REQ-0158 (02 2.6), REQ-0566 (06 6.1),
   REQ-0588 (06 6.3), REQ-0750 (10 10.1), REQ-0924 (10 10.3), REQ-0943
   (10 10.4), REQ-0979 (11 (opening)), REQ-0981 (11 11.1), REQ-0982 (11
   11.1), REQ-0983 (11 11.1), REQ-0984 (11 11.1), REQ-0985 (11 11.1),
   REQ-0986 (11 11.1), REQ-0987 (11 11.1), REQ-0988 (11 11.1), REQ-0989
   (11 11.1), REQ-0990 (11 11.1), REQ-0991 (11 11.1), REQ-0992 (11 11.1),
-  REQ-0993 (11 11.1), REQ-0994 (11 11.1), REQ-0995 (11 11.1), REQ-1028
+  REQ-0993 (11 11.1), REQ-0994 (11 11.1), REQ-0995 (11 11.1), REQ-1368
+  (11 11.1), REQ-1369 (11 11.1), REQ-1028
   (11 11.4).
 - Operator: block O3 produces it; the maintainer opens it. A16's result
   file is committed from the maintainer's shell, and its **[review]**
@@ -58,7 +116,7 @@ written when the task reopens.
     results; its fix is its own pull request, and `tools/ci acceptance`
     (T090) fails until `resolvedBy` is set (11 11.4).
   - Pass, for block O3: `go run ./tools/ci probes --require-pass
-    A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14,A15,A16,A17` exits 0 on the
+    A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19` exits 0 on the
     branch with both hosts' results; a `fail` or `inconclusive` verdict
     does not merge.
   - While the branch holds results alone, `git diff --name-only
@@ -78,4 +136,4 @@ written when the task reopens.
     return after this task; the fake's own unit test data under
     `e2e/fakesbx/` is outside its scope.
 - Verify: `go run ./tools/ci fast`; `go run ./tools/ci probes
-  --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14,A15,A16,A17`.
+  --require-pass A1,A2,A3,A4,A5,A6,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19`.

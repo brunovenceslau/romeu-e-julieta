@@ -28,8 +28,14 @@ variable holding the hand-written manifest, encoded with `go run
 origin SHA each clone started from, 03 3.6, so a snapshot bundles only
 the work since it; its `generation` one ULID per project, kept in the
 runbook), with beside it the entry of the `julieta-claude` kit of T079,
-pinned at a SHA of this repository and its `julietaBin` arg set to the
-path of the julieta binary in the bin mount, listed after the sandbox agent payload's kit so its
+pinned at a SHA of this repository (its `julietaBin` arg set to the
+path of the julieta binary in the bin mount until T201 gives the kit
+its fixed path, after which the hand-written definition mounts the bin
+dir at `/opt/julieta/bin` and the memory dirs at their targets of 02
+2.5, amended on 2026-11-06, and re-encodes the manifest in the same
+edit with `repos[].memory`, and `sharedMemory` once T174 lands, at the
+same targets, since julieta's memory check reads the manifest's paths,
+REQ-0221, amended on 2026-11-07), listed after the sandbox agent payload's kit so its
 skills are the ones installed; the kit brings the SessionStart and
 SessionEnd hook lines of 08 8.2 (each a wrapper that prints one warning
 line and exits 0 when the mount is absent, so a skipped hook is never

@@ -53,7 +53,7 @@ func TestVersionCarriesTheVersions(t *testing.T) {
 	var doc versionsDoc
 	require.NoError(t, json.Unmarshal([]byte(res.Stdout), &doc), res.Stdout)
 	v := doc.Versions
-	assert.Equal(t, "0.49.2", v.Sbx)
+	assert.Equal(t, "0.51.0", v.Sbx)
 	assert.Regexp(t, `^[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.-]*$`, v.Git, "git's own version token")
 	if runtime.GOOS == "darwin" {
 		assert.Regexp(t, `^[0-9]+\.[0-9]+(\.[0-9]+)?$`, v.MacOS)

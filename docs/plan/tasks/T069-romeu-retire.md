@@ -24,6 +24,17 @@ Goal: `romeu retire`.
 Re-plan (2026-10-12): Kept as written before the re-plan; its e2e file
 is `e2e/retire_test.go` (rule 1 of `docs/plan.md`).
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): `retire` makes the refusal of REQ-1387 on a
+stopped sandbox whose live recreate digest differs from the open
+generation's `createdWith`, or whose generation was adopted, right after
+the preflight and before its listing and any prompt: exit 5 with
+`recreate-needed` (`RJ-305`) and the stopped hint of REQ-1377, no
+starting sbx call, nothing moved. The salvage half it runs through T068
+re-reads `sbx ls --json` before each exec on such a generation
+(REQ-1389, T068's code). With the preflight's mounts check failing,
+`retire` passes every step but it before its removal half (REQ-0078).
+
 - Implements: REQ-0012 (index), REQ-0048 (01 1.2), REQ-0052 (01 1.2),
   REQ-0056 (01 1.3), REQ-0081 (01 1.6), REQ-0096 (01 1.6), REQ-0099 (01
   1.6), REQ-0105 (01 1.6), REQ-0108 (01 1.6), REQ-0109 (01 1.6),
@@ -38,7 +49,8 @@ is `e2e/retire_test.go` (rule 1 of `docs/plan.md`).
   REQ-0524 (05 5.2), REQ-0525 (05 5.2), REQ-0526 (05 5.2), REQ-0527 (05
   5.2), REQ-0528 (05 5.2), REQ-0529 (05 5.2), REQ-0530 (05 5.2),
   REQ-0531 (05 5.2), REQ-0532 (05 5.2), REQ-0533 (05 5.2), REQ-0534 (05
-  5.2), REQ-0580 (06 6.2), REQ-0720 (08 8.5), REQ-0736 (10 10.1).
+  5.2), REQ-0580 (06 6.2), REQ-0720 (08 8.5), REQ-0736 (10 10.1),
+  REQ-1387 (04 4.2).
 - Operator: no.
 - Acceptance:
   - The J7 scenario passes in CI: `retire` refuses a project the spec
@@ -52,6 +64,13 @@ is `e2e/retire_test.go` (rule 1 of `docs/plan.md`).
     and moves its state to the state attic. The confirmation goes to
     stderr and stdin decides the TTY; the `/dev/ptmx` case of `retire`
     drives stdin and reads stderr.
+  - On a stopped sandbox whose recreate digests differ, and on a
+    stopped adopted one, `retire` exits 5 with `recreate-needed`
+    (`RJ-305`) and the stopped hint of REQ-1377 before any prompt: the
+    fake `sbx` records no starting call, and the tree, the workspace
+    files and the state are unchanged (REQ-1387).
+  - With the preflight's mounts check failing, `retire` passes every
+    step but it before its removal half.
   - Nothing is deleted; `.attic/` is created with mode 0700.
   - Retire fault injection: romeu is killed after each of the three
     steps of 01 1.6 (Retire), one test per step; the next `status`,

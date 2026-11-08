@@ -24,16 +24,16 @@ func TestParseVersion(t *testing.T) {
 		want string
 	}{
 		{"one line", "v0.48.0\n", "0.48.0"},
-		{"the form of v0.49.2", "sbx version v0.49.2 5d40fd43027b33ed1f1a39c14fb07e2503d6998f\n", "0.49.2"},
+		{"the form of v0.51.0", "sbx version v0.51.0 5d40fd43027b33ed1f1a39c14fb07e2503d6998f\n", "0.51.0"},
 		{"the label and no commit", "sbx version v0.48.0\n", "0.48.0"},
 		{"a short commit", "sbx version v0.48.0 5d40fd4\n", "0.48.0"},
 		{"a zero number", "v0.0.0\n", "0.0.0"},
 		{"no v", "0.46.0", "0.46.0"},
 		{"labelled", "Client Version:  v0.48.0\nServer Version:  v0.48.0\n", "0.48.0"},
-		{"leading blank line", "\n\nv0.49.1\n", "0.49.1"},
+		{"leading blank line", "\n\nv0.50.9\n", "0.50.9"},
 		{"carriage return", "v0.48.0\r\n", "0.48.0"},
-		{"prerelease", "v0.50.0-rc.1\n", "0.50.0-rc.1"},
-		{"build metadata is dropped", "v0.50.0+abc123\n", "0.50.0"},
+		{"prerelease", "v0.52.0-rc.1\n", "0.52.0-rc.1"},
+		{"build metadata is dropped", "v0.52.0+abc123\n", "0.52.0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -93,13 +93,13 @@ func TestCheckFloor(t *testing.T) {
 		out   string
 		below bool
 	}{
-		{"the floor", "v0.49.2", false},
-		{"above", "v0.49.3", false},
+		{"the floor", "v0.51.0", false},
+		{"above", "v0.51.1", false},
 		{"a later major", "v1.0.0", false},
-		{"one patch below", "v0.49.1", true},
+		{"just below", "v0.50.9", true},
 		{"far below", "v0.9.0", true},
-		{"a release candidate of the floor", "v0.49.2-rc.1", true},
-		{"a release candidate above the floor", "v0.50.0-rc.1", false},
+		{"a release candidate of the floor", "v0.51.0-rc.1", true},
+		{"a release candidate above the floor", "v0.52.0-rc.1", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

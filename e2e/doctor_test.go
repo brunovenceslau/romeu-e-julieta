@@ -53,11 +53,11 @@ func (r doctorReport) result(t *testing.T, slug string) (string, string) {
 	return "", ""
 }
 
-// sessionLines returns the lines of a recorded session of sbx 0.49.2:
+// sessionLines returns the lines of a recorded session of sbx 0.51.0:
 // its header and the entries whose argv is one of argvs.
 func sessionLines(t *testing.T, name string, argvs ...[]string) []string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "sbx", "0.49.2", name))
+	data, err := os.ReadFile(filepath.Join("testdata", "sbx", "0.51.0", name))
 	require.NoError(t, err)
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	out := []string{lines[0]}

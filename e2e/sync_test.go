@@ -36,7 +36,7 @@ func TestSyncHarnessEmbedsJulieta(t *testing.T) {
 	t.Parallel()
 	e := romeu.NewEmbedded(t, nil)
 	e.WriteSettings(t, all.HostSettings{Config: all.ConfigRepo{Project: "cfg", URL: "https://github.com/owner/cfg", Ref: "main"}})
-	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.49.2", "handshake.jsonl"))
+	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.51.0", "handshake.jsonl"))
 	require.NoError(t, err)
 	require.NoError(t, e.SetSbxSession(session))
 
@@ -51,7 +51,7 @@ func TestSyncHarnessEmbedsJulieta(t *testing.T) {
 }
 
 // syncSetup is an Env, embedded or plain, with host settings and the
-// fake sbx replaying the handshake of the recorded sbx 0.49.2, which
+// fake sbx replaying the handshake of the recorded sbx 0.51.0, which
 // answers sbx version.
 func syncSetup(t *testing.T, embedded bool) *romeu.Env {
 	t.Helper()
@@ -61,7 +61,7 @@ func syncSetup(t *testing.T, embedded bool) *romeu.Env {
 	}
 	env := e(t, nil)
 	env.WriteSettings(t, all.HostSettings{Config: all.ConfigRepo{Project: "cfg", URL: "https://github.com/owner/cfg", Ref: "main"}})
-	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.49.2", "handshake.jsonl"))
+	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.51.0", "handshake.jsonl"))
 	require.NoError(t, err)
 	require.NoError(t, env.SetSbxSession(session))
 	return env
@@ -158,7 +158,7 @@ func newSyncFixture(t *testing.T) syncFixture {
 	res := e.Run(t, []string{"init", "--config-url", url})
 	require.Equal(t, 0, res.Code, res.Stderr)
 	e.AppendSettings(t, "gitHosts:\n  - host: github.com\nworkloadRepositories:\n  - docker.io/docker/sbx-kit-claude\n")
-	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.49.2", "handshake.jsonl"))
+	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.51.0", "handshake.jsonl"))
 	require.NoError(t, err)
 	require.NoError(t, e.SetSbxSession(session))
 	approve(t, e)

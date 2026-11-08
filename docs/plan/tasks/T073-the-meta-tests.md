@@ -27,6 +27,10 @@ asserted, no network in the preflight.
 Re-plan (2026-10-12): Kept as written before the re-plan. It owns
 `internal/cli/errorids_exempt.yaml`, which T008's `owns` excludes.
 
+Amended on 2026-11-07: the idempotency table's appending commands are
+those REQ-0279 lists, so `julieta stamp` takes the row the earlier text
+gave `handoff write`, which is no command of 04 4.3.
+
 - Implements: REQ-0077 (01 1.5), REQ-0081 (01 1.6), REQ-0087 (01 1.6),
   REQ-0277 (04 4.1), REQ-0278 (04 4.1), REQ-0279 (04 4.1), REQ-0281 (04
   4.1), REQ-0283 (04 4.1), REQ-0521 (05 5.2), REQ-0522 (05 5.2),
@@ -43,7 +47,7 @@ Re-plan (2026-10-12): Kept as written before the re-plan. It owns
 - Acceptance:
   - The idempotency table T043 started has a row for each converging and
     each appending command of 04 4.1, romeu's and julieta's (`setup`,
-    `install`, `lock`, `memory add`, `handoff write` and `snapshot`, at
+    `install`, `lock`, `memory add`, `stamp` and `snapshot`, at
     the container level); a test fails a command of the command
     definitions that has no row; the row for `stop` runs the second
     `stop` against a running fixture.

@@ -56,7 +56,7 @@ func newHost(t *testing.T) *host {
 	h.env = map[string]string{"HOME": h.home, "XDG_STATE_HOME": h.state}
 	require.NoError(t, os.MkdirAll(h.root, 0o700))
 	sbx := filepath.Join(dir, "sbx")
-	require.NoError(t, os.WriteFile(sbx, []byte("#!/bin/sh\necho 'sbx version v0.49.2 0123456789abcdef'\n"), 0o700))
+	require.NoError(t, os.WriteFile(sbx, []byte("#!/bin/sh\necho 'sbx version v0.51.0 0123456789abcdef'\n"), 0o700))
 	data, err := spec.EncodeHostSettings(spec.HostSettings{
 		Schema: "host-settings/v1",
 		Root:   h.root,

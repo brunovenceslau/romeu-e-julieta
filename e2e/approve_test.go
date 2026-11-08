@@ -31,12 +31,12 @@ const question = "acknowledge this toolchain? [y/N] "
 var approveArgs = []string{"approve", "--toolchain"}
 
 // approveSetup is an Env with host settings and the fake sbx replaying
-// the handshake of the recorded sbx 0.49.2, which answers sbx version.
+// the handshake of the recorded sbx 0.51.0, which answers sbx version.
 func approveSetup(t *testing.T) *romeu.Env {
 	t.Helper()
 	e := romeu.New(t, nil)
 	e.WriteSettings(t, all.HostSettings{Config: all.ConfigRepo{Project: "cfg", URL: "https://github.com/owner/cfg", Ref: "main"}})
-	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.49.2", "handshake.jsonl"))
+	session, err := filepath.Abs(filepath.Join("testdata", "sbx", "0.51.0", "handshake.jsonl"))
 	require.NoError(t, err)
 	require.NoError(t, e.SetSbxSession(session))
 	return e
@@ -129,7 +129,7 @@ func TestApproveWritesToolchainJSON(t *testing.T) {
 	res := approve(t, e)
 
 	assert.Contains(t, res.Stderr, "gate 1: the toolchain of this machine\n")
-	assert.Contains(t, res.Stderr, "  sbx 0.49.2 (none recorded) (newest recorded 0.49.2; tested window 0.49.2)\n")
+	assert.Contains(t, res.Stderr, "  sbx 0.51.0 (none recorded) (newest recorded 0.51.0; tested window 0.51.0)\n")
 	assert.Contains(t, res.Stderr, "\n  julieta v0.0.0-placeholder (none recorded), protocol 1 (none recorded), sha256 e3b0c44298fc (none recorded)\n")
 	assert.Contains(t, res.Stderr, "\n    tool core:go (new): ")
 	assert.True(t, strings.HasSuffix(res.Stderr, question+"y\n"), "the prompt comes last on the terminal, then the typed answer: %q", res.Stderr)
@@ -138,7 +138,7 @@ func TestApproveWritesToolchainJSON(t *testing.T) {
 
 	r := readToolchain(t, e)
 	assert.Equal(t, "state-toolchain/v1", r.Schema)
-	assert.Equal(t, "0.49.2", r.SbxVersion)
+	assert.Equal(t, "0.51.0", r.SbxVersion)
 	assert.True(t, strings.HasPrefix(r.Romeu.Version, "v0.0.0-dev+"), r.Romeu.Version)
 	assert.Len(t, r.Romeu.SHA256, 64)
 	assert.Equal(t, 1, r.Julieta.Protocol)
@@ -181,7 +181,7 @@ func TestApproveOncePerBuild(t *testing.T) {
 	res := approve(t, e)
 	prompt := res.Stderr[:strings.Index(res.Stderr, question)+len(question)]
 	assert.NotContains(t, prompt, "\n", "with julieta and the catalog unchanged the prompt is one line")
-	assert.Contains(t, prompt, "tested window 0.49.2")
+	assert.Contains(t, prompt, "tested window 0.51.0")
 	assert.Contains(t, prompt, " -> v0.0.0-dev+feedface, sha256 ")
 	assert.Equal(t, "v0.0.0-dev+feedface", readToolchain(t, e).Romeu.Version)
 }
@@ -195,15 +195,15 @@ func TestApproveSbxVersion(t *testing.T) {
 	e := approveSetup(t)
 	approve(t, e)
 
-	sbxSession(t, e, "0.50.0")
+	sbxSession(t, e, "0.52.0")
 	res := approve(t, e)
-	assert.Contains(t, res.Stderr, "gate 1: sbx 0.49.2 -> 0.50.0 (newest recorded 0.49.2; tested window 0.49.2; 0.50.0 is outside it, untested), romeu ")
-	assert.Equal(t, "0.50.0", readToolchain(t, e).SbxVersion)
+	assert.Contains(t, res.Stderr, "gate 1: sbx 0.51.0 -> 0.52.0 (newest recorded 0.51.0; tested window 0.51.0; 0.52.0 is outside it, untested), romeu ")
+	assert.Equal(t, "0.52.0", readToolchain(t, e).SbxVersion)
 
-	sbxSession(t, e, "0.49.2")
+	sbxSession(t, e, "0.51.0")
 	res = approve(t, e)
-	assert.Contains(t, res.Stderr, "gate 1: sbx 0.50.0 -> 0.49.2 downgrade (newest recorded 0.49.2; tested window 0.49.2), romeu ")
-	assert.Equal(t, "0.49.2", readToolchain(t, e).SbxVersion)
+	assert.Contains(t, res.Stderr, "gate 1: sbx 0.52.0 -> 0.51.0 downgrade (newest recorded 0.51.0; tested window 0.51.0), romeu ")
+	assert.Equal(t, "0.51.0", readToolchain(t, e).SbxVersion)
 }
 
 // TestApproveCatalogDiff: a catalog other than the acknowledged one

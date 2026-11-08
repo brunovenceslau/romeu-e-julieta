@@ -34,6 +34,11 @@ T024's; the E-level cases of T044 ride in T043. The I13 row and its
 golden are T037's. The I28 row reads the sitting M2 fixtures of T113
 until A11 and A12 re-measure them.
 
+Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments): the
+reserved kit arg `julietaBin` of the acceptance line below went with the
+fixed target of 02 2.5 (T201), and T212 removes it from the render
+after T201; the line is history.
+
 - Implements: REQ-0043 (01 1.1), REQ-0044 (01 1.2), REQ-0048 (01 1.2),
   REQ-0056 (01 1.3), REQ-0068 (01 1.4), REQ-0070 (01 1.4), REQ-0132 (02
   2.1), REQ-0137 (02 2.3), REQ-0341 (04 4.2), REQ-0363 (04 4.2),

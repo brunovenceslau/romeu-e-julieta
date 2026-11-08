@@ -84,7 +84,7 @@ func TestPreflightStep5SbxGlobals(t *testing.T) {
 		err := hostStepWith(t, "secrets-unparseable.txt", "policies-recorded.json", quietHost(t))
 		details := cli.Of(err).Details
 		assert.Contains(t, details, cli.Detail{Key: "upstream", Value: "sbx"})
-		assert.Contains(t, details, cli.Detail{Key: "recorded sbx versions", Value: "0.49.2"})
+		assert.Contains(t, details, cli.Detail{Key: "recorded sbx versions", Value: "0.51.0"})
 	})
 	t.Run("a listing sbx cannot give stops the step as it is", func(t *testing.T) {
 		sbx := &fakeSbx{}

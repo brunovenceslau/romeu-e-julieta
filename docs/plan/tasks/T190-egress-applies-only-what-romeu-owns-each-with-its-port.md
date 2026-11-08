@@ -40,6 +40,17 @@ with no port opens every port of the domain (80, 8080 and 2222 of
    is read (the probe of 2026-10-29 read `sbx policy ls --json`, whose
    resources carry `host:port`).
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments,
+as decided on 2026-11-07): REQ-1316 now carries an exception for the
+per-sandbox deny of REQ-1374, which applies only if T205 takes the deny
+branch; the deny's spec text and code are T209's own pull request. This
+task builds item 1 as written: a descriptor-only domain is skipped by
+the application. Whether `Derive` also keeps each descriptor-declared
+host with its declared port, for T209 to read, or T209 takes the two
+pairs of T205's note as fixed data, is decided in T209's pull request;
+this task adds no deny and no field for it, and its port rule of item 2
+covers only the rules romeu applies.
+
 - Implements: REQ-1316 (07 7.5), REQ-0634 (07 7.5).
 - Operator: approves the port rule of item 2 (`spec`).
 - Acceptance:

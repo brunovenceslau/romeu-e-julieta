@@ -46,6 +46,13 @@ Amended on 2026-11-01 (the release and upgrade amendments, ADR 0044):
 REQ-0296 (04 4.1) now admits `gh` in `upgrade` and `doctor`; nothing
 changes for the signing rule.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+this task forwards `SSH_AUTH_SOCK` from the live render's kit set. On a
+generation whose recreate digests differ, or that was adopted, the
+forwarding rule of REQ-1394 (05 5.4) needs the creating render's kit
+set, which no record holds; it is the deferred T215's, which comes
+after this task.
+
 - Implements: REQ-0075 (01 1.5), REQ-0296 (04 4.1), REQ-0384 (04 4.2),
   REQ-0520 (05 5.2), REQ-0549 (05 5.4), REQ-0600 (06 6.4), REQ-0601 (06
   6.4).

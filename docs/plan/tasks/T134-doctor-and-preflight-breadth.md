@@ -36,6 +36,10 @@ REQ-0061 and REQ-0062 (01 1.4) now name the confirmed prompt of `romeu
 upgrade` as gate 1 too; T196 builds it, and the preflight of this task
 is unchanged.
 
+Amended on 2026-11-07 (the sbx 0.51 and kit schema m.12 amendments):
+the `egress-applied` row of `doctor` moved to T203 on 2026-11-06, so it
+is not this task's.
+
 - Implements: REQ-0011 (index), REQ-0020 (index), REQ-0048 (01 1.2),
   REQ-0056 (01 1.3), REQ-0061 (01 1.4), REQ-0062 (01 1.4), REQ-0063 (01
   1.4), REQ-0065 (01 1.4), REQ-0141 (02 2.3), REQ-0145 (02 2.3),
