@@ -35,8 +35,8 @@ while sbx's `skills.defaultMode` is `readonly`, its default (03 3.3,
 REQ-0200; 05 5.4); the mounts check admits that read-only bind
 (REQ-1381), and `doctor` warns `skills-shared` (T191). A sandbox gets
 only the skills its kits bundle once the setting is `off`, which
-reaches sandboxes created after the change, so a daily sandbox must not
-depend on the share. Which skills move into
+reaches sandboxes created after the change; the runbook records the
+setting in force when the list below is read. Which skills move into
 this kit is read, not guessed: the operator lists the skills the
 maintainer's daily sessions read from the host store, and each one that
 neither `julieta-claude` nor a pinned plugin carries ships here as a
