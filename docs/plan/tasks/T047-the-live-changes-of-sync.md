@@ -75,8 +75,8 @@ REQ-1377).
     from the open generation's `createdWith`, or the generation was
     adopted, with the sandbox running and with it stopped, and makes no
     sbx call for it: an e2e case per state asserts the slug, the hint of
-    REQ-1377 for that state (`romeu recreate <name>` while running; the
-    undo, `romeu sync <name>` and rerun hint while stopped) and that the
+    REQ-1377 (`romeu recreate <name>`, running or stopped, amended on
+    2026-11-08) and that the
     fake `sbx` records no `sbx env run`.
   - The J11 scenario function runs in CI.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestSyncLive' -v`. The

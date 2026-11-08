@@ -7,6 +7,8 @@ fate: new
 owns:
   - internal/preflight/stopped_start*.go
   - internal/state/created_lists*.go
+  - internal/state/records*.go
+  - internal/state/apply*.go
   - internal/sbxdrv/env_exec_start*.go
   - e2e/stopped_start_test.go
 needs:
@@ -30,8 +32,9 @@ Goal: the code of the lift decided on 2026-11-08. A stopped sandbox
 whose recreate digests differ is started with `sbx env exec <dir> --
 true` by `run`, `salvage`, `rm`, `recreate`, `retire` and the
 fingerprint read, and refused by `run` and `pull` when the spec removed
-a kit or a secrets binding since the create; the create records the kit
-ids and the secret names that tell it.
+a kit or a secrets binding since the create; the create records each
+kit's id and content digest and each binding's name and argv digest,
+and the ids and names tell a removal.
 
 Added on 2026-11-08 (scope this repository), as decided on 2026-11-08:
 T210's measurement found that `sbx env exec <dir> -- true` starts a
@@ -47,7 +50,7 @@ where their text still says that such a sandbox is refused, this
 task's text wins.
 
 1. The state members `generations[].createdKits` (`{id, contentDigest}`)
-   and `generations[].createdSecrets` (`{name, specDigest}`, never a
+   and `generations[].createdSecrets` (`{name, argvDigest}`, never a
    value or an argv) of 03 3.8, written by `run`'s create in the same
    whole-file write as `createdWith` and always written, `[]` included
    (no `omitempty` on these two members, unlike the other lists of the

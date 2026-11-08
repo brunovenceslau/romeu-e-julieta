@@ -194,7 +194,9 @@ recognition of the store's bind (REQ-1381) and the mount parse of T202.
   - The hint function returns `romeu recreate <name>` for a running
     and for a stopped sandbox of a generation romeu created, and the two
     adopted messages, each a table case asserting the text of REQ-1377;
-    the refusal helper returns exit 5 and `RJ-305` with that hint,
+    the refusal helper returns exit 5 and `RJ-305` with the hint for
+    the case (`romeu recreate <name>` after a removal, the stopped
+    adopted message for an adopted generation),
     and the fake records no sbx call (REQ-1377, REQ-1387).
   - The preflight returns the mounts failure as a non-stopping result
     for the protective commands (`salvage`, `salvage --from-host`,

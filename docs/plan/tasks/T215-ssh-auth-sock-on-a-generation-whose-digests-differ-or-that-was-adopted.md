@@ -30,7 +30,8 @@ recreate digests differ, or that was adopted, `run` attaches by `sbx env
 exec` to a sandbox that may never have been created with
 `git-ssh-sign`, or whose kit was removed for safety. The creating
 render's kit set is `createdKits` (03 3.8, REQ-1403), which T217
-records at create (amended on 2026-11-08; before, this task was to add
+records at create; a generation without it is treated as an adopted
+one (amended on 2026-11-08; before, this task was to add
 the member). Reopened by: the first report of a
 signing prompt from a sandbox that was not created with `git-ssh-sign`;
 or T210 opening the in-place apply (REQ-1394 no longer cites A4;

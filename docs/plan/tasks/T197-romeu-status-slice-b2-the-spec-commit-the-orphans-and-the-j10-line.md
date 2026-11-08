@@ -106,8 +106,8 @@ slice prints; T203 leaves `after`.
     dirty and stash counts (03 3.10), which T174 writes; moved from
     T048's acceptance with slice B2 (re-plan of 2026-10-31).
   - The `recreate-needed` finding names `romeu recreate <name>` for a
-    running sandbox whose digests differ, the stopped hint of REQ-1377
-    for a stopped one, and the adopted messages for an adopted
+    sandbox whose digests differ, running or stopped (amended on
+    2026-11-08), and the adopted messages for an adopted
     generation, running and stopped, each a fixture (amended on
     2026-11-07).
   - A listing with a host bind off the closed list prints that bind; an
