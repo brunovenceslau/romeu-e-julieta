@@ -11,6 +11,7 @@ owns:
   - internal/preflight/errors.go
   - internal/cmd/romeu/doctor/env_base*.go
   - internal/cmd/romeu/doctor/egress_applied*.go
+  - internal/cmd/romeu/doctor/skills_share_writable*.go
   - e2e/preflight_mounts_test.go
   - e2e/doctor_env_base_test.go
   - internal/preflight/recreate*.go
@@ -130,7 +131,15 @@ items 4 and 5 are added.
    session of `e2e/testdata/sbx/0.51.0/egress.jsonl`, after T202, which
    owns the other sessions.
 
-- Implements: REQ-1354 (01 1.5), REQ-0078 (01 1.5), REQ-1361 (04 4.2),
+Amended on 2026-11-08 (as decided on 2026-11-08, security finding M3 of
+the review of the sbx 0.51 amendments; scope every adopter of the
+product): the doctor row `skills-share-writable` (04 4.2, REQ-1398)
+reads every sandbox sbx lists, romeu's or not, from the structured
+mounts of `sbx inspect`, and warns for each that holds a writable bind
+of the skills store or of a directory above it; it reuses this task's
+recognition of the store's bind (REQ-1381) and the mount parse of T202.
+
+- Implements: REQ-1398 (04 4.2), REQ-1354 (01 1.5), REQ-0078 (01 1.5), REQ-1361 (04 4.2),
   REQ-0392 (04 4.2), REQ-1363 (04 4.4), REQ-1364 (04 4.4), REQ-0506 (05
   5.2), REQ-1377 (04 4.1), REQ-1381 (01 1.5), REQ-1382 (01 1.5),
   REQ-1383 (01 1.5), REQ-1387 (04 4.2), REQ-1393 (05 5.4).
@@ -142,6 +151,10 @@ items 4 and 5 are added.
   changed on a running sandbox, and which kit dirs the closed list
   exempts (amended on 2026-11-07).
 - Acceptance:
+  - `skills-share-writable`: a sandbox romeu did not create with a
+    writable bind of the store, and one with a writable bind of `$HOME`,
+    each a warning that names it escaped; every store bind read-only, no
+    finding; a sandbox listed with no mounts, skipped and named.
   - With a fake session listing every compared mount at its target,
     step 6 passes; with one missing, one at another target, one marked
     missing, a memory bind of a repo the spec removed since the create,

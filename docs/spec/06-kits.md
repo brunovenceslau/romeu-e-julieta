@@ -13,7 +13,7 @@ and `oci`. Type: reference with the decision record for each choice.
 | Build | `REQ-0567` **local directory sources**: on approval romeu promotes kit sources into content-addressed dirs `<name>-env/.romeu/kits/<kit>-<digest12>/`; sbx builds them at create and reuses its cache when unchanged. Where sbx runs a local kit's install steps and lifecycle hooks, and what they reach (network, host paths, uid), is measured by A11 and A14 ([11 11.1](11-host-probes.md#111-block-a---sbx-and-runtime-facts)) | no registry needed in v1; a kit change applies on recreate; immutable dirs make promotion crash-safe (01 1.6) |
 | Materialization | `REQ-0568` product kits from romeu's embedded copy; personal kits from the config commit's tree through `git fsck --strict` and `gitsafe.WalkTree` (I27), each read up to 64 MiB in all, written with `os.Root` into the candidate | agent-authored trees never reach a live path before the gate |
 | Capabilities | `REQ-0569` romeu parses every descriptor (local kits from their files, the workload from its image annotation via `internal/oci`, verified by digest at every hop) with a strict subset grammar into a normalized capability set that enters gate 2 (I28); `REQ-0570` one package, `internal/oci`, owns that grammar and the normalized set, and `render` calls it for local kits (01 1.4, 12 12.2; decided in [round 8](../reviews/round-8.md#decisions-for-the-operator)); kit-declared domains go through `egress.Split`; `REQ-0571` parsed descriptors are cached by digest in host state. `REQ-0572` The conformance fixtures of I28 record the sbx version and frontend digest they were made with, and a frontend pin change, or an sbx version entering the tested window, runs the A11 and A12 conformance subset again, named in the PR's Evidence. `REQ-0573` A capability type the grammar does not model fails `sync` closed, a row of [Deferred decisions](../spec.md#in-the-product). `REQ-1385` `internal/oci` also reads the workload image's annotation `com.docker.sandboxes.start-docker`, which starts the engine of `docker.io/sbx/claude` (6.2): `true` enters the normalized set as the `dockerd@1` grant, privileged plus private storage at `/var/lib/docker`, so gate 2 shows the engine's elevation, and a value other than `true` or `false` fails `sync` closed as REQ-0573 does (decided on 2026-11-07; the code does not read it yet; the task that builds this ships first the interim refusal of a workload that carries the key, [05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), REQ-1391) | a kit is a capability grant, so its capabilities are what the gate must show; romeu and sbx must read the same descriptor the same way. For the workload, a digest change alone does not show a reviewer that the new image added a mount, a credential or a network domain; the capability set does, and the gated egress of the workload's declared domains depends on it |
-| Personal kits | `REQ-0574` a personal kit is a `mixin`: a `set` or a `workload` is refused (sync error), since a set's listed kits carry capabilities its own descriptor does not and a workload is the base image; network, mount, volume, credential, ssh-agent, docker-auth, host-port and dockerd capabilities are refused (sync error): docker-auth hands the sandbox the host's registry logins and host-port a host service past the egress policy, the reach of a credential and of network, and dockerd a root-equivalent engine with private storage at `/var/lib/docker` (Q33), refused until A19 records the elevation and Q33 is amended or a 05 5.4 row accepts it by name (added on 2026-11-07). The other capability types, install steps, privileges and lifecycle hooks, are not refused: a personal kit that declares one is shown in the gate 2 diff. Whether install steps and lifecycle hooks are refused too is decided once A14 reports where they run (Q32); a `privileged@1` entry stays admitted and shown at gate 2 while `dockerd@1`, which adds `/var/lib/docker` to it, is refused, and is weighed again with Q32 and A19 (decided on 2026-11-07) | personal kits should not widen a sandbox silently, and a refusal we state is one the code makes |
+| Personal kits | `REQ-0574` a personal kit is a `mixin`: a `set` or a `workload` is refused (sync error), since a set's listed kits carry capabilities its own descriptor does not and a workload is the base image; network, mount, volume, credential, ssh-agent, docker-auth, host-port and dockerd capabilities are refused (sync error): docker-auth hands the sandbox the host's registry logins and host-port a host service past the egress policy, the reach of a credential and of network, and dockerd a root-equivalent engine with private storage at `/var/lib/docker` (Q33), refused until a 05 5.4 row accepts a personal kit's engine by name (Q33's acceptance names the workload's engine only; added on 2026-11-07, amended on 2026-11-08). The other capability types, install steps, privileges and lifecycle hooks, are not refused: a personal kit that declares one is shown in the gate 2 diff. Whether install steps and lifecycle hooks are refused too is decided once A14 reports where they run (Q32); a `privileged@1` entry stays admitted and shown at gate 2 while `dockerd@1`, which adds `/var/lib/docker` to it, is refused, and is weighed again with Q32 and A19 (decided on 2026-11-07) | personal kits should not widen a sandbox silently, and a refusal we state is one the code makes |
 | Signing | `REQ-0575` **none in v1** (local v3 kits cannot be signed); trust = romeu release + approved config commits. Publishing and signing product kits is a row of [Deferred decisions](../spec.md#in-the-product); the one constraint it puts on today's design is that gate 2 can record a digest in place of a content hash | honest about the limit; the gate hashes kit content |
 | Kit sets | not used (they need published refs) | - |
 
@@ -21,7 +21,7 @@ and `oci`. Type: reference with the decision record for each choice.
 
 | Option | For | Against | Decision |
 |---|---|---|---|
-| **Docker's Claude kit pinned by digest** (`docker.io/docker/sbx-kit-claude`; `docker.io/sbx/claude`, the built-in Claude sbx 0.51 publishes as a v3 kit, once the pin moves under the condition of Q2, decided on 2026-11-06) | `REQ-0576` maintained upstream with Claude Code releases; multi-arch; carries gh, jq and the docker CLI (`sbx-kit-claude` also Go and Node; `sbx/claude` a Docker Hardened Image and docker-ce with its engine started, so no `dockerd@1` of the product's, the annotation that starts it entering gate 2 as that grant, REQ-1385); agent state in volumes of its own (below; `sbx/claude` declares none) | unsigned today; Debian base; built outside our review; `sbx/claude` declares plain-HTTP runtime egress (Q2) | **default (Q2)**, with `workloadRepositories` allowlist in host settings and its capabilities in gate 2 |
+| **Docker's Claude kit pinned by digest** (`docker.io/docker/sbx-kit-claude`; `docker.io/sbx/claude`, the built-in Claude sbx 0.51 publishes as a v3 kit, once the pin moves under the condition of Q2, decided on 2026-11-06) | `REQ-0576` maintained upstream with Claude Code releases; multi-arch; carries gh, jq and the docker CLI, and starts a Docker engine as root (`sbx-kit-claude` too, measured on 2026-11-07, sbx v0.51.0, with no annotation gate 2 reads yet; 05 5.4, REQ-1386) (`sbx-kit-claude` also Go and Node; `sbx/claude` a Docker Hardened Image and docker-ce with its engine started, so no `dockerd@1` of the product's, the annotation that starts it entering gate 2 as that grant, REQ-1385); agent state in volumes of its own (below; `sbx/claude` declares none) | unsigned today; Debian base; built outside our review; `sbx/claude` declares plain-HTTP runtime egress (Q2) | **default (Q2)**, with `workloadRepositories` allowlist in host settings and its capabilities in gate 2 |
 | Own workload | full control; signable once published | we would track Claude Code releases ourselves | rejected for v1 |
 
 `REQ-0577` `julieta pin workload` moves a project spec's digest, verifying the
@@ -222,8 +222,9 @@ obligation of the row above:
 8. `REQ-1353` A symbolic link at `/usr/local/bin/julieta` to
    `/opt/julieta/bin/julieta`, root-owned, so `julieta` resolves by name
    in every sandbox with the kit, before any `julieta setup`, and the
-   agent user cannot rewrite it; where the agent has root, as through
-   `sudo`, it can, so the link is a convenience and not a boundary
+   agent user cannot rewrite it; the agent has root, through the
+   workload's Docker engine and `sudo` (05 5.4, REQ-1386, REQ-1400), so
+   it can, and the link is a convenience and not a boundary
    (amended on 2026-11-06: a `sh` launcher until then, and the link of
    `julieta setup` beside it, retired). The hooks and the guard keep
    the absolute path. `$HOME/.local/bin` comes first on the agent's
@@ -233,6 +234,17 @@ obligation of the row above:
    REQ-1351). Added on 2026-11-03, after a sandbox where `setup` had
    not run lost its handoff to a file because the skills call `julieta`
    by name.
+9. `REQ-1399` The guard of item 4 refuses the agent's root commands,
+   the forms I35 lists: the root tools by basename and through common
+   wrappers, privileged `docker` forms, the same inside `bash -c`,
+   `sh -c` and `eval`, and a command name the guard can resolve
+   statically to one of them. The refusal says that root needs the
+   maintainer, who runs the command from the host, and the `julieta`
+   skill says the same in one line.
+   It is an instruction and a guard against mistakes, not containment:
+   the agent keeps `sudo` and the `docker` group (05 5.4, REQ-1386,
+   REQ-1400) and can reach root another way (added on 2026-11-08, as
+   decided on 2026-11-08).
 
 `julieta-claude` replaces the agent's built-in memory with
 `julieta memory` on purpose
@@ -243,8 +255,11 @@ obligation of the row above:
 sync` refuses to render `git-ssh-sign` (exit 2, the error
 `signing-socket`, `RJ-204`) unless `signing.agentSocket` is set,
 reachable, and holds exactly one key, and that key equals the kit's
-`signingKey` arg. The full host agent is never forwarded; the rule
-governs the sandboxes romeu renders. `REQ-0601` `internal/signing` checks this with
+`signingKey` arg. romeu never forwards the full host agent; the rule
+governs the sandboxes romeu renders. sbx forwards per sandbox and the
+last client wins (Q19), so an sbx call the operator makes into the
+sandbox with their own agent in `SSH_AUTH_SOCK` replaces the signing
+socket there until romeu's next call ([05 5.4](05-security.md#54-known-residual-risks-accepted-in-v1), REQ-1394). `REQ-0601` `internal/signing` checks this with
 the ssh-agent protocol's identity listing, read through
 `golang.org/x/crypto/ssh/agent` (no subprocess, T147); the same check runs
 in `doctor` and in the preflight of
@@ -295,5 +310,5 @@ mise's pin, which has a signed checksum file, is in
 | git commit signing | `git-ssh-sign` | stricter agent forwarding; the key stays an argument |
 | git hooks | `julieta hooks` (sandbox only) | hooks never run on the host |
 | memory, handoffs among it | `julieta memory`, `julieta stamp` | one agent-neutral store |
-| personal agent context (instructions, plugins) | `REQ-0608` a personal kit in the config repo; it may add to the agent's settings and never removes `julieta-claude`'s hooks, which `julieta status` reports if it does (04 4.3) | personal, not product |
+| personal agent context (instructions, plugins) | `REQ-0608` a personal kit in the config repo; it may add to the agent's settings and never removes `julieta-claude`'s hooks, which `julieta status` reports if it does (04 4.3); its instructions never tell the agent to run `sudo` or another root command, and state I35's rule (no root command without the maintainer's authorization; packages through `os-base` or mise, or installed by the maintainer from the host), the line that replaces the one the interim house payload of the maintainer's sandbox repository carries (added on 2026-11-08, as decided on 2026-11-08; scope every sandbox of the maintainer) | personal, not product |
 | OS packages tied to libc/root (git, curl, ca-certificates, sudo) | the workload base; gaps, if A12 finds any, in `os-base` | rarely change |

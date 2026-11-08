@@ -89,7 +89,7 @@ The table is written by hand; generating it is a row of
 
 `REQ-0059` There are two romeu-level approvals, both TTY-only, plus sbx's own
 native approval of host commands, which romeu never bypasses (never
-the flag that applies a plan without asking (`--auto-approve` or `-y`; `-f`/`--force` on `env run`, `env create`, `run` or `create`); `romeu doctor` recommends
+the flag that applies a plan without asking (`--auto-approve` or `-y`; `-f`/`--force` on `env run`, `env create`, `run` or `create`; the `--force` of `sbx env rm` and of the egress `sbx policy rm network`, the two removals romeu decides, approves no plan, I4); `romeu doctor` recommends
 `sbx settings set env.rememberHostCommands true`). `sbx env plan` output
 is not part of romeu's gates: sbx shows its own plan and prompts during
 `sbx env run`. *Why for us:* sbx already re-asks when a host command
@@ -185,7 +185,7 @@ derivation, and sbx, not romeu, applies those of the runtime phase
 declares a network, mount, volume, credential, ssh-agent, docker-auth,
 host-port or `dockerd@1` capability is refused (sync error): `dockerd@1`
 hands the sandbox a root-equivalent engine and private storage, refused
-until A19 records the elevation and Q33 is amended or a 05 5.4 row accepts it by name (amended on 2026-11-07). Its other capabilities (install steps,
+until a 05 5.4 row accepts a personal kit's engine by name (Q33's acceptance names the workload's engine only; amended on 2026-11-07 and 2026-11-08). Its other capabilities (install steps,
 privileges, lifecycle hooks) are not refused: they are shown in the
 gate 2 diff.
 
@@ -340,7 +340,7 @@ A generation is one sandbox lifetime, identified by a ULID.
 | (none) | `REQ-0088` `run` finds the sandbox absent and is about to create it | open | record id, recreate digest, workspace path, the repo set, written before `sbx env run` |
 | open | `REQ-1379` the `sbx env run` of that same command exits 0 | open | `sbxVersion` written from `sbx inspect` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1), REQ-1359); a read that fails leaves it absent, and `run` warns `sbx-version-unread` ([04 4.1](04-cli.md#41-conventions-both-binaries), Warnings) and goes on (added on 2026-11-07) |
 | open | `REQ-1212` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows no sandbox | (none) | the record just written is removed; exit 1 |
-| open | `REQ-1213` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1 |
+| open | `REQ-1213` the `sbx env run` of that same command returns non-zero, and `sbx ls --json` then shows the sandbox | open | the record is kept; exit 1; a sandbox present right after a failed create may vanish (one sample on 2026-11-08, sbx v0.51.0: a create killed after kit assembly left the sandbox `stopped` and it was gone 30 s later), and the next `run` closes such a generation as lost (the `closed-lost` row) |
 | open | `REQ-0089` the `sbx env run` of that same command times out (`subprocess-timeout`, [04 4.1](04-cli.md#starting-values)), whatever `sbx ls --json` shows | open | the record is kept, because sbx's daemon may finish the create after romeu stopped waiting; exit 1; the next `run` finds the sandbox present and goes on, or absent and closes the generation as lost (the `closed-lost` row), which costs one extra `run` and never a sandbox without a generation |
 | (none) | `REQ-0090` `adopt` on TTY, workspace path matches | open | record as above with `adopted: true` and an unknown recreate digest; the generation is accepted as it stands until it is recreated, and `status` shows `adopted, not gated`; `run` makes no `sbx env run` with romeu's env file on its sandbox ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), step 3, REQ-1378) |
 | open | `REQ-0091` `salvage`, `rm`, `recreate` or `retire` starts the sandbox half | salvaging | new salvage id |
@@ -351,7 +351,7 @@ A generation is one sandbox lifetime, identified by a ULID.
 | salvaging | `REQ-0095` salvage verified; command was `salvage` | open | salvage record `result: complete` |
 | salvaging | `REQ-1216` salvage incomplete, no `--accept-loss` | open | salvage record `result: incomplete` with reasons; exit 5 |
 | salvaging | `REQ-0096` salvage complete or `--accept-loss`; command removes the sandbox | removing | state written, with the salvage entry's `fingerprint` ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)), before `sbx env rm`; for a salvage that a rerun on a `removing` generation started because a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) differs from the newest one written with `removing`, the command exits 5 with `fingerprint-unstable` in place of `sbx env rm` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) |
-| removing | `REQ-0097` `sbx env rm` succeeds | closed-removed | egress rules removed |
+| removing | `REQ-0097` `sbx env rm` succeeds; it exits 0 also on a sandbox that does not exist, printing `not found` (measured on 2026-11-08, sbx v0.51.0), so an exit 0 may mean already absent | closed-removed | egress rules removed |
 | removing | `REQ-0098` `sbx env rm` fails | removing | the existing salvage record kept; exit 1 |
 | removing | `REQ-0099` `rm`, `recreate` or `retire` finds the sandbox present (a command killed before `sbx env rm`, or one whose `sbx env rm` failed), and a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) equals the newest `fingerprint` written with `removing` | removing | the existing salvage record kept; the command resumes at `sbx env rm` |
 | removing | `REQ-1217` `rm`, `recreate` or `retire` finds the sandbox present, and a fresh fingerprint ([03 3.8](03-formats.md#38-host-state-schemas-state-v1)) differs from the newest `fingerprint` written with `removing` | salvaging | new salvage id; the `salvaging` rows decide how that salvage ends, as `fingerprint-unstable` (`RJ-338`, [04 4.4](04-cli.md#44-error-ids)) lists them |

@@ -46,6 +46,16 @@ kit declares no `dockerd@1`, which a personal kit may not (REQ-0574).
 
 - Implements: REQ-0608 (06 6.5).
 - Operator: builds a daily sandbox with it.
+Amended on 2026-11-08 (as decided on 2026-11-08; scope every sandbox of
+the maintainer): the instructions file states the rule of I35 (05 5.2):
+no `sudo` or other root command without the maintainer's authorization,
+packages through `os-base` or mise or installed by the maintainer from
+the host, and nothing in it tells the agent to use `sudo` (06 6.5,
+REQ-0608). It replaces the same line of the interim house
+payload of the maintainer's sandbox repository, written there on
+2026-11-08, so the rule does
+not lapse when this kit takes over.
+
 - Acceptance:
   - A daily sandbox built with it and `julieta-claude` delivers the
     instructions file, the merged settings, the plugins at their pins,

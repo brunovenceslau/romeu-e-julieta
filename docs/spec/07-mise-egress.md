@@ -208,7 +208,7 @@ would mean running mise on the host.
 `REQ-0634` Application (romeu): per-sandbox rules via
 `sbx policy allow network --sandbox <name> <domain>` for `auto` plus
 approved `gated`; removal via `sbx policy rm network --sandbox <name>
---resource <domain>` for domains romeu applied earlier and that left the set;
+--resource <domain> --force --no-input` (04 4.2, REQ-0354) for domains romeu applied earlier and that left the set;
 verification with `sbx policy check network --sandbox <name> <domain>`
 (exact argv from the block A recordings). `REQ-1316` The domains that
 only the descriptors declared (step 6) are not applied, removed or

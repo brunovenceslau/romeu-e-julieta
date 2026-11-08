@@ -47,7 +47,19 @@ the files of `run` that pass the environment.
   `sbxdrv`, `env_signing.go`), `internal/state/**` (ask-first `gates`,
   the creating kit set) and `schemas/**` (ask-first `formats`, the
   regenerated `state-project.v1.json`) when the task reopens.
+Amended on 2026-11-08 (as decided on 2026-11-08; scope every adopter
+of the product): withholding `SSH_AUTH_SOCK` revokes nothing, since sbx
+keeps the last agent forwarded into a sandbox (measured on 2026-11-07
+and 2026-11-08, sbx v0.51.0). Where this task does not forward the
+signing socket, the exec or the attach forwards an agent with no keys,
+which replaces the signing key in the sandbox; its form (an agent romeu
+serves through `golang.org/x/crypto/ssh/agent`, or a socket where
+nothing listens) is measured first, since `sbx env run -d` refuses a
+start of an `ssh-agent@1` kit without a host agent.
+
 - Acceptance:
+  - Inside the sandbox, `ssh-add -L` lists no key after such an exec,
+    where the signing key was listed before it.
   - On a generation whose recreate digests differ, an exec and the
     attach carry `SSH_AUTH_SOCK` only when the recorded creating kit set
     and the live render both hold `git-ssh-sign`; a unit table covers

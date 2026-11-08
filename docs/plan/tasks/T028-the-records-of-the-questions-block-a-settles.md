@@ -29,7 +29,10 @@ socket in the sandbox"), so settling it compares A19's record with that
 sentence, and an A19 that records a reach either finds the row of 05 5.4
 that accepts it by name (REQ-1386, written by the pull request that
 moves Q2's pin) or reopens Q33 as an amendment of the specification
-under `spec`; A18 settles the caches row of Deferred decisions, not a
+under `spec`; that sentence and that PR are history: Q33 now reads "it
+can, and it uses root only with the maintainer's authorization", and
+the pull request of the sbx 0.51 measurement wrote REQ-1386 (amended on
+2026-11-08); A18 settles the caches row of Deferred decisions, not a
 question.
 
 - Implements: REQ-0979 (11 (opening)), REQ-1030 (11 11.4), REQ-1168 (12

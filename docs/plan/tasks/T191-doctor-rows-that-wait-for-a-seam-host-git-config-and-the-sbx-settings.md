@@ -9,6 +9,7 @@ owns:
   - internal/cmd/romeu/doctor/sbx_remember_commands*.go
   - internal/cmd/romeu/doctor/sbx_allowed_sources*.go
   - internal/cmd/romeu/doctor/sbx_skills_shared*.go
+  - internal/cmd/romeu/doctor/personal_agent*.go
   - internal/gitsafe/host_config*.go
   - internal/sbxdrv/settings_ls*.go
   - e2e/testdata/sbx/0.51.0/secrets-settings.jsonl
@@ -59,8 +60,15 @@ recreate <name>` (A4 records whether an env-file create honours
 `off`), says to keep no secret in the store, and says that a sandbox
 with a writable share writes into every other sandbox.
 
+Amended on 2026-11-08 (as decided on 2026-11-08; scope every adopter
+of the product): the row `personal-agent-forwardable` (04 4.2,
+REQ-1402) reads the identity listing of the agent the doctor's own
+`SSH_AUTH_SOCK` names, as REQ-0601 does, and warns when it lists a key
+other than the signing key of host settings, printing the count, never
+a key.
+
 - Implements: REQ-0370 (04 4.2), REQ-0373 (04 4.2), REQ-0374 (04 4.2),
-  REQ-1397 (04 4.2).
+  REQ-1397 (04 4.2), REQ-1402 (04 4.2).
 - Operator: no.
 - Acceptance:
   - Each row has a fixture with `HOME` in a temp dir, and its test
@@ -75,8 +83,11 @@ with a writable share writes into every other sandbox.
     `off`, no finding; a listing without the key falls under the next
     item, since sbx lists every key with its source (seen on
     2026-11-07).
+  - `personal-agent-forwardable`: an agent with the signing key and one
+    other key, a warning with the count 1; the signing key alone, no
+    finding; no `SSH_AUTH_SOCK`, no finding.
   - A settings listing of an unrecorded shape is the error
     `upstream-shape` on the rows that read it, and `doctor` exits 1.
 - Verify: `go test ./internal/cmd/romeu/doctor/ -run
-  '^TestDoctor(HostGitConfig|SbxRememberCommands|SbxAllowedSources|SbxSkillsShared)'
+  '^TestDoctor(HostGitConfig|SbxRememberCommands|SbxAllowedSources|SbxSkillsShared|PersonalAgent)'
   -v`, which names the row tests this task adds.

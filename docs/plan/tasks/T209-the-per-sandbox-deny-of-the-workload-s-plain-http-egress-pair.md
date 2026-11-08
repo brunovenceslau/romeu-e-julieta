@@ -46,13 +46,25 @@ Added on 2026-11-06 (scope this repository): the plain-HTTP row of 05
 branch of T205's decision; on the other branches it is closed with the
 reason in its file, and T208 moves the pin without it.
 
+Amended on 2026-11-08 (scope this repository): measured by hand on
+2026-11-07, sbx v0.51.0 ([the in-place apply
+measurement](../../notes/in-place-apply-measurement.md)), the deny beats
+the provisioned allow but does not survive a recreate under the same
+name; as decided on 2026-11-07, this is the deny branch with that
+condition: step 4 applies the deny after each create and recreate, the
+same reconcile that runs on every `run`, and the survival clause of the
+goal above is history.
+
 1. The reconcile (REQ-0354): beside the allow rules, `run` step 4
    applies `sbx policy deny network --sandbox <name> <host>:<port>` for
    each pair the workload descriptor declares in its runtime egress
    over plain HTTP (the set of 07 7.5 that only a descriptor declared,
    REQ-1316, filtered to port 80), verifies each with `sbx policy check
    network`, and records each, before and after the calls as the
-   allow rules are (REQ-0355); "in `egressApplied` as a deny" and "every
+   allow rules are (REQ-0355), and checks each recorded deny again after
+   the reconcile's `policy rm` calls, until A9 records whether
+   `--resource <host>` matches a `<host>:80` deny (REQ-0354, added on
+   2026-11-08); "in `egressApplied` as a deny" and "every
    pair over plain HTTP" are history: see the amendment below.
 2. `doctor` (REQ-0392): the `egress-applied` row compares the deny
    rules too, so a deny that went missing, after a recreate or by hand, is
