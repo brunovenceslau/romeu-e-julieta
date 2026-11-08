@@ -29,6 +29,17 @@ sitting: none
 
 # T197 - romeu status slice B2: the spec commit, the orphans and the J10 line
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create or the generation
+lacks the lists that tell it (04 4.2, REQ-1387, REQ-1405, REQ-1406).
+The hint of REQ-1377 is `romeu recreate <name>` for every generation
+romeu created, running or stopped; the hint to undo the change and run
+`romeu sync`, and the advice to start a sandbox before a sync or an
+upgrade, are gone. T217 builds the start; where this task's text below
+says otherwise, the spec and T217 win.
+
 Goal: the slice B2 of `romeu status` (T048): the spec commit against the
 synced one, the orphaned project and the orphaned repo dir with their
 unpushed and salvage-only work (J13 step 3), and the J10 step 1 line of
@@ -95,8 +106,8 @@ slice prints; T203 leaves `after`.
     dirty and stash counts (03 3.10), which T174 writes; moved from
     T048's acceptance with slice B2 (re-plan of 2026-10-31).
   - The `recreate-needed` finding names `romeu recreate <name>` for a
-    running sandbox whose digests differ, the stopped hint of REQ-1377
-    for a stopped one, and the adopted messages for an adopted
+    sandbox whose digests differ, running or stopped (amended on
+    2026-11-08), and the adopted messages for an adopted
     generation, running and stopped, each a fixture (amended on
     2026-11-07).
   - A listing with a host bind off the closed list prints that bind; an

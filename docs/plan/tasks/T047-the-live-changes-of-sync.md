@@ -22,6 +22,17 @@ sitting: none
 
 # T047 - The live changes of `sync`
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create or the generation
+lacks the lists that tell it (04 4.2, REQ-1387, REQ-1405, REQ-1406).
+The hint of REQ-1377 is `romeu recreate <name>` for every generation
+romeu created, running or stopped; the hint to undo the change and run
+`romeu sync`, and the advice to start a sandbox before a sync or an
+upgrade, are gone. T217 builds the start; where this task's text below
+says otherwise, the spec and T217 win.
+
 Goal: The live changes of `sync`.
 
 Re-plan (2026-10-12): Kept, in M4. Its scenario files live under
@@ -64,8 +75,8 @@ REQ-1377).
     from the open generation's `createdWith`, or the generation was
     adopted, with the sandbox running and with it stopped, and makes no
     sbx call for it: an e2e case per state asserts the slug, the hint of
-    REQ-1377 for that state (`romeu recreate <name>` while running; the
-    undo, `romeu sync <name>` and rerun hint while stopped) and that the
+    REQ-1377 (`romeu recreate <name>`, running or stopped, amended on
+    2026-11-08) and that the
     fake `sbx` records no `sbx env run`.
   - The J11 scenario function runs in CI.
 - Verify: `go test -tags e2e ./e2e/... -run '^TestSyncLive' -v`. The

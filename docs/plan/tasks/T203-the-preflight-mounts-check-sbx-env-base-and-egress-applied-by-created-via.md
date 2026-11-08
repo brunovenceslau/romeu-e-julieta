@@ -35,6 +35,17 @@ sitting: none
 
 # T203 - The preflight mounts check, sbx-env-base and egress-applied by --created-via
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create or the generation
+lacks the lists that tell it (04 4.2, REQ-1387, REQ-1405, REQ-1406).
+The hint of REQ-1377 is `romeu recreate <name>` for every generation
+romeu created, running or stopped; the hint to undo the change and run
+`romeu sync`, and the advice to start a sandbox before a sync or an
+upgrade, are gone. T217 builds the start; where this task's text below
+says otherwise, the spec and T217 win.
+
 Goal: the preflight lets sbx tell romeu what it mounted and what it
 merged: step 6 compares the mounts `sbx ls --json` lists with the
 render's, step 5 and `doctor` fail on a user-level `~/.sbxenv.yaml`,
@@ -101,26 +112,21 @@ items 4 and 5 are added.
    (REQ-1383). RJ-368's hint is the one of 04 4.4 for the sandbox's
    state: restore the source and rerun, or salvage then recreate; for a
    removed repo or a changed target on a running sandbox `romeu
-   recreate <name>`; on a stopped sandbox whose digests differ it ends
-   with the stopped hint of item 4.
+   recreate <name>`, on a stopped sandbox too (amended on 2026-11-08).
 4. The recreate-needed hint and refusal (REQ-1377, `RJ-305`): one
    function in `internal/preflight/recreate*.go`, keyed by the
    sandbox's state (running or stopped) and by whether the generation
    was adopted, returns the hint of every `recreate-needed` warning and
-   error: `romeu recreate <name>` for a running sandbox; for a stopped
-   one, the undo of the change that moved the recreate digest, then
-   `romeu sync <name>` and a rerun, naming the three sources that
-   digest covers: the project spec, a secret's argv in the host
-   settings, and the product-kit content of the romeu release, which
-   has no romeu route until T210, so a sandbox a release will need
-   recreated is started before the upgrade (REQ-1377, J9), with the
-   warnings REQ-1377 lists; the adopted
-   messages for an adopted generation. Beside it, the refusal that
-   `run` (T066), `pull` (T067), `salvage`, `rm`, `recreate`, `retire`
-   and the fingerprint read (T068, T069) make on a stopped sandbox whose
-   digests differ or whose generation was adopted: exit 5 with
-   `recreate-needed`, no sbx call that starts it, no record change
-   (REQ-1387). `RJ-305` is declared in `internal/preflight/errors.go`.
+   error: `romeu recreate <name>` for a generation romeu created, running
+   or stopped, and the adopted messages for an adopted generation
+   (REQ-1377, amended on 2026-11-08). Beside it, the refusal that every
+   command makes on a stopped sandbox whose generation was adopted, and
+   that `run` (T066) and `pull` (T067) also make when the spec removed a
+   kit or a secrets binding since the create or the generation lacks the
+   lists that tell it: exit 5 with `recreate-needed`, no sbx call that
+   starts it, no record change (REQ-1387, REQ-1406; the decision between
+   the start and the refusal is T217's). `RJ-305` is declared in
+   `internal/preflight/errors.go`.
    This task is the first that needs the hint, for RJ-368's, so it owns
    it; `status` (T197) and `sync` step 9 (T047) import it.
 5. The step table and the step 5 seam: step 6's mounts result is
@@ -186,9 +192,11 @@ recognition of the store's bind (REQ-1381) and the mount parse of T202.
   - For an adopted generation the step compares nothing and passes
     (REQ-1383).
   - The hint function returns `romeu recreate <name>` for a running
-    sandbox, the stopped hint for a stopped one, and the two adopted
-    messages, each a table case asserting the text of REQ-1377; the
-    refusal helper returns exit 5 and `RJ-305` with the stopped hint,
+    and for a stopped sandbox of a generation romeu created, and the two
+    adopted messages, each a table case asserting the text of REQ-1377;
+    the refusal helper returns exit 5 and `RJ-305` with the hint for
+    the case (`romeu recreate <name>` after a removal, the stopped
+    adopted message for an adopted generation),
     and the fake records no sbx call (REQ-1377, REQ-1387).
   - The preflight returns the mounts failure as a non-stopping result
     for the protective commands (`salvage`, `salvage --from-host`,
