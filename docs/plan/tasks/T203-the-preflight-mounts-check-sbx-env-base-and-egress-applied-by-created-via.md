@@ -155,7 +155,7 @@ items 4 and 5 are added.
     target and read-only flag the session records (REQ-1381; amended on
     2026-11-07); a bind of the store that is not read-only fails with
     `mounts-mismatch`, and its hint names `skills.defaultMode` first (set
-    it to `readonly` or `off`, then `romeu recreate <name>`), since a
+    it to `off` (or `readonly`), then `romeu recreate <name>`), since a
     recreate under the same setting fails again (04 4.4, RJ-368; decided
     on 2026-11-07).
   - An exempt bind (the env file, a kit source, a skill dir) passes at

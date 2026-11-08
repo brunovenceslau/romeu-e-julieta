@@ -80,8 +80,8 @@ holds them.
 Amended on 2026-11-06 (the sbx 0.51 and kit schema m.12 amendments):
 steps 5 and 6 invoke `/opt/julieta/bin/julieta-linux-<GOARCH>`, the
 target of the `.romeu/bin` mount (02 2.5, T200), and step 7 execs into
-the attached `sbx env run <dir>`, whose `entrypoint` and `cmd` are `julieta layout up` (amended on 2026-11-07)
-over the manifest step 6 cached (03 3.3, REQ-0358; the builder is
+the attached `sbx env run <dir>`, whose `entrypoint` and `cmd` run
+`julieta layout up` over the manifest step 6 cached (03 3.3, REQ-0358; the builder is
 T202's), so the argv of I1 is that call, the `sbx env exec -it` of
 `layout up` until A15 records it; step 3 hands a changed env file to
 sbx with `sbx env run -d <dir>`, stopped or running, after `julieta
@@ -94,7 +94,8 @@ cached, prints that none is cached and that `romeu run --no-attach
 <name>` writes one, and execs the login shell (REQ-0418, 04 4.3); the
 hybrid test mounts `.romeu/bin` at `/opt/julieta/bin` (REQ-0738). The
 sentence on the `sbx env exec -it` of `layout up` in the re-plan
-paragraph above is history.
+paragraph above is history (the `entrypoint` and `cmd` of step 7
+amended on 2026-11-07).
 
 Amended on 2026-11-07 (the closed gate, as decided on 2026-11-07):
 the in-place apply waits behind a closed gate, a Deferred row of the

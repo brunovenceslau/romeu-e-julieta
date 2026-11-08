@@ -34,8 +34,9 @@ store, so a romeu sandbox gets it read-only beside its kits' skills
 while sbx's `skills.defaultMode` is `readonly`, its default (03 3.3,
 REQ-0200; 05 5.4); the mounts check admits that read-only bind
 (REQ-1381), and `doctor` warns `skills-shared` (T191). A sandbox gets
-only the skills its kits bundle once the setting is `off`, which
-reaches sandboxes created after the change; the runbook records the
+only the skills its kits bundle once the setting is `off`, which by
+sbx's description reaches sandboxes created after the change (A4
+records whether an env-file create honours it); the runbook records the
 setting in force when the list below is read. Which skills move into
 this kit is read, not guessed: the operator lists the skills the
 maintainer's daily sessions read from the host store, and each one that
@@ -62,7 +63,8 @@ kit declares no `dockerd@1`, which a personal kit may not (REQ-0574).
   - The skills list of the amendment above is in the runbook, each
     skill marked bundled here, carried by `julieta-claude` or a plugin,
     or dropped; a skill neither bundled nor dropped is reported as the
-    trigger of the `skills` row of Deferred decisions before sitting M3.
+    trigger (a project that relies on a host skill) of the `skills` row
+    of Deferred decisions before sitting M3.
 - Verify: one daily sandbox, read at sitting M2: its SessionStart output
   shows the instructions and the status line, `julieta status --json`
   reports no `agent-hooks-missing`, and the plugin list shows the pinned

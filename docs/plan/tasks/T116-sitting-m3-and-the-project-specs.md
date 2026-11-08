@@ -62,7 +62,8 @@ share.
     socket's group and what the agent user reaches.
   - Each slot records the `skills.defaultMode` in force and whether a
     skill its sessions use is missing from the rendered sandbox's kits; a missing one is added to T114's kit or
-    reported as the trigger of the `skills` row before the next slot.
+    reported as the trigger (a project that relies on a host skill) of
+    the `skills` row before the next slot.
   - Every issue opened here from an item of the retired capabilities
     passes `go run ./tools/ci hygiene --file <body>` before it is
     opened, and the runbook lists the item ids moved.

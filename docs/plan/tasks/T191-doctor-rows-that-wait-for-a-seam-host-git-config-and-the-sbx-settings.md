@@ -52,9 +52,12 @@ measurement of sbx v0.51.0 that day showed the env file refuses a
 reads `skills.defaultMode` from the same settings listing and warns,
 never blocking, while it is not `off`, since each sandbox created then
 gets the host's skills store read-only (03 3.3, REQ-0200; 05 5.4). Its
-hint names the sbx settings command that sets the key to `off` and
-says the setting reaches only sandboxes created after the change, so
-an existing sandbox keeps the share until `romeu recreate <name>`.
+hint names the sbx settings command that sets the key to `off`, says
+that by sbx's description the setting reaches only sandboxes created
+after the change, so an existing sandbox keeps the share until `romeu
+recreate <name>` (A4 records whether an env-file create honours
+`off`), says to keep no secret in the store, and says that a sandbox
+with a writable share writes into every other sandbox.
 
 - Implements: REQ-0370 (04 4.2), REQ-0373 (04 4.2), REQ-0374 (04 4.2),
   REQ-1397 (04 4.2).
@@ -66,10 +69,12 @@ an existing sandbox keeps the share until `romeu recreate <name>`.
     Go slice of `internal/gitsafe` (T023), a warning with the
     review-checkout risk; `env.rememberHostCommands` not true, a
     warning; `kit.allowedSources` that does not admit the workload
-    registries, a failure; `skills.defaultMode` `readonly`, `readwrite`
-    or absent from the listing (sbx's default `readonly`), the warning
-    `skills-shared` whose hint names the setting and the recreate, and
-    `off`, no finding.
+    registries, a failure; `skills.defaultMode` `readonly` or
+    `readwrite`, the warning `skills-shared` whose hint names the
+    setting, the recreate, the secret and the writable share, and
+    `off`, no finding; a listing without the key falls under the next
+    item, since sbx lists every key with its source (seen on
+    2026-11-07).
   - A settings listing of an unrecorded shape is the error
     `upstream-shape` on the rows that read it, and `doctor` exits 1.
 - Verify: `go test ./internal/cmd/romeu/doctor/ -run

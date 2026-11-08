@@ -32,20 +32,23 @@ engine of the `sbx/claude` workload and `dockerd@1`, REQ-1369; its
 workload part is measured first by hand inside T205's measurement,
 beside A9's deny, and this probe re-records it), and extends:
 - A3: each mount at its target of 02 2.5, the `julieta` link, and a
-  write, as the agent and as root, to each bind sbx makes itself (the
-  env file, each kit source, each skill dir of an `agent-skill@1` entry),
-  whose read-only flag is recorded;
+  write, as the agent and as root, also after a remount and through the
+  share's root mounted anew, to each bind sbx makes itself (the env
+  file, each kit source, each skill dir of an `agent-skill@1` entry,
+  the host's skills store), whose read-only flag is recorded;
 - A4: `sbx inspect`, the mount fields of `sbx ls --json` for a running
   and for a stopped sandbox (an empty list included) and the source,
   target and read-only flag of each bind sbx adds itself (the host's
-  skills store among them, under the `skills.defaultMode` in force;
-  added on 2026-11-07), the unreadable state, exit 125 of `env exec` and its status when the daemon is
+  skills store among them, under the `skills.defaultMode` in force,
+  and once under `off`, whether an env-file create honours it; added
+  on 2026-11-07), the unreadable state, exit 125 of `env exec` and its status when the daemon is
   stopped, `--no-input` per argv shape and the two offers of sbx 0.51,
   each provoked where the harness can; a shape provoked on neither host
   is recorded as `not-provoked`, keeps no `--no-input`, and is named in
   the result, whose synthetic session 10 10.3 admits (REQ-0924);
 - A5: the goldens with `target`, `entrypoint` and `cmd` and no
-  `skills` key, the golden with a `skills` key added (refused by hand
+  `skills` key, a variant of a golden with a `skills: "off"` key
+  added, no golden and no recorded hash (refused by hand
   on 2026-11-07, sbx v0.51.0; an acceptance reopens the skills row of
   Deferred decisions), and a `~/.sbxenv.yaml`
   planted under a home the harness creates, never the operator's: the
