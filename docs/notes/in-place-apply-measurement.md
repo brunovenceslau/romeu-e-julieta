@@ -13,8 +13,9 @@ times are UTC.
 - Sitting 2, 2026-11-08, 01:06 to 01:13: protocol 2, on the throwaway
   sandboxes `rj2-a`, `rj2-b`, `rj2-k` and the never-created `rj2-ghost`.
 
-Quotes replace the host's home directory with `~` and an env directory
-with `<dir>`. Nothing in this note is a product rule; the spec pages
+Quotes replace the host's home directory with `~`, an env directory
+with `<dir>`, and the em dash sbx prints
+before a status word with a plain dash. Nothing in this note is a product rule; the spec pages
 cite it as the source of what they record.
 
 ## What was measured
@@ -67,7 +68,7 @@ binding is `left in place`.
 
 ## Stopped sandbox (sitting 1)
 
-Each accepted run started the sandbox (`✓ sandbox rj-probe-a —
+Each accepted run started the sandbox (`✓ sandbox rj-probe-a -
 started`) with the same id, creation time and markers, and with the
 configuration it was created with.
 
@@ -99,7 +100,7 @@ global line for it appeared at any point. The binding did not reach
 
 ```text
 $ sbx env run -d -f <dir>
-  openai — no longer declared, left in place
+  openai - no longer declared, left in place
   1 to forget
 [exit 0]
 ```
