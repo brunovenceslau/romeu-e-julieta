@@ -95,10 +95,10 @@ at each floor bump.
 
 Outcome (2026-11-08): the apply passed for no kind, so the in-place
 apply row stays deferred with the note as its evidence; the
-stopped-start reading held for six kinds, and the maintainer lifted the
-refusals of REQ-1376 and REQ-1387 except for a kit or a secrets binding
-removed since the create and for an adopted generation (04 4.2,
-REQ-1405, REQ-1406); T217 is the code task. The running exec read no
+stopped-start reading held for six kinds, and the refusals were lifted:
+REQ-1387 except for an adopted generation, and `run`'s (REQ-1376) also
+except for a kit or a secrets binding removed since the create, which
+`pull` keeps too (04 4.2, REQ-1405, REQ-1406); T217 is the code task. The running exec read no
 changed file for the kinds tried, so REQ-1388's running branch stays.
 A killed apply on a present sandbox and `agent` alone were not
 measured; A15 records them (decided on 2026-11-08).

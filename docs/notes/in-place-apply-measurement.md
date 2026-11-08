@@ -286,9 +286,11 @@ policy allows, answered 200 directly, with no proxy. Raw TCP connects
 to `8.8.8.8:53` and `1.1.1.1:443` reported open in every case, before
 and after the flush, while HTTP to the same hosts failed; that an
 interceptor outside the sandbox completes the handshake and then
-applies the policy is inferred. So a denied destination stays denied
-for root, the in-sandbox firewall plays no part in it, and an allowed
-host is reachable without the proxy variables.
+applies the policy is inferred. So, over HTTP and HTTPS, a denied
+destination stays denied for root, the in-sandbox firewall plays no part
+in it, and an allowed host is reachable without the proxy variables.
+UDP, DNS, ICMP and a non-HTTP payload over the open handshake were not
+tried.
 
 ### SSH
 
@@ -354,9 +356,10 @@ entry was planned only, not applied.
 ## Outcome for T210 item 2
 
 - The stopped-start reading holds for the six kinds measured with
-  `sbx env exec`. On 2026-11-08 the maintainer lifted the refusals of
-  REQ-1376 and REQ-1387, except for a kit or a secrets binding removed
-  since the create and for an adopted generation (04 4.2, `run` step 3).
+  `sbx env exec`. On 2026-11-08 the refusals were lifted: REQ-1387 except
+  for an adopted generation, and `run`'s (REQ-1376) also except for a kit
+  or a secrets binding removed since the create, which `pull` keeps too
+  (04 4.2, `run` step 3, REQ-1405, REQ-1406).
 - Nothing passes the apply, so the in-place apply row of Deferred
   decisions stays deferred, with this note as its evidence.
 - On a running sandbox, `sbx env exec <dir> -- true` and `sbx env exec

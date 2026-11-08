@@ -24,6 +24,17 @@ sitting: none
 
 # T204 - sandboxOptions rootSize, dockerSize and clonedWorkspaceSize
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create or the generation
+lacks the lists that tell it (04 4.2, REQ-1387, REQ-1405, REQ-1406).
+The hint of REQ-1377 is `romeu recreate <name>` for every generation
+romeu created, running or stopped; the hint to undo the change and run
+`romeu sync`, and the advice to start a sandbox before a sync or an
+upgrade, are gone. T217 builds the start; where this task's text below
+says otherwise, the spec and T217 win.
+
 Goal: the project spec takes the three size options of sbx 0.51 beside
 `cpus` and `memory`, ungated and recreate-class, and the render passes
 them through.

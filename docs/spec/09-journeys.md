@@ -162,7 +162,7 @@ one it starts with `sbx env exec`, which applies nothing, warns the
 same and attaches, except when the spec removed a kit or a secrets
 binding since the create: then it exits 5 with `recreate-needed`
 (`RJ-305`), hint `romeu recreate <name>`, whose salvage starts the
-sandbox (REQ-1387; decided on 2026-11-08).
+sandbox (REQ-1405, REQ-1406, REQ-1387; decided on 2026-11-08).
 `julieta setup` is a no-op when locks are unchanged (S8). J3b: record
 a new generation, create (`sbx env run -d --clone`), egress,
 compatibility check, `julieta setup` installs everything, then attach.
@@ -310,11 +310,10 @@ stopped adopted sandbox is not started, by `run` or by a salvage
 - Workload: [A] `julieta pin workload projects/foo.yaml` in the config
   sandbox, whose `egress.extra` holds the registry hosts
   ([07 7.5](07-mise-egress.md#75-egress-derivation-internalegress)) -> PR -> merge -> [O] `romeu sync foo` (gate: new digest) ->
-  `romeu recreate foo`, with the sandbox running (`romeu run --no-attach
-  foo` before the sync if it is stopped; once the change is promoted a
-  stopped sandbox is refused, J3a).
+  `romeu recreate foo`, which starts a stopped sandbox for its salvage
+  (J3a; amended on 2026-11-08).
 - Personal kit: [A] edit `kits/<id>/` in the config repo -> PR -> sync ->
-  gate -> recreate, with the sandbox running, as for the workload.
+  gate -> recreate, as for the workload.
 - sbx update on the host: the next `romeu sync` or `run` exits 3 (gate
   1, [04 4.2](04-cli.md#42-romeu-host)); [O] `romeu doctor` shows the
   new sbx version against the floor and the recording set
@@ -387,9 +386,7 @@ stopped adopted sandbox is not started, by `run` or by a salvage
 1. [A] edit the spec (remove the repo, change its URL, or add the new
    repos); PR; merge.
 2. [O] `romeu sync foo` -> gate 2 (repos changed) -> `romeu recreate foo`
-   with the sandbox running (`romeu run --no-attach foo` before the
-   sync if it is stopped; once the change is promoted a stopped sandbox
-   is refused, J3a; salvage runs first, over the generation's recorded repo set, so the
+   (a stopped sandbox is started for the salvage, J3a; salvage runs first, over the generation's recorded repo set, so the
    removed repo is still salvaged).
 3. [H] new repos get new clone dirs; a removed repo's clone and memory
    dir stay in place and are reported by `status` as `orphaned repo dir`

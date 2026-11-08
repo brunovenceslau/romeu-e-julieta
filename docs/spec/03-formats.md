@@ -234,8 +234,9 @@ What the tags decide:
   ([01 1.7](01-system-model.md#17-vocabulary), recreate needed).
 - `secrets` applies at recreate; it becomes `live` if probe A10
   confirms it (Q18). A kit or a secrets binding removed since the
-  create keeps a stopped sandbox from starting until `romeu recreate`
-  (`createdKits` and `createdSecrets` in 3.8).
+  create keeps `run` and `pull` from starting a stopped sandbox until
+  `romeu recreate`, whose salvage starts it (`createdKits` and
+  `createdSecrets` in 3.8).
 - `salvage.excludeIgnored` is widening, since it defines acknowledged
   loss.
 - `REQ-0192` `sandboxOptions` (`cpus`, `memory`, `rootSize`, `dockerSize`
@@ -645,7 +646,8 @@ says which states persist; the candidate states do not):
   "generations": [
     {"id": "01j9zc2q8x7w4t6y3r5e1v9k0p", "state": "open", "adopted": false,
      "createdAt": "2026-10-02T09:14:07Z", "createdWith": "<recreateDigest>", "sbxVersion": "0.51.0",
-     "createdKits": ["julieta-claude", "git-ssh-sign"], "createdSecrets": ["github"],
+     "createdKits": [{"id": "julieta-claude", "contentDigest": "<hex>"}, {"id": "git-ssh-sign", "contentDigest": "<hex>"}],
+     "createdSecrets": [{"name": "github", "specDigest": "<hex>"}],
      "workspacePath": "/abs/root/shop-env/shop-api",
      "repos": [{"dir": "shop-api", "url": "https://github.com/example/shop-api", "primary": true},
                {"dir": "shop-web", "url": "https://github.com/example/shop-web", "primary": false}],
@@ -665,7 +667,9 @@ A member that holds nothing may be absent from the file: an empty list
 absent object (`approval`, `retiring`) and an absent time (`lastRunAt`,
 `closedAt`), and so may `createdWith` and `fingerprint`, where the example
 above writes `null` or `[]`. romeu writes them absent, and a reader accepts
-both forms.
+both forms. `createdKits` and `createdSecrets` are the exception: romeu
+always writes them, `[]` included, since their absence means a generation
+that does not tell its kits and secrets (added on 2026-11-08).
 
 | Field | Values |
 |---|---|
@@ -674,8 +678,8 @@ both forms.
 | `generations[].state` | `REQ-0232` `open`, `salvaging`, `removing`, `closed-removed`, `closed-lost` |
 | `generations[].createdWith` | `REQ-0233` the recreate digest at create; `run` never moves it while the in-place apply waits behind the gate of run step 3 ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), REQ-1376; amended on 2026-11-07); `null` for an adopted generation, which `status` and `sync` report with the warning `recreate-needed`, naming the generation adopted, with the hint of REQ-1377 for the sandbox's state (`romeu recreate <name>` for a running sandbox) |
 | `generations[].sbxVersion` | `REQ-1359` the sbx version that created the sandbox, read after the create from the field sbx 0.51 records for it (`sbx inspect`; A4 records the field and its shape; [01 1.6](01-system-model.md#generation), REQ-1379); absent for a generation created before this member, by an older sbx or by `adopt`, and when that read fails, which `run` warns as `sbx-version-unread` and goes on; `status` prints it beside the live `sbx version` (added on 2026-11-06) |
-| `generations[].createdKits` | `REQ-1403` the id of every kit of the render at create, product kits included, written in the same whole-file write as `createdWith`; `run` step 3 reads it to tell whether the spec removed a kit since the create, which keeps the refusal of a stopped start ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout)); absent for an adopted generation and for one created before this member, which `run` treats as a removal (added on 2026-11-08) |
-| `generations[].createdSecrets` | `REQ-1404` the name of every secrets binding of the render at create, the names only and never a value or an argv, written and read as `createdKits` is, for a secrets binding removed since the create (added on 2026-11-08) |
+| `generations[].createdKits` | `REQ-1403` one `{id, contentDigest}` per kit of the render at create, product kits included, the digest the kit's content has under 3.12, written in the same whole-file write as `createdWith` and always written, `[]` included; `run` step 3 reads the ids to tell whether the spec removed a kit since the create, which keeps `run` and `pull` from starting a stopped sandbox ([04 4.2](04-cli.md#how-romeu-run-reaches-the-run-layout), REQ-1406), and compares no digest (decided on 2026-11-08); absent for an adopted generation and for one created before this member, which `run` treats as a removal (added on 2026-11-08) |
+| `generations[].createdSecrets` | `REQ-1404` one `{name, specDigest}` per secrets binding of the render at create, `specDigest` the 3.12 digest of the binding's source as the host settings give it, never a value or an argv in clear, written and read as `createdKits` is, `[]` included, for a secrets binding removed since the create (added on 2026-11-08) |
 | `salvage[].manifestSha256` | `REQ-0234` plain sha256 of the salvage `manifest.json` bytes (3.12, raw) |
 | `salvage[].id` | `REQ-0235` a ULID, as the generation's id is ([01 1.6](01-system-model.md#generation)); 01 1.6 appends one entry per salvage, so the newest entry is the last of `salvage[]` |
 | `salvage[].fingerprint` | `REQ-0236` `null`, or, written in the same whole-file write as the state `removing` (01 1.6), the `fingerprint` digest (3.12) of the values the list **Fingerprint** after this table names, not read again at that write. That list is the one home of what a fingerprint is; the pages that compare one cite it. A field of the state format, under the version rule of the opening of this page |
