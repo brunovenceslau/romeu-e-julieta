@@ -9,6 +9,7 @@ owns:
   - internal/cmd/romeu/doctor/sbx_remember_commands*.go
   - internal/cmd/romeu/doctor/sbx_allowed_sources*.go
   - internal/cmd/romeu/doctor/sbx_skills_shared*.go
+  - internal/cmd/romeu/doctor/sbx_skills_share_writable*.go
   - internal/gitsafe/host_config*.go
   - internal/sbxdrv/settings_ls*.go
   - e2e/testdata/sbx/0.51.0/secrets-settings.jsonl
@@ -59,8 +60,14 @@ recreate <name>` (A4 records whether an env-file create honours
 `off`), says to keep no secret in the store, and says that a sandbox
 with a writable share writes into every other sandbox.
 
+Amended on 2026-11-08 (as decided on 2026-11-08, security finding M3 of
+the review of the sbx 0.51 amendments; scope this repository): the row
+`skills-share-writable` (04 4.2, REQ-1398) reads every sandbox
+`sbx ls --json` lists, romeu's or not, and warns for each whose bind of
+the host's skills store is not read-only.
+
 - Implements: REQ-0370 (04 4.2), REQ-0373 (04 4.2), REQ-0374 (04 4.2),
-  REQ-1397 (04 4.2).
+  REQ-1397 (04 4.2), REQ-1398 (04 4.2).
 - Operator: no.
 - Acceptance:
   - Each row has a fixture with `HOME` in a temp dir, and its test
@@ -75,8 +82,12 @@ with a writable share writes into every other sandbox.
     `off`, no finding; a listing without the key falls under the next
     item, since sbx lists every key with its source (seen on
     2026-11-07).
+  - `skills-share-writable`: a listing with a sandbox romeu did not
+    create whose store bind is writable, a warning that names it; every
+    store bind read-only, no finding; a sandbox listed with no mounts,
+    skipped and named.
   - A settings listing of an unrecorded shape is the error
     `upstream-shape` on the rows that read it, and `doctor` exits 1.
 - Verify: `go test ./internal/cmd/romeu/doctor/ -run
-  '^TestDoctor(HostGitConfig|SbxRememberCommands|SbxAllowedSources|SbxSkillsShared)'
+  '^TestDoctor(HostGitConfig|SbxRememberCommands|SbxAllowedSources|SbxSkillsShared|SbxSkillsShareWritable)'
   -v`, which names the row tests this task adds.

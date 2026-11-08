@@ -27,6 +27,16 @@ pairs the `docker.io/sbx/claude` workload declares beats the allow rule
 sbx provisions from its descriptor, and survives a recreate under the
 same name.
 
+Amended on 2026-11-08 (scope this repository): measured by hand on
+2026-11-07, sbx v0.51.0 ([the in-place apply
+measurement](../../notes/in-place-apply-measurement.md)): the deny beats
+the provisioned allow and a portless allow of the same host, and does
+not survive a recreate under the same name, so, as decided on
+2026-11-07, the pin keeps the condition that romeu re-applies it after
+each create and recreate (Q2, REQ-1374); A19 showed that the agent
+reaches the engine's socket, and the engine row of 05 5.4 (REQ-1386)
+now accepts it by name, so the pin no longer waits on A19.
+
 Added on 2026-11-06 (scope this repository): Q2 of the index, as
 decided on 2026-11-06, the plain-HTTP row of 05 5.4 (REQ-1374) and 06
 6.2. Measured that day from both descriptor annotations: `sbx/claude`

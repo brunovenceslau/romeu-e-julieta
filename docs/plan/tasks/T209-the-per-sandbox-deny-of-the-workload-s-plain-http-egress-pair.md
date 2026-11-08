@@ -46,6 +46,15 @@ Added on 2026-11-06 (scope this repository): the plain-HTTP row of 05
 branch of T205's decision; on the other branches it is closed with the
 reason in its file, and T208 moves the pin without it.
 
+Amended on 2026-11-08 (scope this repository): measured by hand on
+2026-11-07, sbx v0.51.0 ([the in-place apply
+measurement](../../notes/in-place-apply-measurement.md)), the deny beats
+the provisioned allow but does not survive a recreate under the same
+name; as decided on 2026-11-07, this is the deny branch with that
+condition: step 4 applies the deny after each create and recreate, the
+same reconcile that runs on every `run`, and the survival clause of the
+goal above is history.
+
 1. The reconcile (REQ-0354): beside the allow rules, `run` step 4
    applies `sbx policy deny network --sandbox <name> <host>:<port>` for
    each pair the workload descriptor declares in its runtime egress
