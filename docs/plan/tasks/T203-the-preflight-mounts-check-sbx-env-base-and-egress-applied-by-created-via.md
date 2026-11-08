@@ -35,6 +35,13 @@ sitting: none
 
 # T203 - The preflight mounts check, sbx-env-base and egress-applied by --created-via
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create (04 4.2, REQ-1387,
+REQ-1405, REQ-1406). T217 builds it; where this task's text below says
+such a sandbox is refused, T217's text wins.
+
 Goal: the preflight lets sbx tell romeu what it mounted and what it
 merged: step 6 compares the mounts `sbx ls --json` lists with the
 render's, step 5 and `doctor` fail on a user-level `~/.sbxenv.yaml`,

@@ -14,6 +14,13 @@ sitting: none
 
 # T075 - The remaining scenario functions and the host suite
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create (04 4.2, REQ-1387,
+REQ-1405, REQ-1406). T217 builds it; where this task's text below says
+such a sandbox is refused, T217's text wins.
+
 Re-plan (2026-10-12): deferred to M6; the CI journeys with the fake
 cover J2, J3b, J6, J7, J10 and J11; the maintainer's own projects are
 the smoke steps. The J5 function (from T059) and the J8 function with

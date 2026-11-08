@@ -28,6 +28,13 @@ sitting: none
 
 # T068 - `romeu salvage`, `rm` and `recreate`
 
+Narrowed on 2026-11-08: a stopped sandbox whose recreate digests
+differ is now started with `sbx env exec <dir> -- true`, and refused
+only for an adopted generation or, by `run` and `pull`, when the spec
+removed a kit or a secrets binding since the create (04 4.2, REQ-1387,
+REQ-1405, REQ-1406). T217 builds it; where this task's text below says
+such a sandbox is refused, T217's text wins.
+
 Goal: `romeu salvage`, `rm` and `recreate`, whole.
 
 Re-plan (2026-10-12): Kept whole. The first uncommitted change lost to a
