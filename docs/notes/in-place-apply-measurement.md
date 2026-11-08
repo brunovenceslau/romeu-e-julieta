@@ -5,7 +5,7 @@ reader: whoever decides T210 item 2 or re-records A15 with the harness
 
 # The in-place apply measurement on sbx 0.51
 
-This note records two hand measurements, both run by the maintainer on
+This note records three hand measurements, all run by the maintainer on
 an Apple-silicon Mac with sbx v0.51.0 (7d55286d); sitting 1 records
 macOS 27.2. Dates and times are UTC.
 
@@ -15,6 +15,9 @@ macOS 27.2. Dates and times are UTC.
   sandbox of part C) and `rj-probe-b` (`docker.io/sbx/claude`).
 - Sitting 2, 2026-11-08, 01:06 to 01:13: protocol 2, on the throwaway
   sandboxes `rj2-a`, `rj2-b`, `rj2-k` and the never-created `rj2-ghost`.
+- Sitting 3, 2026-11-08, 05:57 to 06:07: protocol 3, on the throwaway
+  sandboxes `rj3-a`, `rj3-r`, `rj3-n`, `rj3-s`, `rj3-w` and the declined
+  `rj3-c`. Its results are in [Sitting 3](#sitting-3-declines-egress-against-root-ssh-and-four-more-stopped-starts).
 
 Quotes replace the host's home directory with `~`, an env directory
 with `<dir>`, and the em dash sbx prints before a status word with a
@@ -132,16 +135,16 @@ binding entry is written to sbx's credentials file that
   `waits for the next create`; after `y` and exit 0 the instance is kept
   (the same id) and the kit is not applied. Dropped from the file again,
   it becomes `no longer declared, never applied` and `1 to forget`.
-- **A declined plan.** Not measured: in both sittings the deliberate `n`
-  answers were typed `y`. In sitting 2 the stopped case was not prompted
+- **A declined plan.** Measured in sitting 3 (below). In sittings 1 and
+  2 the deliberate `n` answers were typed `y`. In sitting 2 the stopped case was not prompted
   at all, most likely because sbx remembered the approval given 6 s
   earlier; a start path that never prompts for `waits for the next
   create` items is not excluded. Two accidental answers of sitting 1
   stand in: `yy` on a running sandbox and an empty answer on a stopped
   one. Both exited 1 with `error: the plan for ... was not approved` and
   changed nothing; the stopped sandbox stayed stopped.
-- **A declined create.** Not measured (sitting 2, the same typing slip).
-  REQ-1212 of 01 1.6 stays an unmeasured row.
+- **A declined create.** Measured in sitting 3 (below); not in sitting 2,
+  by the same typing slip.
 - **The same changed file applied twice** (sitting 1): the second run
   asked nothing, exited 0 and changed nothing. Nothing applied either
   time.
@@ -198,8 +201,8 @@ binding entry is written to sbx's credentials file that
   found` and exited **0**, with the flags and without them.
 - `sbx env rm --force --no-input --prune-bindings` removed the sandbox
   and printed `Removed secrets scoped to rj2-b`, with the file declaring
-  the secret again; whether the flag is what removed it was not
-  measured.
+  the secret again; sitting 3 shows that `env rm` without the flag
+  removes it too.
 
 ## The offer to create a sandbox (sitting 2)
 
@@ -236,7 +239,7 @@ the agent. On the current pin `docker.io/docker/sbx-kit-claude`
 (`rj-probe-a`) dockerd and containerd also run as root, with the agent
 in the `sudo` and `docker` groups; its socket and a `docker run` were
 not read. `sudo -n` works on both workloads. Whether root inside the
-sandbox can bypass sbx's egress rules was not tried.
+sandbox can bypass sbx's egress rules was tried in sitting 3 (below).
 
 A per-sandbox `sbx policy deny network` on `deb.debian.org:80` and on
 `dhi.io:80` beat the allow sbx provisions from the workload's
@@ -248,43 +251,134 @@ recreate under the same name. sbx's global rule
 `default-code-and-containers` also allows `dhi.io:80` for every
 sandbox.
 
+## Sitting 3: declines, egress against root, SSH and four more stopped starts
+
+Each sandbox was created with `sbx env run -d -f <dir>`. Prompts that
+the protocol meant to decline were answered with an empty line.
+
+### Declines
+
+- **A declined plan on a running sandbox** (`rj3-a`, a kit never
+  approved added to the file): `sbx env run -d <dir>` showed the plan;
+  the empty answer printed `error: the plan for <dir>/sbxenv.yaml was
+  not approved`, exit 1. `rj3-a` stayed running, and the next
+  `sbx env plan` still listed the kit as `waits for the next create`,
+  `not approved yet`.
+- **A declined plan on a stopped sandbox** (`rj3-a`, another such kit):
+  the prompt appeared, the empty answer gave the same error, exit 1,
+  and `rj3-a` stayed stopped.
+- **A declined create** (`rj3-c`, with such a kit): the same error,
+  exit 1. No sandbox existed at once or 40 s later, `sbx inspect` said
+  not found, and no git remote `sandbox-rj3-c` was left.
+- **A create with `-f` records no approval.** The plan after it listed
+  every base item as `unchanged, needs your approval`, and a later
+  start without `-f` prompted for them.
+
+### Egress against root
+
+On `rj3-r`, as the agent user and as root alike: `example.com` through
+the proxy answered 403, and `example.com` and `1.1.1.1` with
+`--noproxy` made no connection (curl's `000`). Then, as root, the
+in-sandbox `iptables`, `iptables-legacy`, `ip6tables` and `nft` rules
+were flushed and the proxy variables unset: `example.com` and
+`1.1.1.1` still made no connection, while `api.github.com`, a host the
+policy allows, answered 200 directly, with no proxy. Raw TCP connects
+to `8.8.8.8:53` and `1.1.1.1:443` reported open in every case, before
+and after the flush, while HTTP to the same hosts failed; that an
+interceptor outside the sandbox completes the handshake and then
+applies the policy is inferred. So a denied destination stays denied
+for root, the in-sandbox firewall plays no part in it, and an allowed
+host is reachable without the proxy variables.
+
+### SSH
+
+- The `sign: [git]` restriction holds on sbx v0.51.0: inside, with the
+  key forwarded, `ssh-keygen -Y sign -n git` wrote a signature and
+  `-n file` failed with `agent refused operation`.
+- An exec whose `SSH_AUTH_SOCK` names an empty agent: inside, `The
+  agent has no identities`; a later exec with `SSH_AUTH_SOCK` unset
+  still listed none, so the empty agent replaced the one forwarded
+  before.
+- An exec whose `SSH_AUTH_SOCK` names a path with no socket: the exec
+  ran, and inside `communication with agent failed`, also on a later
+  exec with `SSH_AUTH_SOCK` unset.
+- A start (`sbx env run -d <dir>`) with the empty agent was accepted
+  and the sandbox listed no identities; with a path with no socket it
+  was accepted, exit 0, and the agent inside failed the same way.
+  (Sitting 1: with `SSH_AUTH_SOCK` unset the start refuses.)
+- A sandbox whose kits lack `ssh-agent@1` (`rj3-n`), exec with a
+  loaded agent: `SSH_AUTH_SOCK` unset inside and `Could not open a
+  connection to your authentication agent`, so nothing is forwarded
+  without the capability.
+- sbx settings: `ssh.agentSocketPath` empty,
+  `ssh.agentForwardingEnabled` true, `env.rememberHostCommands` false.
+
+### Rules and secrets
+
+- With a deny on `example.org:80` and an allow on `example.org` both on
+  `rj3-a`, `sbx policy rm network --sandbox rj3-a --resource
+  example.org --force --no-input` removed only the allow; the deny
+  stayed, and `sbx policy check` said `Denied` for ports 80 and 443. A
+  second removal of the same resource failed with `rule not found`.
+- `sbx env rm <dir> --force --no-input` without `--prune-bindings`
+  printed `Removed secrets scoped to rj3-s`; `sbx secret ls --sandbox
+  rj3-s` was then empty, and a same-name create from a file without
+  the binding had no secret. A sandbox-scoped secret from the env file
+  goes with the sandbox.
+
+### Four more stopped starts by exec
+
+On `rj3-w`, for each kind: a marker written inside, `sbx stop`, the env
+file changed in that kind, then `sbx env exec <dir> -- true`.
+
+| kind | started | prompt | in force after the start |
+|---|---|---|---|
+| kit removed | yes, exit 0 | none | the kit's file (`v1`) and its `example.net` rule |
+| repo removed | yes, exit 0 | none | the mount, read-write |
+| workspace `readOnly` | yes, exit 0 | none | the mount, read-write |
+| `rootSize` 20g to 30g | yes, exit 0 | none | root 20G |
+
+The marker was present after each start. For the first three kinds,
+`sbx env exec -it <dir>` on the running sandbox also exited 0, with no
+prompt, and changed nothing. With sitting 1, six kinds are measured:
+kit added, repo added, kit removed, repo removed, workspace
+`readOnly`, `rootSize`.
+
+### Ports
+
+`sbx env plan` accepts T037's entry shape `{sandbox, host, protocol,
+hostIP}` and lists `+ 18080/tcp - waits for the next create` with the
+host port and `hostIP`; without `protocol` it shows `18080/tcp4`. The
+entry was planned only, not applied.
+
 ## Outcome for T210 item 2
 
-- The stopped-start reading holds for the two kinds measured with
-  `sbx env exec`: a kit added and a repo added. Whether that is enough
-  to lift the refusals of REQ-1376 and REQ-1387 is the maintainer's
-  decision.
+- The stopped-start reading holds for the six kinds measured with
+  `sbx env exec`. On 2026-11-08 the maintainer lifted the refusals of
+  REQ-1376 and REQ-1387, except for a kit or a secrets binding removed
+  since the create and for an adopted generation (04 4.2, `run` step 3).
 - Nothing passes the apply, so the in-place apply row of Deferred
   decisions stays deferred, with this note as its evidence.
 - On a running sandbox, `sbx env exec <dir> -- true` and `sbx env exec
-  -it <dir>` did not read the changed file for the kinds tried; `-it`
-  was tried for a kit added only, so REQ-1388 stays open for the other
-  kinds.
+  -it <dir>` did not read the changed file for the kinds tried: `-it`
+  for a kit added (sitting 2) and for the three kinds of sitting 3.
 
 ## Not measured
 
-- The `ports` entry on both states. Sitting 1 refused a string; sitting
-  2 refused the mapping `{host_ip, host_port, sandbox_port, protocol}`
-  guessed from `sbx ls --json` with `unknown field`, exit 1. T037's
-  shape `{sandbox, host, protocol, hostIP}` was not tried, and no
-  accepted form is known.
-- `agent` alone, with an agent name that matches the workload kit.
-- A repo removed on a stopped sandbox (the plan was declined).
+- A killed apply on a present sandbox, and `agent` alone, with an agent
+  name that matches the workload kit; A15 records both.
+- The `ports` entry applied, on either state (only planned).
 - The inside read of a workspace `target` change on a running sandbox.
 - `dockerSize` inside the sandbox (the script reads no Docker volume).
-- A deliberately declined plan, on both states, and a declined create.
-- An apply killed mid-run on a present sandbox.
-- `sbx env exec -it <dir>` with a changed env file of any kind other
-  than a kit added.
+- A stopped start by exec for kit content, workload, ports,
+  `dockerSize`, `clonedWorkspaceSize`, `agent`, a workspace `target`,
+  and a secrets binding added or removed.
+- A stopped start by exec with `SSH_AUTH_SOCK` unset on a sandbox whose
+  kit has `ssh-agent@1`, and one under `--no-input`.
+- `sbx env exec -it <dir>` with a changed env file of the kinds not
+  named above.
 - Whether a create without `-f` records approval of the items other
   than the launch, which is romeu's path.
 - The Docker restart of A15 and `ssh-add -L` after it (left out, since
   it reaches every sandbox on the host).
-- sbx's `ssh.agentSocketPath` setting, forwarding into a sandbox whose
-  kit lacks `ssh-agent@1`, and whether the `sign: [git]` restriction
-  measured on sbx v0.48.0 still holds.
-- Whether root inside the sandbox bypasses sbx's egress rules (a raw IP,
-  the proxy variables unset, the VM's netfilter rules flushed).
-- Whether a same-name recreate after `sbx env rm` without
-  `--prune-bindings` inherits a sandbox-scoped secret.
 - Intel hosts: one host only, which part C allows; REQ-0979 stays open.
