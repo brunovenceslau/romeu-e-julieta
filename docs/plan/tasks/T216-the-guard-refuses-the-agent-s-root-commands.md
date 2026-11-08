@@ -10,7 +10,8 @@ owns:
   - kits/julieta-claude/skills/julieta/SKILL.md
   - kits/julieta-claude/julieta-claude.yaml
   - internal/agent/claude/digest.go
-  - internal/agent/claude/payload_test.go
+  - internal/agent/claude/claude_test.go
+  - internal/agent/claude/installed_test.go
   - e2e/kit_julieta_claude_test.go
 needs: []
 after:
