@@ -1,34 +1,35 @@
 # Farewell, fun little thing
 
-Deciding what not to build is the most important decision an
-experienced engineer makes, and a fun hobby project is where it is
-hardest: the building itself is the reward, so there is never an
-obvious moment to stop. With agents doing the building, the fun never
-runs out. This project showed me that in work like this the stop has
-to come from a rule I set for myself, before I need it.
+Knowing when to stop, and writing down why, is part of the job. A fun
+hobby project is where that is hardest: the building itself is the
+reward, so there is never an obvious moment to stop, and with agents
+doing the building the fun never runs out. This project showed me that
+in work like this the stop has to be a rule I set for myself, before I
+need it.
 
 The finding is about agent loops. Agents are tireless at producing
 specification and at approving it: a reviewer agent finds a gap, and
-the gap becomes a requirement. None of them asks whether anyone uses
-the thing yet. In a hobby project that question is mine to ask, so it
-has to be a gate in the process, not a line in a plan. Meanwhile the
-ground moved: Docker Sandboxes, still pre-1.0, shipped faster than a
-wrapper around it could follow, and Claude Code's own memory made
-julieta's unnecessary.
+the gap becomes a requirement. Nothing in the loop asked for use before
+more spec. The re-plan of 2026-10-12 put "daily use first" in writing,
+and the daily-use sessions it planned never ran. That question is mine
+to ask, so it has to be a gate in the process, not a line in a plan.
+Meanwhile the ground moved: Docker Sandboxes, still pre-1.0, changed
+faster than a wrapper around it could follow, and Claude Code's own
+memory, once it persisted on the host, made the memory tool built here
+unnecessary.
 
-The useful parts did not stop with it: they moved to other projects
-and run there every day. One signing key for commits, git hooks in
-every repo, a pinned toolchain, the guard that keeps an agent from
-merging or tagging, and a measurement discipline that writes the tool
-version, the date and the command next to every claim.
+The useful parts outlived it. They are small, and they live on in my
+sandbox configuration: one signing key for commits, git hooks in every
+repo, a pinned toolchain, a guard that keeps an agent from merging or
+tagging, and the habit of writing the tool version, the date and the
+command next to every measured claim.
 
-Why it mattered: I now know from my own work, not from a blog post,
-where agent-driven work goes wrong: it produces volume, approves volume,
-and never asks for real use. When the only feedback is the system's own
-(green pull requests, approving reviewers, a growing spec), every day
-looks productive. The practice I carry forward: real use is a gate
-before more spec, and the call to stop is made against usage, not
-against progress.
+It mattered because I now know first-hand where agent-driven work goes
+wrong: it produces volume, approves volume, and never asks for real
+use. When the only feedback is the system's own (green pull requests,
+approving reviewers, a growing spec), every day looks productive. The
+practice I carry forward: real use is a gate before more spec, and the
+call to stop is made against usage, not against progress.
 
 Thank you for reading. Goodbye, fun little thing: you taught me more
 than you ever shipped.
@@ -148,7 +149,7 @@ The ideas that held up, each with its record in [docs/adr/](docs/adr/)
   (Accepted).
 - The re-plan for early daily use:
   [ADR 0014](docs/adr/0014-re-plan-v1-for-early-daily-use-task-files-registration-by-file-build-order-dogfood-before-recording.md)
-  (Proposed), worth reading next to the farewell below.
+  (Proposed), worth reading next to the farewell above.
 
 The code is GPL-3.0-only, and `examples/` and `schemas/` are CC0-1.0
 ([LICENSES/](LICENSES/)).
