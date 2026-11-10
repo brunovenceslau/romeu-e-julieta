@@ -122,7 +122,7 @@ The code is GPL-3.0-only, and `examples/` and `schemas/` are CC0-1.0
 
 `go run ./tools/planviewer` writes `plan-viewer.html` at the repository root (git ignores it) and prints its path. The page is one file with no network use: each task of `docs/plan/tasks` is a node, colored by status, with its dependencies as edges. Run it again to refresh it. `go run ./tools/planviewer -ready` prints the ready ids, the same as `go run ./tools/ci plan --ready`.
 
-## Farewell
+# Farewell, fun little thing
 
 Deciding what not to build is the most important decision an
 experienced engineer makes, and the hardest. This project is where I
@@ -153,4 +153,5 @@ loop is the system's own (green pull requests, approving reviewers, a
 growing spec), every day feels productive. That is the lesson I carry
 into daily work with agents: put real use in the loop before more spec.
 
-Thank you for reading, and goodbye.
+Thank you for reading. Goodbye, fun little thing: you taught me more
+than you ever shipped.
