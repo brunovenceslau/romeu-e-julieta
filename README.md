@@ -1,33 +1,34 @@
 # Farewell, fun little thing
 
 Deciding what not to build is the most important decision an
-experienced engineer makes, and the hardest. This project is where I
-learned to make it, late and at a cost, but I was the one who pulled
-the brake: no deadline or manager did.
+experienced engineer makes, and a fun hobby project is where it is
+hardest: the building itself is the reward, so there is never an
+obvious moment to stop. With agents doing the building, the fun never
+runs out. This project showed me that in work like this the stop has
+to come from a rule I set for myself, before I need it.
 
-Agents are excellent at producing more specification and approving more
-volume, and poor at saying "stop and use it". Eighteen rounds of agent
-review each added requirements, and nothing in the loop required real
-use before more spec. The re-plan of 2026-10-12 asked for daily use
-first, in writing, and still no use session happened. At the stop the
-specification held 1409 requirement ids, with zero use sessions and
-zero recorded lost work that the tool would have prevented. A wrapper
-around a pre-1.0 dependency, Docker Sandboxes, moved slower than the
-dependency itself, and Claude Code's own memory made julieta's memory
-unnecessary.
+The finding is about agent loops. Agents are tireless at producing
+specification and at approving it: a reviewer agent finds a gap, and
+the gap becomes a requirement. None of them asks whether anyone uses
+the thing yet. In a hobby project that question is mine to ask, so it
+has to be a gate in the process, not a line in a plan. Meanwhile the
+ground moved: Docker Sandboxes, still pre-1.0, shipped faster than a
+wrapper around it could follow, and Claude Code's own memory made
+julieta's unnecessary.
 
-The small pieces worked in daily use and live on elsewhere: one signing
-key for commits, git hooks in every repo, a pinned toolchain, the guard
-that keeps an agent from merging or tagging, and a measurement
-discipline that wrote the tool version, the date and the command next
-to every claim.
+The useful parts did not stop with it: they moved to other projects
+and run there every day. One signing key for commits, git hooks in
+every repo, a pinned toolchain, the guard that keeps an agent from
+merging or tagging, and a measurement discipline that writes the tool
+version, the date and the command next to every claim.
 
-Why it mattered: six weeks taught me, in my own work and in detail,
-where working with agents misleads: in producing volume, in approving
-volume, in never asking for real use. When the only feedback in the
-loop is the system's own (green pull requests, approving reviewers, a
-growing spec), every day feels productive. That is the lesson I carry
-into daily work with agents: put real use in the loop before more spec.
+Why it mattered: I now know from my own work, not from a blog post,
+where agent-driven work goes wrong: it produces volume, approves volume,
+and never asks for real use. When the only feedback is the system's own
+(green pull requests, approving reviewers, a growing spec), every day
+looks productive. The practice I carry forward: real use is a gate
+before more spec, and the call to stop is made against usage, not
+against progress.
 
 Thank you for reading. Goodbye, fun little thing: you taught me more
 than you ever shipped.
