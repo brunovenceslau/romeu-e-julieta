@@ -1,3 +1,37 @@
+# Farewell, fun little thing
+
+Deciding what not to build is the most important decision an
+experienced engineer makes, and the hardest. This project is where I
+learned to make it, late and at a cost, but I was the one who pulled
+the brake: no deadline or manager did.
+
+Agents are excellent at producing more specification and approving more
+volume, and poor at saying "stop and use it". Eighteen rounds of agent
+review each added requirements, and nothing in the loop required real
+use before more spec. The re-plan of 2026-10-12 asked for daily use
+first, in writing, and still no use session happened. At the stop the
+specification held 1409 requirement ids, with zero use sessions and
+zero recorded lost work that the tool would have prevented. A wrapper
+around a pre-1.0 dependency, Docker Sandboxes, moved slower than the
+dependency itself, and Claude Code's own memory made julieta's memory
+unnecessary.
+
+The small pieces worked in daily use and live on elsewhere: one signing
+key for commits, git hooks in every repo, a pinned toolchain, the guard
+that keeps an agent from merging or tagging, and a measurement
+discipline that wrote the tool version, the date and the command next
+to every claim.
+
+Why it mattered: six weeks taught me, in my own work and in detail,
+where working with agents misleads: in producing volume, in approving
+volume, in never asking for real use. When the only feedback in the
+loop is the system's own (green pull requests, approving reviewers, a
+growing spec), every day feels productive. That is the lesson I carry
+into daily work with agents: put real use in the loop before more spec.
+
+Thank you for reading. Goodbye, fun little thing: you taught me more
+than you ever shipped.
+
 # romeu-e-julieta
 
 **Status: paused on 2026-11-09 and archived. The repository is read-only;
@@ -121,37 +155,3 @@ The code is GPL-3.0-only, and `examples/` and `schemas/` are CC0-1.0
 ## The plan viewer
 
 `go run ./tools/planviewer` writes `plan-viewer.html` at the repository root (git ignores it) and prints its path. The page is one file with no network use: each task of `docs/plan/tasks` is a node, colored by status, with its dependencies as edges. Run it again to refresh it. `go run ./tools/planviewer -ready` prints the ready ids, the same as `go run ./tools/ci plan --ready`.
-
-# Farewell, fun little thing
-
-Deciding what not to build is the most important decision an
-experienced engineer makes, and the hardest. This project is where I
-learned to make it, late and at a cost, but I was the one who pulled
-the brake: no deadline or manager did.
-
-Agents are excellent at producing more specification and approving more
-volume, and poor at saying "stop and use it". Eighteen rounds of agent
-review each added requirements, and nothing in the loop required real
-use before more spec. The re-plan of 2026-10-12 asked for daily use
-first, in writing, and still no use session happened. At the stop the
-specification held 1409 requirement ids, with zero use sessions and
-zero recorded lost work that the tool would have prevented. A wrapper
-around a pre-1.0 dependency, Docker Sandboxes, moved slower than the
-dependency itself, and Claude Code's own memory made julieta's memory
-unnecessary.
-
-The small pieces worked in daily use and live on elsewhere: one signing
-key for commits, git hooks in every repo, a pinned toolchain, the guard
-that keeps an agent from merging or tagging, and a measurement
-discipline that wrote the tool version, the date and the command next
-to every claim.
-
-Why it mattered: six weeks taught me, in my own work and in detail,
-where working with agents misleads: in producing volume, in approving
-volume, in never asking for real use. When the only feedback in the
-loop is the system's own (green pull requests, approving reviewers, a
-growing spec), every day feels productive. That is the lesson I carry
-into daily work with agents: put real use in the loop before more spec.
-
-Thank you for reading. Goodbye, fun little thing: you taught me more
-than you ever shipped.
